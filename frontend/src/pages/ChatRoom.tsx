@@ -1,7 +1,7 @@
 // import { useEffect, useRef, useState } from 'react';
 // import { io, Socket } from 'socket.io-client';
 
-// const SOCKET_URL = 'http://localhost:3000';
+// const SOCKET_URL = '';
 
 // interface Message {
 //   nickname: string;
@@ -352,7 +352,11 @@
 
 // export default ChatRoom;
 
-import { useEffect, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL =
@@ -401,7 +405,10 @@ export default function ChatRoom() {
   const inputRef = useRef<HTMLInputElement>(null);
   
   // Inactivity timer refs
-  const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
+const inactivityTimer =
+  useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const INACTIVITY_LIMIT = 2 * 60 * 1000; // 2 minutes
 
   const fmt = (d?: string) => d ? new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true }) : '';
