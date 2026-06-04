@@ -135,6 +135,45 @@
 
 
 
+// import { useState } from 'react';
+// import { useNavigate } from 'react-router-dom';
+// import axios from 'axios';
+
+// const API_URL =
+//   import.meta.env.VITE_API_URL ||
+//   'https://backend-9i6w.onrender.com/api';
+
+// export default function JoinRoom() {
+//   const navigate = useNavigate();
+//   const [nickname, setNickname] = useState('');
+//   const [passcode, setPasscode] = useState('');
+//   const [loading, setLoading] = useState(false);
+
+//   const joinRoom = async () => {
+//     if (!nickname.trim() || !passcode.trim()) {
+//       alert('Please enter nickname and passcode');
+//       return;
+//     }
+//     try {
+//       setLoading(true);
+//       const { data } = await axios.post(`${API_URL}/rooms/join`, {
+//         nickname: nickname.trim(),
+//         passcode: passcode.trim(),
+//       });
+
+//       localStorage.setItem('nickname', nickname.trim());
+//       localStorage.setItem('passcode', passcode.trim());
+//       if (data?.room?.id) {
+//         localStorage.setItem('roomId', data.room.id.toString());
+//       }
+//       navigate('/chat');
+//     } catch (error: any) {
+//       console.error(error);
+//       alert(error?.response?.data?.message || 'Unable to join room');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -145,6 +184,7 @@ const API_URL =
 
 export default function JoinRoom() {
   const navigate = useNavigate();
+
   const [nickname, setNickname] = useState('');
   const [passcode, setPasscode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -154,27 +194,52 @@ export default function JoinRoom() {
       alert('Please enter nickname and passcode');
       return;
     }
+
     try {
       setLoading(true);
-      const { data } = await axios.post(`${API_URL}/rooms/join`, {
-        nickname: nickname.trim(),
-        passcode: passcode.trim(),
-      });
 
-      localStorage.setItem('nickname', nickname.trim());
-      localStorage.setItem('passcode', passcode.trim());
-      if (data?.room?.id) {
-        localStorage.setItem('roomId', data.room.id.toString());
+      console.log('API_URL:', API_URL);
+
+      const response = await axios.post(
+        `${API_URL}/rooms/join`,
+        {
+          nickname: nickname.trim(),
+          passcode: passcode.trim(),
+        },
+      );
+
+      const data = response.data;
+
+      localStorage.setItem(
+        'nickname',
+        nickname.trim(),
+      );
+
+      localStorage.setItem(
+        'passcode',
+        passcode.trim(),
+      );
+
+      if (data.roomId) {
+        localStorage.setItem(
+          'roomId',
+          data.roomId.toString(),
+        );
       }
+
       navigate('/chat');
     } catch (error: any) {
       console.error(error);
-      alert(error?.response?.data?.message || 'Unable to join room');
+
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          'Unable to join room',
+      );
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <div className="join-wrap">
       <div className="orb o1" />
