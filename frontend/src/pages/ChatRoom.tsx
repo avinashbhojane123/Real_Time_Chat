@@ -355,7 +355,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = (import.meta as any).env?.SOCKET_URL || 'http://localhost:3000';
+const SOCKET_URL = (import.meta as any).env?.SOCKET_URL || 'https://backend-9i6w.onrender.com';
 
 interface Message {
   nickname: string;
