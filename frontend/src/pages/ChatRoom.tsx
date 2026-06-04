@@ -1,7 +1,7 @@
 // import { useEffect, useRef, useState } from 'react';
 // import { io, Socket } from 'socket.io-client';
 
-// const SOCKET_URL = '';
+// const SOCKET_URL = (import.meta as any).env?.VITE_SOCKET_URL || 'https://backend-9i6w.onrender.com';
 
 // interface Message {
 //   nickname: string;
