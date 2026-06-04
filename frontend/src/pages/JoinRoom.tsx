@@ -141,7 +141,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'https://backend-9i6w.onrender.com/api';
+const SOCKET_URL =
+  (import.meta as any).env?.VITE_SOCKET_URL ||
+  'https://backend-9i6w.onrender.com';
 
 export default function JoinRoom() {
   const navigate = useNavigate();
