@@ -1,3 +1,54 @@
+// import {
+//   Entity,
+//   PrimaryGeneratedColumn,
+//   Column,
+//   CreateDateColumn,
+//   UpdateDateColumn,
+//   ManyToOne,
+//   JoinColumn,
+// } from 'typeorm';
+
+// import { Room } from '../rooms/room.entity';
+
+// @Entity('users')
+// export class User {
+//   @PrimaryGeneratedColumn()
+//   id!: number;
+
+//   @Column({
+//     length: 50,
+//   })
+//   nickname!: string;
+
+//   @Column({
+//     default: false,
+//   })
+//   isOnline!: boolean;
+
+//   @Column({
+//     nullable: true,
+//     type: 'timestamptz',
+//   })
+//   lastSeen!: Date| null;
+
+//   @ManyToOne(() => Room, (room) => room.users, {
+//     onDelete: 'CASCADE',
+//   })
+//   @JoinColumn({
+//     name: 'roomId',
+//   })
+//   room!: Room;
+
+//   @Column()
+//   roomId!: number;
+
+//   @CreateDateColumn()
+//   createdAt!: Date;
+
+//   @UpdateDateColumn()
+//   updatedAt!: Date;
+// }
+
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -16,6 +67,7 @@ export class User {
   id!: number;
 
   @Column({
+    type: 'varchar',
     length: 50,
   })
   nickname!: string;
@@ -26,14 +78,18 @@ export class User {
   isOnline!: boolean;
 
   @Column({
-    nullable: true,
     type: 'timestamptz',
+    nullable: true,
   })
-  lastSeen!: Date| null;
+  lastSeen!: Date | null;
 
-  @ManyToOne(() => Room, (room) => room.users, {
-    onDelete: 'CASCADE',
-  })
+  @ManyToOne(
+    () => Room,
+    (room) => room.users,
+    {
+      onDelete: 'CASCADE',
+    },
+  )
   @JoinColumn({
     name: 'roomId',
   })
@@ -47,4 +103,32 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  deviceType!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
+  deviceModel!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  browser!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  os!: string | null;
 }
