@@ -72,7 +72,7 @@ test() {
         file.size,
 
       fileUrl:
-        `http://localhost:3000/api/uploads/${file.filename}`,
+        `https://backend-9i6w.onrender.com/api/uploads/${file.filename}`,
     };
   }
 }
