@@ -591,6 +591,7 @@
 
 // export default ChatRoom;
 
+}
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
@@ -730,12 +731,10 @@ export default function ChatRoom() {
     });
 
     socket.on('chatHistory', (data: Message[]) => {
-      console.log('History received:', data.length);
       setMessages(data || []);
     });
 
     socket.on('newMessage', (data: Message) => {
-      console.log('New message:', data.id);
       setMessages((prev) => {
         const exists = prev.some((msg) => msg.id === data.id);
         return exists ? prev : [...prev, data];
@@ -851,6 +850,7 @@ export default function ChatRoom() {
   };
 
   const onlineCount = users.filter((u) => u.isOnline).length;
+  const [myBg, myFg] = avatarColor(nickname);
 
   // ── File renderer ────────────────────────────────────────────────────────────
 
@@ -861,24 +861,24 @@ export default function ChatRoom() {
 
     if (fileType?.startsWith('image/')) {
       return (
-        <a href={src} target="_blank" rel="noreferrer">
-          <img src={src} alt={fileName} className="cr-file-img" />
+        <a href={src} target="_blank" rel="noreferrer" className="d-block mt-1">
+          <img src={src} alt={fileName} className="img-fluid rounded" style={{ maxHeight: '250px' }} />
         </a>
       );
     }
     if (fileType?.startsWith('video/')) {
       return (
-        <video controls className="cr-file-video">
+        <video controls className="w-100 rounded mt-1" style={{ maxWidth: '300px' }}>
           <source src={src} type={fileType} />
         </video>
       );
     }
     if (fileType?.startsWith('audio/')) {
-      return <audio controls src={src} className="cr-file-audio" />;
+      return <audio controls src={src} className="w-100 mt-1" style={{ minWidth: '220px' }} />;
     }
     if (fileType === 'application/pdf') {
       return (
-        <iframe src={src} title={fileName} className="cr-file-pdf" />
+        <iframe src={src} title={fileName} className="w-100 rounded mt-1" style={{ height: '300px', border: 'none' }} />
       );
     }
 
@@ -890,11 +890,11 @@ export default function ChatRoom() {
       fileType === 'text/plain' || fileType === 'application/json' ? '📄' : '📎';
 
     return (
-      <a href={src} target="_blank" rel="noreferrer" download className="cr-file-link">
-        <span className="cr-file-icon">{icon}</span>
-        <div className="cr-file-meta">
-          <span className="cr-file-name">{fileName}</span>
-          {fileSize && <span className="cr-file-size">{formatFileSize(fileSize)}</span>}
+      <a href={src} target="_blank" rel="noreferrer" download className="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-2 mt-1 text-start text-wrap text-break" style={{ maxWidth: '260px' }}>
+        <span style={{ fontSize: '1.25rem' }}>{icon}</span>
+        <div className="min-w-0">
+          <div className="text-truncate" style={{ fontSize: '0.85rem' }}>{fileName}</div>
+          {fileSize && <small className="text-white-50" style={{ fontSize: '0.75rem' }}>{formatFileSize(fileSize)}</small>}
         </div>
       </a>
     );
@@ -903,150 +903,144 @@ export default function ChatRoom() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="cr-wrap">
-      {/* ── Sidebar ── */}
-      <aside className="cr-sidebar">
-        <div className="cr-sidebar-header">
-          <div
-            className="cr-my-avatar"
-            style={{ background: avatarColor(nickname)[0], color: avatarColor(nickname)[1] }}
-          >
-            {nickname.slice(0, 2).toUpperCase()}
+    <div className="d-flex flex-column vh-100 w-100 bg-dark text-light overflow-hidden">
+      
+      {/* ── Navbar Header (With Profile Info Built-in) ── */}
+      <nav className="navbar navbar-dark bg-secondary bg-gradient bg-opacity-25 border-bottom border-secondary border-opacity-25 px-3 flex-shrink-0">
+        <div className="container-fluid p-0 d-flex align-items-center justify-content-between">
+          <div className="d-flex align-items-center gap-2">
+            <span className="fs-4">💬</span>
+            <div>
+              <h1 className="navbar-brand m-0 fs-6 fw-bold">Chat Room</h1>
+              <small className="text-white-50 d-block" style={{ fontSize: '0.75rem' }}>
+                {onlineCount} {onlineCount === 1 ? 'member' : 'members'} online
+              </small>
+            </div>
           </div>
-          <div>
-            <div className="cr-my-name">{nickname}</div>
-            <div className="cr-online-badge">
-              <span className="cr-dot-green" />
-              {onlineCount} online
+
+          {/* Current User details on the right */}
+          <div className="d-flex align-items-center gap-2">
+            <div className="text-end d-none d-sm-block">
+              <div className="fw-semibold text-truncate" style={{ fontSize: '0.9rem', maxWidth: '150px' }}>{nickname}</div>
+              <small className="text-success d-flex align-items-center justify-content-end gap-1" style={{ fontSize: '0.75rem' }}>
+                <span className="d-inline-block bg-success rounded-circle" style={{ width: '6px', height: '6px' }} />
+                Active
+              </small>
+            </div>
+            <div 
+              className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+              style={{ width: '40px', height: '40px', background: myBg, color: my開g || myFg, fontSize: '0.85rem', letterSpacing: '0.5px' }}
+            >
+              {nickname.slice(0, 2).toUpperCase()}
             </div>
           </div>
         </div>
+      </nav>
 
-        <div className="cr-sidebar-label">Members</div>
-        <ul className="cr-user-list">
-          {users.map((u) => {
-            const [bg, fg] = avatarColor(u.nickname);
+      {/* ── Messages Display Container ── */}
+      <div ref={chatRef} className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2" style={{ scrollbarWidth: 'thin' }}>
+        {messages.map((msg, i) => {
+          const me = msg.nickname === nickname;
+          const sys = msg.nickname === 'System';
+
+          if (sys) {
             return (
-              <li key={u.id} className="cr-user-item">
-                <div className="cr-user-avatar" style={{ background: bg, color: fg }}>
-                  {u.nickname.slice(0, 2).toUpperCase()}
-                  <span className={`cr-status-dot ${u.isOnline ? 'cr-status-on' : 'cr-status-off'}`} />
-                </div>
-                <div className="cr-user-info">
-                  <span className="cr-user-name">{u.nickname}</span>
-                  {!u.isOnline && u.lastSeen && (
-                    <span className="cr-user-lastseen">{fmt(u.lastSeen)}</span>
-                  )}
-                  {u.browser && u.os && (
-                    <span className="cr-user-device">{u.browser} · {u.os}</span>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </aside>
-
-      {/* ── Main area ── */}
-      <div className="cr-main">
-        {/* Header */}
-        <header className="cr-header">
-          <div className="cr-header-icon">💬</div>
-          <div>
-            <div className="cr-header-title">Chat Room</div>
-            <div className="cr-header-sub">
-              {onlineCount} member{onlineCount !== 1 ? 's' : ''} online
-            </div>
-          </div>
-        </header>
-
-        {/* Messages */}
-        <div ref={chatRef} className="cr-messages">
-          {messages.map((msg, i) => {
-            const me = msg.nickname === nickname;
-            const sys = msg.nickname === 'System';
-
-            if (sys) {
-              return (
-                <div key={msg.id ?? `sys-${i}`} className="cr-sys-msg">
-                  <span>{msg.message}</span>
-                </div>
-              );
-            }
-
-            const [bg, fg] = avatarColor(msg.nickname);
-            return (
-              <div
-                key={msg.id ?? `${msg.nickname}-${msg.createdAt}-${i}`}
-                className={`cr-msg-row ${me ? 'cr-msg-me' : 'cr-msg-other'}`}
-                onClick={() => setReplyTo(msg)}
-                title="Click to reply"
-              >
-                {!me && (
-                  <div className="cr-msg-avatar" style={{ background: bg, color: fg }}>
-                    {msg.nickname.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <div className="cr-msg-body">
-                  {!me && <div className="cr-msg-nick">{msg.nickname}</div>}
-
-                  {/* Reply preview */}
-                  {msg.replyTo && (
-                    <div className={`cr-reply-preview ${me ? 'cr-reply-me' : ''}`}>
-                      <span className="cr-reply-nick">{msg.replyTo.nickname}</span>
-                      <span className="cr-reply-text">
-                        {msg.replyTo.message || '📁 Attachment'}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className={`cr-bubble ${me ? 'cr-bubble-me' : 'cr-bubble-other'}`}>
-                    {msg.message && <div className="cr-bubble-text">{msg.message}</div>}
-                    {renderFile(msg)}
-                  </div>
-
-                  {msg.createdAt && (
-                    <div className={`cr-msg-time ${me ? 'cr-time-me' : ''}`}>
-                      {fmt(msg.createdAt)}
-                    </div>
-                  )}
-                </div>
+              <div key={msg.id ?? `sys-${i}`} className="align-self-center text-center px-3 py-1 rounded-pill bg-light bg-opacity-10 border border-light border-opacity-10 text-white-50 m-1" style={{ fontSize: '0.75rem', maxWidth: '80%' }}>
+                <span>{msg.message}</span>
               </div>
             );
-          })}
+          }
 
-          {typingUser && (
-            <div className="cr-typing-indicator">
-              <span className="cr-typing-dot" /><span className="cr-typing-dot" /><span className="cr-typing-dot" />
-              <span className="cr-typing-name">{typingUser} is typing…</span>
-            </div>
-          )}
-        </div>
+          const [bg, fg] = avatarColor(msg.nickname);
+          return (
+            <div
+              key={msg.id ?? `${msg.nickname}-${msg.createdAt}-${i}`}
+              className={`d-flex align-items-end gap-2 style-msg-row ${me ? 'align-self-end flex-row-reverse' : 'align-self-start'}`}
+              style={{ maxWidth: '80%', cursor: 'pointer' }}
+              onClick={() => setReplyTo(msg)}
+              title="Click to reply"
+            >
+              {!me && (
+                <div 
+                  className="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0 mb-1" 
+                  style={{ width: '30px', height: '30px', background: bg, color: fg, fontSize: '0.65rem' }}
+                >
+                  {msg.nickname.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className={`d-flex flex-column gap-1 min-w-0 ${me ? 'align-items-end' : 'align-items-start'}`}>
+                {!me && <small className="text-white-50 fw-semibold px-1" style={{ fontSize: '0.75rem' }}>{msg.nickname}</small>}
 
-        {/* Reply bar */}
-        {replyTo && (
-          <div className="cr-reply-bar">
-            <div className="cr-reply-bar-content">
-              <span className="cr-reply-bar-label">Replying to</span>
-              <span className="cr-reply-bar-nick">{replyTo.nickname}</span>
-              <span className="cr-reply-bar-msg">
-                {replyTo.message || (replyTo.fileUrl ? '📁 Attachment' : '')}
-              </span>
+                {/* Reply preview logic wrapper inside bubble cluster */}
+                {msg.replyTo && (
+                  <div className={`p-2 rounded-3 text-start border-start border-3 bg-light bg-opacity-10 d-flex flex-column mb-1 ${me ? 'border-light border-opacity-50' : 'border-primary'}`} style={{ maxWidth: '100%', fontSize: '0.75rem' }}>
+                    <span className="fw-bold text-info">{msg.replyTo.nickname}</span>
+                    <span className="text-white-50 text-truncate" style={{ maxWidth: '200px' }}>
+                      {msg.replyTo.message || '📁 Attachment'}
+                    </span>
+                  </div>
+                )}
+
+                <div 
+                  className={`p-2 px-3 rounded-4 style-bubble ${me ? 'bg-primary text-white bg-gradient' : 'bg-white bg-opacity-10 text-light border border-light border-opacity-10'}`}
+                  style={{ 
+                    wordBreak: 'break-word', 
+                    fontSize: '0.9rem',
+                    borderRadius: me ? '1rem 1rem 0.25rem 1rem' : '1rem 1rem 1rem 0.25rem'
+                  }}
+                >
+                  {msg.message && <div className="mb-0">{msg.message}</div>}
+                  {renderFile(msg)}
+                </div>
+
+                {msg.createdAt && (
+                  <small className="text-white-50 px-1 mt-auto" style={{ fontSize: '0.65rem' }}>
+                    {fmt(msg.createdAt)}
+                  </small>
+                )}
+              </div>
             </div>
-            <button className="cr-reply-cancel" onClick={() => setReplyTo(null)} aria-label="Cancel reply">
-              ✕
-            </button>
+          );
+        })}
+
+        {/* Typing Notification Banner Component */}
+        {typingUser && (
+          <div className="align-self-start d-flex align-items-center gap-2 p-2 px-3 rounded-4 bg-white bg-opacity-10 border border-light border-opacity-10 mt-1" style={{ maxWidth: '200px' }}>
+            <div className="d-flex gap-1 align-items-center">
+              <span className="cr-typing-dot bg-white bg-opacity-50 rounded-circle" style={{ width: '5px', height: '5px' }} />
+              <span className="cr-typing-dot bg-white bg-opacity-50 rounded-circle" style={{ width: '5px', height: '5px' }} />
+              <span className="cr-typing-dot bg-white bg-opacity-50 rounded-circle" style={{ width: '5px', height: '5px' }} />
+            </div>
+            <small className="text-white-50" style={{ fontSize: '0.75rem' }}>{typingUser} is typing…</small>
           </div>
         )}
+      </div>
 
-        {/* Composer */}
-        <footer className="cr-composer">
-          {/* File attach button */}
+      {/* ── Active Reply Reference Bar Container ── */}
+      {replyTo && (
+        <div className="d-flex align-items-center justify-content-between p-2 px-3 bg-primary bg-opacity-10 border-top border-primary border-opacity-25 flex-shrink-0">
+          <div className="min-w-0 d-flex flex-column">
+            <small className="text-info fw-bold" style={{ fontSize: '0.65rem', textTransform: 'uppercase' }}>Replying to</small>
+            <span className="fw-semibold text-light" style={{ fontSize: '0.8rem' }}>{replyTo.nickname}</span>
+            <small className="text-white-50 text-truncate" style={{ fontSize: '0.75rem', maxWidth: '400px' }}>
+              {replyTo.message || (replyTo.fileUrl ? '📁 Attachment' : '')}
+            </small>
+          </div>
+          <button className="btn btn-sm btn-close btn-close-white bg-secondary bg-opacity-20 rounded-circle p-1" onClick={() => setReplyTo(null)} aria-label="Cancel reply" style={{ width: '22px', height: '22px', fontSize: '0.5rem' }} />
+        </div>
+      )}
+
+      {/* ── Input Composer Section Container ── */}
+      <footer className="p-3 bg-secondary bg-opacity-10 border-top border-secondary border-opacity-25 flex-shrink-0">
+        <div className="d-flex align-items-center gap-2 container-fluid p-0">
+          
+          {/* File input attachment control hooks */}
           <button
-            className="cr-icon-btn"
+            className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0 flex-shrink-0 text-light border-light border-opacity-25 bg-white bg-opacity-5"
             onClick={() => fileInputRef.current?.click()}
             aria-label="Attach file"
             title="Attach file"
+            style={{ width: '40px', height: '40px', fontSize: '1.1rem' }}
           >
             📎
           </button>
@@ -1054,226 +1048,32 @@ export default function ChatRoom() {
             ref={fileInputRef}
             type="file"
             onChange={handleFile}
-            style={{ display: 'none' }}
+            className="d-none"
           />
 
           <input
             ref={inputRef}
-            className="cr-input"
+            type="text"
+            className="form-control rounded-pill bg-white bg-opacity-5 text-light border-light border-opacity-25 px-3"
             value={message}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="Type a message…"
+            style={{ height: '40px', fontSize: '0.9rem' }}
           />
 
-          <button className="cr-send-btn" onClick={sendMessage} aria-label="Send message">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <button className="btn btn-primary rounded-circle d-flex align-items-center justify-content-center p-0 flex-shrink-0 shadow-sm" onClick={sendMessage} aria-label="Send message" style={{ width: '40px', height: '40px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" />
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
           </button>
-        </footer>
-      </div>
+        </div>
+      </footer>
 
-      {/* ── Styles ── */}
+      {/* Mini System Rules Layer Injection */}
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .cr-wrap {
-          display: flex;
-          height: 100dvh;
-          width: 100%;
-          background: #0d0d1a;
-          font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-          color: #e8eaf6;
-          overflow: hidden;
-        }
-
-        /* ── Sidebar ── */
-        .cr-sidebar {
-          width: 260px;
-          flex-shrink: 0;
-          display: flex;
-          flex-direction: column;
-          background: rgba(255,255,255,0.04);
-          border-right: 1px solid rgba(255,255,255,0.08);
-          overflow: hidden;
-        }
-        .cr-sidebar-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 20px 16px 18px;
-          border-bottom: 1px solid rgba(255,255,255,0.07);
-          background: rgba(255,255,255,0.03);
-        }
-        .cr-my-avatar {
-          width: 42px; height: 42px;
-          border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 14px; font-weight: 700;
-          flex-shrink: 0; letter-spacing: 0.5px;
-        }
-        .cr-my-name {
-          font-size: 14px; font-weight: 600; color: #e8eaf6;
-          line-height: 1.3; max-width: 160px;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        .cr-online-badge {
-          display: flex; align-items: center; gap: 5px;
-          font-size: 12px; color: rgba(232,234,246,0.55); margin-top: 2px;
-        }
-        .cr-dot-green {
-          width: 7px; height: 7px; border-radius: 50%;
-          background: #4ade80; display: inline-block; flex-shrink: 0;
-        }
-        .cr-sidebar-label {
-          font-size: 11px; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 1px; color: rgba(232,234,246,0.35);
-          padding: 16px 16px 8px;
-        }
-        .cr-user-list {
-          list-style: none; flex: 1; overflow-y: auto;
-          padding: 0 8px 12px;
-          scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
-        }
-        .cr-user-item {
-          display: flex; align-items: center; gap: 10px;
-          padding: 8px 10px; border-radius: 10px; margin-bottom: 2px;
-          transition: background 0.15s; cursor: default;
-        }
-        .cr-user-item:hover { background: rgba(255,255,255,0.05); }
-        .cr-user-avatar {
-          width: 34px; height: 34px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 11px; font-weight: 700; flex-shrink: 0;
-          position: relative; letter-spacing: 0.4px;
-        }
-        .cr-status-dot {
-          position: absolute; bottom: 0; right: 0;
-          width: 9px; height: 9px; border-radius: 50%;
-          border: 2px solid #0d0d1a;
-        }
-        .cr-status-on { background: #4ade80; }
-        .cr-status-off { background: #6b7280; }
-        .cr-user-info { display: flex; flex-direction: column; min-width: 0; }
-        .cr-user-name {
-          font-size: 13px; font-weight: 500; color: #dde0f5;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .cr-user-lastseen { font-size: 10.5px; color: rgba(232,234,246,0.4); margin-top: 1px; }
-        .cr-user-device { font-size: 10px; color: rgba(232,234,246,0.28); margin-top: 1px; }
-
-        /* ── Main ── */
-        .cr-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-
-        /* ── Header ── */
-        .cr-header {
-          display: flex; align-items: center; gap: 12px;
-          padding: 16px 20px;
-          background: rgba(255,255,255,0.03);
-          border-bottom: 1px solid rgba(255,255,255,0.07);
-          flex-shrink: 0;
-        }
-        .cr-header-icon { font-size: 22px; line-height: 1; }
-        .cr-header-title { font-size: 15px; font-weight: 700; color: #e8eaf6; letter-spacing: 0.2px; }
-        .cr-header-sub { font-size: 12px; color: rgba(232,234,246,0.5); margin-top: 1px; }
-
-        /* ── Messages ── */
-        .cr-messages {
-          flex: 1; overflow-y: auto;
-          padding: 20px 20px 12px;
-          display: flex; flex-direction: column; gap: 6px;
-          scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
-        }
-        .cr-sys-msg {
-          align-self: center; text-align: center;
-          padding: 5px 14px; border-radius: 20px;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.1);
-          font-size: 11.5px; color: rgba(232,234,246,0.55);
-          margin: 4px 0; max-width: 80%;
-        }
-        .cr-msg-row {
-          display: flex; align-items: flex-end; gap: 8px;
-          max-width: 75%; cursor: pointer;
-        }
-        .cr-msg-row:hover .cr-bubble { opacity: 0.92; }
-        .cr-msg-me { align-self: flex-end; flex-direction: row-reverse; }
-        .cr-msg-other { align-self: flex-start; }
-        .cr-msg-avatar {
-          width: 30px; height: 30px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 700; flex-shrink: 0;
-          letter-spacing: 0.3px; margin-bottom: 2px;
-        }
-        .cr-msg-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-        .cr-msg-nick { font-size: 11.5px; font-weight: 600; color: rgba(232,234,246,0.6); padding: 0 4px; }
-
-        /* Reply preview inside bubble */
-        .cr-reply-preview {
-          display: flex; flex-direction: column; gap: 1px;
-          padding: 5px 10px; border-radius: 10px;
-          background: rgba(255,255,255,0.07);
-          border-left: 3px solid rgba(108,79,216,0.6);
-          margin-bottom: 4px; max-width: 100%;
-        }
-        .cr-reply-me { border-left-color: rgba(255,255,255,0.4); }
-        .cr-reply-nick { font-size: 11px; font-weight: 700; color: #a78bfa; }
-        .cr-reply-text {
-          font-size: 11.5px; color: rgba(232,234,246,0.55);
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
-        }
-
-        .cr-bubble {
-          padding: 10px 14px; border-radius: 18px;
-          font-size: 14px; line-height: 1.55;
-          word-break: break-word; max-width: 100%;
-          transition: opacity 0.15s;
-        }
-        .cr-bubble-me {
-          background: linear-gradient(135deg, #6c4fd8, #4f3ab5);
-          color: #fff; border-bottom-right-radius: 5px;
-          box-shadow: 0 2px 12px rgba(108,79,216,0.35);
-        }
-        .cr-bubble-other {
-          background: rgba(255,255,255,0.09); color: #e4e6f5;
-          border: 1px solid rgba(255,255,255,0.1); border-bottom-left-radius: 5px;
-        }
-        .cr-bubble-text { margin-bottom: 4px; }
-        .cr-bubble-text:last-child { margin-bottom: 0; }
-
-        .cr-msg-time { font-size: 10.5px; color: rgba(232,234,246,0.38); padding: 0 4px; }
-        .cr-time-me { text-align: right; }
-
-        /* File renderers */
-        .cr-file-img { max-width: 260px; max-height: 260px; border-radius: 10px; display: block; margin-top: 4px; }
-        .cr-file-video { max-width: 300px; border-radius: 10px; display: block; margin-top: 4px; }
-        .cr-file-audio { width: 100%; min-width: 220px; margin-top: 4px; }
-        .cr-file-pdf { width: 100%; height: 420px; border: none; border-radius: 8px; margin-top: 4px; }
-        .cr-file-link {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 8px 12px; border-radius: 10px;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-          color: #e8eaf6; text-decoration: none; margin-top: 4px;
-          transition: background 0.15s; max-width: 260px;
-        }
-        .cr-file-link:hover { background: rgba(255,255,255,0.16); }
-        .cr-file-icon { font-size: 20px; flex-shrink: 0; }
-        .cr-file-meta { display: flex; flex-direction: column; min-width: 0; }
-        .cr-file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .cr-file-size { font-size: 11px; color: rgba(232,234,246,0.5); margin-top: 1px; }
-
-        /* Typing indicator */
-        .cr-typing-indicator {
-          align-self: flex-start; display: flex; align-items: center; gap: 4px;
-          padding: 8px 14px; border-radius: 18px; border-bottom-left-radius: 5px;
-          background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.1);
-          max-width: 200px; margin-top: 4px;
-        }
         .cr-typing-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: rgba(232,234,246,0.5);
           animation: cr-bounce 1.2s infinite;
         }
         .cr-typing-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -1282,102 +1082,10 @@ export default function ChatRoom() {
           0%, 60%, 100% { transform: translateY(0); }
           30% { transform: translateY(-4px); }
         }
-        .cr-typing-name { font-size: 11.5px; color: rgba(232,234,246,0.5); margin-left: 2px; }
-
-        /* ── Reply bar ── */
-        .cr-reply-bar {
-          display: flex; align-items: center; gap: 10px;
-          padding: 8px 16px;
-          background: rgba(108,79,216,0.12);
-          border-top: 1px solid rgba(108,79,216,0.25);
-          flex-shrink: 0;
-        }
-        .cr-reply-bar-content { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-        .cr-reply-bar-label { font-size: 10.5px; color: #a78bfa; font-weight: 600; }
-        .cr-reply-bar-nick { font-size: 12px; font-weight: 600; color: #e8eaf6; }
-        .cr-reply-bar-msg {
-          font-size: 12px; color: rgba(232,234,246,0.5);
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .cr-reply-cancel {
-          width: 28px; height: 28px; border-radius: 50%; border: none;
-          background: rgba(255,255,255,0.1); color: rgba(232,234,246,0.7);
-          font-size: 13px; cursor: pointer; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          transition: background 0.15s;
-        }
-        .cr-reply-cancel:hover { background: rgba(255,255,255,0.18); }
-
-        /* ── Composer ── */
-        .cr-composer {
-          display: flex; align-items: center; gap: 8px;
-          padding: 12px 16px;
-          background: rgba(255,255,255,0.03);
-          border-top: 1px solid rgba(255,255,255,0.07);
-          position: relative; flex-shrink: 0;
-        }
-        .cr-icon-btn {
-          width: 42px; height: 42px; border-radius: 50%;
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(255,255,255,0.06);
-          font-size: 20px; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; transition: background 0.15s;
-        }
-        .cr-icon-btn:hover { background: rgba(255,255,255,0.12); }
-        .cr-input {
-          flex: 1; height: 42px; padding: 0 16px;
-          border-radius: 21px; border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(255,255,255,0.06); color: #e8eaf6;
-          font-size: 14px; outline: none;
-          transition: border-color 0.2s, background 0.2s;
-          font-family: inherit;
-        }
-        .cr-input::placeholder { color: rgba(232,234,246,0.35); }
-        .cr-input:focus { border-color: rgba(108,79,216,0.7); background: rgba(255,255,255,0.09); }
-        .cr-send-btn {
-          width: 42px; height: 42px; border-radius: 50%; border: none;
-          background: linear-gradient(135deg, #6c4fd8, #4f3ab5);
-          color: #fff; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; transition: opacity 0.15s, transform 0.1s;
-          box-shadow: 0 2px 12px rgba(108,79,216,0.4);
-        }
-        .cr-send-btn:hover { opacity: 0.88; }
-        .cr-send-btn:active { transform: scale(0.94); }
-
-        /* ── Scrollbar ── */
-        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
-
-        /* ── Tablet ── */
-        @media (max-width: 899px) and (min-width: 600px) {
-          .cr-sidebar { width: 200px; }
-          .cr-msg-row { max-width: 82%; }
-        }
-
-        /* ── Mobile ── */
-        @media (max-width: 599px) {
-          .cr-wrap { flex-direction: column; }
-          .cr-sidebar { display: none; }
-          .cr-header { padding: 12px 14px; }
-          .cr-header-title { font-size: 14px; }
-          .cr-messages { padding: 14px 12px 8px; gap: 5px; }
-          .cr-msg-row { max-width: 88%; }
-          .cr-bubble { font-size: 13.5px; padding: 9px 12px; }
-          .cr-composer { padding: 10px; gap: 7px; }
-          .cr-icon-btn { width: 38px; height: 38px; font-size: 18px; }
-          .cr-input { height: 38px; font-size: 13px; }
-          .cr-send-btn { width: 38px; height: 38px; }
-          .cr-file-img { max-width: 200px; max-height: 200px; }
-          .cr-file-video { max-width: 240px; }
-        }
-
-        /* ── Large desktop ── */
-        @media (min-width: 1200px) {
-          .cr-sidebar { width: 280px; }
-        }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+        .style-msg-row:hover .style-bubble { opacity: 0.9; }
       `}</style>
     </div>
   );
