@@ -915,76 +915,78 @@ export default function ChatRoom() {
   return (
     <div className="d-flex flex-column vh-100 w-100 bg-dark text-light overflow-hidden position-relative">
       
-      {/* ── Navbar Header Layer ── */}
-      <nav className="navbar navbar-dark bg-secondary bg-gradient bg-opacity-25 border-bottom border-secondary border-opacity-25 px-3 flex-shrink-0 style-z-index-high">
+      {/* ── Navbar Header Layer (Proper flow validation setup) ── */}
+      <nav className="navbar navbar-dark bg-secondary bg-gradient bg-opacity-25 border-bottom border-secondary border-opacity-25 px-3 flex-shrink-0 style-navbar-container">
         <div className="container-fluid p-0 d-flex align-items-center justify-content-between position-relative">
           
-          {/* Active Member Dropdown Trigger */}
-          <div 
-            className="d-flex align-items-center gap-2 style-clickable-header rounded-3 p-1 px-2"
-            style={{ cursor: 'pointer', transition: 'background 0.2s' }}
-            onClick={(e: MouseEvent<HTMLDivElement>) => {
-              e.stopPropagation();
-              setShowMembersDropdown(!showMembersDropdown);
-            }}
-          >
-            <span className="fs-4">💬</span>
-            <div>
-              <h1 className="navbar-brand m-0 fs-6 fw-bold d-flex align-items-center gap-1">
-                Chat Room <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>▼</span>
-              </h1>
-              <small className="text-info d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
-                <span className="d-inline-block bg-success rounded-circle animate-pulse" style={{ width: '6px', height: '6px' }} />
-                {onlineCount} {onlineCount === 1 ? 'member' : 'members'} online
-              </small>
+          {/* Active Member Dropdown Trigger wrapper setup */}
+          <div className="position-relative">
+            <div 
+              className="d-flex align-items-center gap-2 style-clickable-header rounded-3 p-1 px-2"
+              style={{ cursor: 'pointer', transition: 'background 0.2s' }}
+              onClick={(e: MouseEvent<HTMLDivElement>) => {
+                e.stopPropagation();
+                setShowMembersDropdown(!showMembersDropdown);
+              }}
+            >
+              <span className="fs-4">💬</span>
+              <div>
+                <h1 className="navbar-brand m-0 fs-6 fw-bold d-flex align-items-center gap-1">
+                  Chat Room <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>▼</span>
+                </h1>
+                <small className="text-info d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
+                  <span className="d-inline-block bg-success rounded-circle animate-pulse" style={{ width: '6px', height: '6px' }} />
+                  {onlineCount} {onlineCount === 1 ? 'member' : 'members'} online
+                </small>
+              </div>
             </div>
+
+            {/* Adjusted absolute layout to sit naturally BELOW the heading grid */}
+            {showMembersDropdown && (
+              <div 
+                className="position-absolute bg-dark border border-secondary border-opacity-50 rounded-3 shadow-lg p-2 m-0 style-dropdown-box"
+                onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
+              >
+                <div className="text-white-50 fw-bold px-2 py-1 mb-1 border-bottom border-secondary border-opacity-25" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+                  MEMBERS ({users.length})
+                </div>
+                <ul className="list-unstyled m-0 p-0" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                  {users.map((u) => {
+                    const [bg, fg] = avatarColor(u.nickname);
+                    return (
+                      <li key={u.id} className="d-flex align-items-center gap-2 p-2 rounded-2 style-user-dropdown-item">
+                        <div className="position-relative flex-shrink-0">
+                          <div 
+                            className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                            style={{ width: '32px', height: '32px', background: bg, color: fg, fontSize: '0.75rem' }}
+                          >
+                            {u.nickname.slice(0, 2).toUpperCase()}
+                          </div>
+                          <span 
+                            className="position-absolute bottom-0 end-0 rounded-circle border border-dark" 
+                            style={{ width: '9px', height: '9px', background: u.isOnline ? '#4ade80' : '#6b7280', borderWidth: '2px' }}
+                          />
+                        </div>
+                        <div className="min-w-0 d-flex flex-column">
+                          <span className="text-light text-truncate fw-medium" style={{ fontSize: '0.85rem' }}>
+                            {u.nickname} {u.nickname === nickname && <span className="text-white-50 fw-normal" style={{ fontSize: '0.75rem' }}>(You)</span>}
+                          </span>
+                          {!u.isOnline && u.lastSeen && (
+                            <small className="text-white-50" style={{ fontSize: '0.65rem' }}>Seen: {fmt(u.lastSeen)}</small>
+                          )}
+                          {u.browser && u.os && (
+                            <small className="text-white-50 opacity-50" style={{ fontSize: '0.6rem' }}>{u.browser} · {u.os}</small>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
 
-          {/* Absolute Menu Box for Users details */}
-          {showMembersDropdown && (
-            <div 
-              className="position-absolute bg-dark border border-secondary border-opacity-50 rounded-3 shadow-lg p-2 m-0 style-dropdown-box"
-              onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
-            >
-              <div className="text-white-50 fw-bold px-2 py-1 mb-1 border-bottom border-secondary border-opacity-25" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                MEMBERS ({users.length})
-              </div>
-              <ul className="list-unstyled m-0 p-0">
-                {users.map((u) => {
-                  const [bg, fg] = avatarColor(u.nickname);
-                  return (
-                    <li key={u.id} className="d-flex align-items-center gap-2 p-2 rounded-2 style-user-dropdown-item">
-                      <div className="position-relative flex-shrink-0">
-                        <div 
-                          className="rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                          style={{ width: '32px', height: '32px', background: bg, color: fg, fontSize: '0.75rem' }}
-                        >
-                          {u.nickname.slice(0, 2).toUpperCase()}
-                        </div>
-                        <span 
-                          className="position-absolute bottom-0 end-0 rounded-circle border border-dark" 
-                          style={{ width: '9px', height: '9px', background: u.isOnline ? '#4ade80' : '#6b7280', borderWidth: '2px' }}
-                        />
-                      </div>
-                      <div className="min-w-0 d-flex flex-column">
-                        <span className="text-light text-truncate fw-medium" style={{ fontSize: '0.85rem' }}>
-                          {u.nickname} {u.nickname === nickname && <span className="text-white-50 fw-normal" style={{ fontSize: '0.75rem' }}>(You)</span>}
-                        </span>
-                        {!u.isOnline && u.lastSeen && (
-                          <small className="text-white-50" style={{ fontSize: '0.65rem' }}>Seen: {fmt(u.lastSeen)}</small>
-                        )}
-                        {u.browser && u.os && (
-                          <small className="text-white-50 opacity-50" style={{ fontSize: '0.6rem' }}>{u.browser} · {u.os}</small>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-
-          {/* Current User Profile Card */}
+          {/* Current User Profile Display Segment */}
           <div className="d-flex align-items-center gap-2">
             <div className="text-end d-none d-sm-block">
               <div className="fw-semibold text-truncate text-light" style={{ fontSize: '0.9rem', maxWidth: '140px' }}>{nickname}</div>
@@ -1000,7 +1002,7 @@ export default function ChatRoom() {
         </div>
       </nav>
 
-      {/* ── Messages Box Stream Output ── */}
+      {/* ── Messages Stream Output Box ── */}
       <div ref={chatRef} className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2 bg-gradient" style={{ scrollbarWidth: 'thin' }}>
         {messages.map((msg, i) => {
           const me = msg.nickname === nickname;
@@ -1042,7 +1044,7 @@ export default function ChatRoom() {
                     borderRadius: me ? '1.1rem 1.1rem 0.25rem 1.1rem' : '1.1rem 1.1rem 1.1rem 0.25rem'
                   }}
                 >
-                  {/* Thread reply validation nested nodes */}
+                  {/* Thread reply structural verification metadata wrapper */}
                   {msg.replyTo && (
                     <div className={`p-2 rounded-3 text-start border-start border-3 bg-dark bg-opacity-25 d-flex flex-column mb-2 ${me ? 'border-white border-opacity-50' : 'border-primary'}`} style={{ fontSize: '0.75rem' }}>
                       <span className="fw-bold text-info" style={{ fontSize: '0.7rem' }}>@{msg.replyTo.nickname}</span>
@@ -1066,7 +1068,7 @@ export default function ChatRoom() {
           );
         })}
 
-        {/* Typing Notification Banner */}
+        {/* Dynamic Typing Stream Container */}
         {typingUser && (
           <div className="align-self-start d-flex align-items-center gap-2 p-2 px-3 rounded-pill bg-secondary bg-opacity-20 border border-light border-opacity-5 mt-1" style={{ maxWidth: '220px' }}>
             <div className="d-flex gap-1 align-items-center">
@@ -1093,11 +1095,11 @@ export default function ChatRoom() {
         </div>
       )}
 
-      {/* ── Chat Control Input Base ── */}
+      {/* ── Chat Control Input Composer Base ── */}
       <footer className="p-3 bg-secondary bg-opacity-25 border-top border-secondary border-opacity-25 flex-shrink-0 style-z-index-med shadow-lg">
         <div className="d-flex align-items-center gap-2 container-fluid p-0">
           
-          {/* File input attachment trigger */}
+          {/* File attachment selection triggers */}
           <button
             className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0 flex-shrink-0 text-light border-light border-opacity-10 bg-white bg-opacity-5 style-composer-btn"
             onClick={() => fileInputRef.current?.click()}
@@ -1139,7 +1141,7 @@ export default function ChatRoom() {
         </div>
       </footer>
 
-      {/* Embedded Component Stylesheet to bypass css framework errors */}
+      {/* Style layer override variables */}
       <style>{`
         .cr-typing-dot { animation: cr-bounce 1.2s infinite; }
         .cr-typing-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -1166,9 +1168,18 @@ export default function ChatRoom() {
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-        .style-z-index-high { z-index: 1060; }
+        .style-navbar-container { z-index: 1060; position: relative; }
         .style-z-index-med { z-index: 1040; }
-        .style-dropdown-box { top: 50px; left: 0; width: 280px; maxHeight: 350px; overflow-y: auto; z-index: 1070; }
+        
+        /* Dropdown sits clean below header targets without hiding layouts */
+        .style-dropdown-box { 
+          top: calc(100% + 8px); 
+          left: 0; 
+          width: 280px; 
+          max-height: 340px; 
+          z-index: 1070; 
+        }
+
         .style-msg-row:hover .style-bubble { filter: brightness(1.06); }
         .style-text-input:focus { box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); border-color: #0d6efd !important; }
         .style-clickable-header:hover { background: rgba(255,255,255,0.06); }
