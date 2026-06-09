@@ -592,7 +592,7 @@
 // export default ChatRoom;
 
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, MouseEvent, ChangeEvent } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 
@@ -613,7 +613,7 @@ interface Message {
     id?: number;
     nickname: string;
     message: string;
-  };
+  } | null;
 }
 
 interface User {
@@ -829,7 +829,7 @@ export default function ChatRoom() {
     setReplyTo(null);
   };
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const formData = new FormData();
@@ -866,13 +866,13 @@ export default function ChatRoom() {
 
   const renderFile = (msg: Message) => {
     if (!msg.fileUrl) return null;
-    const src = `${SOCKET_URL}${msg.fileUrl}`;
+    const src = msg.fileUrl.startsWith('http') ? msg.fileUrl : `${SOCKET_URL}${msg.fileUrl}`;
     const { fileType, fileName, fileSize } = msg;
 
     if (fileType?.startsWith('image/')) {
       return (
         <a href={src} target="_blank" rel="noreferrer" className="d-block mt-1">
-          <img src={src} alt={fileName} className="img-fluid rounded-3 shadow-sm border border-secondary border-opacity-25" style={{ maxHeight: '260px' }} />
+          <img src={src} alt={fileName || 'Attachment'} className="img-fluid rounded-3 shadow-sm border border-secondary border-opacity-25" style={{ maxHeight: '260px' }} />
         </a>
       );
     }
@@ -888,7 +888,7 @@ export default function ChatRoom() {
     }
     if (fileType === 'application/pdf') {
       return (
-        <iframe src={src} title={fileName} className="w-100 rounded-3 mt-1 border-0 shadow-sm" style={{ height: '350px' }} />
+        <iframe src={src} title={fileName || 'PDF Document'} className="w-100 rounded-3 mt-1 border-0 shadow-sm" style={{ height: '350px' }} />
       );
     }
 
@@ -903,7 +903,7 @@ export default function ChatRoom() {
       <a href={src} target="_blank" rel="noreferrer" download className="btn btn-sm btn-secondary bg-opacity-20 d-inline-flex align-items-center gap-2 mt-1 text-start border border-light border-opacity-10 text-wrap text-break" style={{ maxWidth: '260px' }}>
         <span style={{ fontSize: '1.3rem' }}>{icon}</span>
         <div className="min-w-0">
-          <div className="text-white fw-medium text-truncate" style={{ fontSize: '0.85rem' }}>{fileName}</div>
+          <div className="text-white fw-medium text-truncate" style={{ fontSize: '0.85rem' }}>{fileName || 'Download File'}</div>
           {fileSize && <small className="text-white-50 d-block" style={{ fontSize: '0.75rem' }}>{formatFileSize(fileSize)}</small>}
         </div>
       </a>
@@ -915,15 +915,15 @@ export default function ChatRoom() {
   return (
     <div className="d-flex flex-column vh-100 w-100 bg-dark text-light overflow-hidden position-relative">
       
-      {/* ── Navbar Header Layer (Subsumed Active Contexts) ── */}
-      <nav className="navbar navbar-dark bg-secondary bg-gradient bg-opacity-25 border-bottom border-secondary border-opacity-25 px-3 flex-shrink-0 z-3">
+      {/* ── Navbar Header Layer ── */}
+      <nav className="navbar navbar-dark bg-secondary bg-gradient bg-opacity-25 border-bottom border-secondary border-opacity-25 px-3 flex-shrink-0 style-z-index-high">
         <div className="container-fluid p-0 d-flex align-items-center justify-content-between position-relative">
           
-          {/* Room details & Active Member Dropdown Trigger */}
+          {/* Active Member Dropdown Trigger */}
           <div 
             className="d-flex align-items-center gap-2 style-clickable-header rounded-3 p-1 px-2"
             style={{ cursor: 'pointer', transition: 'background 0.2s' }}
-            onClick={(e) => {
+            onClick={(e: MouseEvent<HTMLDivElement>) => {
               e.stopPropagation();
               setShowMembersDropdown(!showMembersDropdown);
             }}
@@ -940,12 +940,11 @@ export default function ChatRoom() {
             </div>
           </div>
 
-          {/* Absolute Menu Box for rendering Members details inline */}
+          {/* Absolute Menu Box for Users details */}
           {showMembersDropdown && (
             <div 
-              className="position-absolute bg-dark border border-secondary border-opacity-50 rounded-3 shadow-lg p-2 m-0"
-              style={{ top: '50px', left: '0', width: '280px', maxHeight: '350px', overflowY: 'auto', zIndex: 1050 }}
-              onClick={(e) => e.stopPropagation()}
+              className="position-absolute bg-dark border border-secondary border-opacity-50 rounded-3 shadow-lg p-2 m-0 style-dropdown-box"
+              onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
             >
               <div className="text-white-50 fw-bold px-2 py-1 mb-1 border-bottom border-secondary border-opacity-25" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
                 MEMBERS ({users.length})
@@ -963,7 +962,7 @@ export default function ChatRoom() {
                           {u.nickname.slice(0, 2).toUpperCase()}
                         </div>
                         <span 
-                          className={`position-absolute bottom-0 end-0 rounded-circle border border-dark`} 
+                          className="position-absolute bottom-0 end-0 rounded-circle border border-dark" 
                           style={{ width: '9px', height: '9px', background: u.isOnline ? '#4ade80' : '#6b7280', borderWidth: '2px' }}
                         />
                       </div>
@@ -985,7 +984,7 @@ export default function ChatRoom() {
             </div>
           )}
 
-          {/* Current User credentials display */}
+          {/* Current User Profile Card */}
           <div className="d-flex align-items-center gap-2">
             <div className="text-end d-none d-sm-block">
               <div className="fw-semibold text-truncate text-light" style={{ fontSize: '0.9rem', maxWidth: '140px' }}>{nickname}</div>
@@ -1001,7 +1000,7 @@ export default function ChatRoom() {
         </div>
       </nav>
 
-      {/* ── Messages Stream Output Grid ── */}
+      {/* ── Messages Box Stream Output ── */}
       <div ref={chatRef} className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2 bg-gradient" style={{ scrollbarWidth: 'thin' }}>
         {messages.map((msg, i) => {
           const me = msg.nickname === nickname;
@@ -1035,7 +1034,6 @@ export default function ChatRoom() {
               <div className={`d-flex flex-column gap-1 min-w-0 ${me ? 'align-items-end' : 'align-items-start'}`}>
                 {!me && <small className="text-white-50 fw-semibold px-1" style={{ fontSize: '0.75rem' }}>{msg.nickname}</small>}
 
-                {/* Bubble Cluster layout with reply validation wrappers */}
                 <div 
                   className={`p-2 px-3 rounded-4 style-bubble shadow-sm ${me ? 'bg-primary text-white bg-gradient' : 'bg-secondary bg-opacity-25 text-light border border-light border-opacity-10'}`}
                   style={{ 
@@ -1044,7 +1042,7 @@ export default function ChatRoom() {
                     borderRadius: me ? '1.1rem 1.1rem 0.25rem 1.1rem' : '1.1rem 1.1rem 1.1rem 0.25rem'
                   }}
                 >
-                  {/* Inline nested reply target references */}
+                  {/* Thread reply validation nested nodes */}
                   {msg.replyTo && (
                     <div className={`p-2 rounded-3 text-start border-start border-3 bg-dark bg-opacity-25 d-flex flex-column mb-2 ${me ? 'border-white border-opacity-50' : 'border-primary'}`} style={{ fontSize: '0.75rem' }}>
                       <span className="fw-bold text-info" style={{ fontSize: '0.7rem' }}>@{msg.replyTo.nickname}</span>
@@ -1068,7 +1066,7 @@ export default function ChatRoom() {
           );
         })}
 
-        {/* Dynamic Typing Notification Stream Element */}
+        {/* Typing Notification Banner */}
         {typingUser && (
           <div className="align-self-start d-flex align-items-center gap-2 p-2 px-3 rounded-pill bg-secondary bg-opacity-20 border border-light border-opacity-5 mt-1" style={{ maxWidth: '220px' }}>
             <div className="d-flex gap-1 align-items-center">
@@ -1095,11 +1093,11 @@ export default function ChatRoom() {
         </div>
       )}
 
-      {/* ── Chat Control Input Composer Base ── */}
-      <footer className="p-3 bg-secondary bg-opacity-25 border-top border-secondary border-opacity-25 flex-shrink-0 z-2 shadow-lg">
+      {/* ── Chat Control Input Base ── */}
+      <footer className="p-3 bg-secondary bg-opacity-25 border-top border-secondary border-opacity-25 flex-shrink-0 style-z-index-med shadow-lg">
         <div className="d-flex align-items-center gap-2 container-fluid p-0">
           
-          {/* File input and attachment trigger layout controls */}
+          {/* File input attachment trigger */}
           <button
             className="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0 flex-shrink-0 text-light border-light border-opacity-10 bg-white bg-opacity-5 style-composer-btn"
             onClick={() => fileInputRef.current?.click()}
@@ -1141,11 +1139,9 @@ export default function ChatRoom() {
         </div>
       </footer>
 
-      {/* Custom Keyframe and Scrollbar Native Styling Overrides */}
+      {/* Embedded Component Stylesheet to bypass css framework errors */}
       <style>{`
-        .cr-typing-dot {
-          animation: cr-bounce 1.2s infinite;
-        }
+        .cr-typing-dot { animation: cr-bounce 1.2s infinite; }
         .cr-typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .cr-typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes cr-bounce {
@@ -1153,17 +1149,13 @@ export default function ChatRoom() {
           30% { transform: translateY(-4px); }
         }
         
-        .animate-pulse {
-          animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
+        .animate-pulse { animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes pulse-green {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: .4; transform: scale(1.2); }
         }
 
-        .slide-up-animation {
-          animation: slideUp 0.15s ease-out forwards;
-        }
+        .slide-up-animation { animation: slideUp 0.15s ease-out forwards; }
         @keyframes slideUp {
           from { transform: translateY(100%); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
@@ -1174,6 +1166,9 @@ export default function ChatRoom() {
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
+        .style-z-index-high { z-index: 1060; }
+        .style-z-index-med { z-index: 1040; }
+        .style-dropdown-box { top: 50px; left: 0; width: 280px; maxHeight: 350px; overflow-y: auto; z-index: 1070; }
         .style-msg-row:hover .style-bubble { filter: brightness(1.06); }
         .style-text-input:focus { box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); border-color: #0d6efd !important; }
         .style-clickable-header:hover { background: rgba(255,255,255,0.06); }
