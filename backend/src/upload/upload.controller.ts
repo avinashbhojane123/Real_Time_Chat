@@ -7,51 +7,40 @@ import {
 } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
-
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
 @Controller('upload')
 export class UploadController {
- @Post('test')
-test() {
-  console.log('UPLOAD ROUTE WORKING');
+  @Post('test')
+  test() {
+    return {
+      success: true,
+    };
+  }
 
-  return {
-    success: true,
-  };
-}
-    @Post()
+  @Post()
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: './uploads',
-
-        filename: (
-          req,
-          file,
-          cb,
-        ) => {
+        filename: (req, file, cb) => {
           const uniqueName =
             Date.now() +
             '-' +
-            Math.round(
-              Math.random() * 1e9,
-            ) +
+            Math.round(Math.random() * 1e9) +
             extname(file.originalname);
 
           cb(null, uniqueName);
         },
       }),
-
       limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB
+        fileSize: 100 * 1024 * 1024,
       },
     }),
   )
   uploadFile(
-    @UploadedFile()
-    file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     if (!file) {
       throw new BadRequestException(
@@ -61,18 +50,12 @@ test() {
 
     return {
       success: true,
+      fileName: file.originalname,
+      fileType: file.mimetype,
+      fileSize: file.size,
 
-      fileName:
-        file.originalname,
-
-      fileType:
-        file.mimetype,
-
-      fileSize:
-        file.size,
-
-      fileUrl:
-        `https://backend-9i6w.onrender.com/api/uploads/${file.filename}`,
+      // only return path
+      fileUrl: `/api/uploads/${file.filename}`,
     };
   }
 }
