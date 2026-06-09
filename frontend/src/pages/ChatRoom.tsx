@@ -159,7 +159,7 @@ function ChatRoom() {
     //   setMessages(data || []);
     // });
 
-        socket.on('chatHistory', (data: Message[]) => {
+  socket.on('chatHistory', (data: Message[]) => {
   console.log(
     'History received:',
     data.length,
@@ -168,23 +168,39 @@ function ChatRoom() {
   setMessages(data || []);
 });
 
-    socket.on('newMessage', (data: Message) => {
-          // i have add this
-           console.log('New message:', data.id);
-      setMessages((prev) => {
-        const exists = prev.some(
-          (msg) =>
-            msg.id === data.id ||
-            (msg.nickname === data.nickname &&
-              msg.message === data.message &&
-              msg.createdAt === data.createdAt),
-        );
+    // socket.on('newMessage', (data: Message) => {
+    //       // i have add this
+    //        console.log('New message:', data.id);
+    //   setMessages((prev) => {
+    //     const exists = prev.some(
+    //       (msg) =>
+    //         msg.id === data.id ||
+    //         (msg.nickname === data.nickname &&
+    //           msg.message === data.message &&
+    //           msg.createdAt === data.createdAt),
+    //     );
 
-        if (exists) return prev;
-        return [...prev, data];
-      });
-    });
+    //     if (exists) return prev;
+    //     return [...prev, data];
+    //   });
+    // });
 
+socket.on('newMessage', (data: Message) => {
+  console.log('New message:', data.id);
+
+  setMessages((prev) => {
+    const exists = prev.some(
+      (msg) => msg.id === data.id,
+    );
+
+    if (exists) {
+      return prev;
+    }
+
+    return [...prev, data];
+  });
+});
+    
     socket.on('usersList', (data: User[]) => {
       console.log('Users List:', data);
       setUsers(data || []);
