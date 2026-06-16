@@ -1724,9 +1724,13 @@ const initials = (name: string) =>
 
 /* ─── CSS (injected once) ────────────────────────────────── */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
 
 :root {
   --rose:        #D4537E;
@@ -1745,6 +1749,8 @@ const CSS = `
   --text3:       #9E6B7E;
   --border:      rgba(212,83,126,.18);
   --shadow:      0 4px 24px rgba(212,83,126,.10);
+  --radius:      16px;
+  --transition:  0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1757,7 +1763,71 @@ const CSS = `
   }
 }
 
-html, body, #root { height: 100%; }
+html, body, #root { 
+  height: 100%; 
+  overflow: hidden;
+}
+
+/* ── Floating Hearts Background ── */
+.floating-hearts-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.floating-heart {
+  position: absolute;
+  font-size: 20px;
+  opacity: 0.15;
+  animation: floatHeart linear infinite;
+  user-select: none;
+}
+
+@keyframes floatHeart {
+  0% {
+    transform: translateY(100vh) rotate(0deg) scale(0.5);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.15;
+  }
+  90% {
+    opacity: 0.15;
+  }
+  100% {
+    transform: translateY(-10vh) rotate(720deg) scale(1);
+    opacity: 0;
+  }
+}
+
+/* ── Love Particles ── */
+.love-particles {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  font-size: 14px;
+  animation: particleFloat 3s ease-out forwards;
+  user-select: none;
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-200px) scale(0.3) rotate(360deg);
+  }
+}
 
 .lr-app {
   display: flex;
@@ -1766,80 +1836,121 @@ html, body, #root { height: 100%; }
   font-family: 'Lato', sans-serif;
   color: var(--text1);
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 /* ── Sidebar ── */
 .lr-sidebar {
-  width: 260px;
-  min-width: 260px;
+  width: 280px;
+  min-width: 280px;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
   background: var(--cream);
+  position: relative;
+  z-index: 2;
 }
 
 .lr-sidebar-head {
-  padding: 22px 20px 14px;
+  padding: 24px 20px 16px;
   border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(212,83,126,0.05), rgba(83,74,183,0.05));
 }
 
 .lr-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-family: 'Playfair Display', serif;
-  font-size: 18px;
-  font-weight: 500;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--rose);
-  letter-spacing: .3px;
+  letter-spacing: 0.5px;
 }
 
 .lr-logo-heart {
-  font-size: 20px;
+  font-size: 24px;
   animation: heartbeat 1.4s ease-in-out infinite;
+  display: inline-block;
 }
 
 @keyframes heartbeat {
-  0%,100% { transform: scale(1); }
-  50%      { transform: scale(1.22); }
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.3); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.3); }
+  70% { transform: scale(1); }
 }
 
 .lr-subtitle {
   font-size: 11px;
   color: var(--text3);
-  margin-top: 2px;
-  letter-spacing: .4px;
+  margin-top: 4px;
+  letter-spacing: 0.6px;
+  font-weight: 300;
 }
 
 .lr-users {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 0;
+  padding: 8px 0;
+}
+
+.lr-users::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lr-users::-webkit-scrollbar-thumb {
+  background: var(--rose-soft);
+  border-radius: 4px;
 }
 
 .lr-user-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 20px;
+  padding: 12px 20px;
   cursor: pointer;
-  transition: background .15s;
+  transition: all var(--transition);
   border-left: 3px solid transparent;
+  position: relative;
 }
 
-.lr-user-item:hover  { background: var(--rose-light); }
+.lr-user-item:hover { 
+  background: var(--rose-light); 
+}
+
 .lr-user-item.active {
   background: var(--rose-light);
   border-left-color: var(--rose);
 }
 
+.lr-user-item.active::after {
+  content: '♥';
+  position: absolute;
+  right: 16px;
+  color: var(--rose);
+  font-size: 12px;
+  animation: heartbeat 1.4s ease-in-out infinite;
+}
+
 .lr-av {
-  width: 42px; height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
   flex-shrink: 0;
   position: relative;
+  transition: transform var(--transition);
+}
+
+.lr-user-item:hover .lr-av {
+  transform: scale(1.05);
 }
 
 .lr-av-rose   { background: #F4C0D1; color: #72243E; }
@@ -1849,27 +1960,53 @@ html, body, #root { height: 100%; }
 .lr-av-gray   { background: #D3D1C7; color: #444441; }
 
 .lr-av-dot {
-  width: 10px; height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   position: absolute;
-  bottom: 1px; right: 1px;
-  border: 2px solid var(--cream);
+  bottom: 0;
+  right: 0;
+  border: 2.5px solid var(--cream);
+  transition: all var(--transition);
 }
-.lr-dot-on  { background: #1D9E75; }
-.lr-dot-off { background: #B4B2A9; }
 
-.lr-user-name  { font-size: 14px; font-weight: 700; color: var(--text1); }
-.lr-user-meta  { font-size: 11px; color: var(--text3); margin-top: 1px; }
-.lr-user-device{ font-size: 10px; color: var(--text3); }
+.lr-dot-on  { 
+  background: #1D9E75;
+  box-shadow: 0 0 8px rgba(29, 158, 117, 0.4);
+}
+
+.lr-dot-off { 
+  background: #B4B2A9; 
+}
+
+.lr-user-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text1);
+  margin-bottom: 2px;
+}
+
+.lr-user-meta {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+
+.lr-user-device {
+  font-size: 10px;
+  color: var(--text3);
+  opacity: 0.7;
+}
 
 .lr-sidebar-foot {
-  padding: 12px 20px;
+  padding: 14px 20px;
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--text3);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(212,83,126,0.03), rgba(83,74,183,0.03));
 }
 
 /* ── Chat Main ── */
@@ -1878,312 +2015,569 @@ html, body, #root { height: 100%; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative;
+  z-index: 2;
+  background: var(--cream);
 }
 
 .lr-chat-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
+  gap: 14px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--cream);
+  min-height: 72px;
 }
 
-.lr-head-av    { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
-.lr-head-name  { font-size: 15px; font-weight: 700; color: var(--text1); }
-.lr-head-status{ font-size: 11px; color: var(--text3); margin-top: 1px; }
-.lr-head-status.online { color: #1D9E75; }
+.lr-head-av {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: transform var(--transition);
+}
 
-.lr-head-actions { margin-left: auto; display: flex; gap: 6px; }
+.lr-head-av:hover {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+.lr-head-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text1);
+}
+
+.lr-head-status {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+.lr-head-status.online {
+  color: #1D9E75;
+}
+
+.lr-head-status.online::before {
+  content: '●';
+  margin-right: 4px;
+}
+
+.lr-head-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
 
 .lr-icon-btn {
-  width: 34px; height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: none;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--rose);
-  font-size: 15px;
-  transition: background .15s, transform .12s;
+  font-size: 16px;
+  transition: all var(--transition);
+  position: relative;
 }
-.lr-icon-btn:hover  { background: var(--rose-light); }
-.lr-icon-btn:active { transform: scale(.92); }
+
+.lr-icon-btn:hover {
+  background: var(--rose-light);
+  transform: scale(1.05);
+  border-color: var(--rose);
+}
+
+.lr-icon-btn:active {
+  transform: scale(0.92);
+}
+
+.lr-icon-btn .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--rose);
+  color: white;
+  font-size: 9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
 
 /* ── Messages ── */
 .lr-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 20px 8px;
+  padding: 20px 24px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   scroll-behavior: smooth;
+  background: var(--cream);
 }
 
-.lr-messages::-webkit-scrollbar { width: 4px; }
-.lr-messages::-webkit-scrollbar-thumb { background: var(--rose-soft); border-radius: 4px; }
+.lr-messages::-webkit-scrollbar {
+  width: 5px;
+}
+
+.lr-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lr-messages::-webkit-scrollbar-thumb {
+  background: var(--rose-soft);
+  border-radius: 8px;
+}
 
 .lr-date-sep {
   text-align: center;
   font-size: 11px;
   color: var(--text3);
-  margin: 8px 0;
-  letter-spacing: .4px;
+  margin: 12px 0 8px;
+  letter-spacing: 0.6px;
+  font-weight: 300;
+  position: relative;
+}
+
+.lr-date-sep::before,
+.lr-date-sep::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 30%;
+  height: 1px;
+  background: var(--border);
+}
+
+.lr-date-sep::before {
+  left: 0;
+}
+
+.lr-date-sep::after {
+  right: 0;
 }
 
 .lr-msg-row {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  animation: msgIn .22s ease;
+  gap: 10px;
+  animation: msgIn 0.3s ease;
 }
 
 @keyframes msgIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.lr-msg-row.mine { flex-direction: row-reverse; }
+.lr-msg-row.mine {
+  flex-direction: row-reverse;
+}
 
 .lr-msg-av {
-  width: 28px; height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
   flex-shrink: 0;
+  transition: transform var(--transition);
+}
+
+.lr-msg-av:hover {
+  transform: scale(1.1);
 }
 
 .lr-bubble {
-  max-width: 65%;
-  padding: 10px 14px;
+  max-width: 70%;
+  padding: 10px 16px;
   border-radius: 18px;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
   word-break: break-word;
   cursor: pointer;
-  transition: filter .12s;
+  transition: all var(--transition);
+  position: relative;
 }
-.lr-bubble:hover { filter: brightness(.96); }
+
+.lr-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
 
 .lr-bubble.theirs {
   background: white;
   color: var(--text1);
   border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
+
 .lr-bubble.mine {
   background: linear-gradient(135deg, #ED93B1 0%, #D4537E 100%);
   color: #fff;
   border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(212,83,126,0.25);
 }
+
 .lr-bubble.system-msg {
   background: none;
   border: none;
   color: var(--text3);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
   cursor: default;
   max-width: 100%;
-  padding: 4px 0;
+  padding: 6px 0;
+  opacity: 0.7;
+  font-style: italic;
 }
-.lr-bubble:hover { filter: none; }
-.lr-bubble.system-msg:hover { filter: none; }
+
+.lr-bubble.system-msg:hover {
+  transform: none;
+  box-shadow: none;
+}
 
 .lr-bubble-time {
   display: block;
   font-size: 10px;
-  margin-top: 5px;
-  opacity: .6;
+  margin-top: 6px;
+  opacity: 0.6;
   text-align: right;
+  letter-spacing: 0.3px;
 }
-.lr-bubble.theirs .lr-bubble-time { text-align: left; }
+
+.lr-bubble.theirs .lr-bubble-time {
+  text-align: left;
+}
+
+.lr-bubble.mine .lr-bubble-time {
+  color: rgba(255,255,255,0.8);
+}
 
 .lr-reply-quote {
-  border-left: 3px solid rgba(212,83,126,.5);
-  padding: 4px 8px;
-  border-radius: 4px;
-  margin-bottom: 6px;
+  border-left: 3px solid rgba(212,83,126,0.5);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
   font-size: 12px;
-  background: rgba(212,83,126,.08);
+  background: rgba(212,83,126,0.06);
 }
-.lr-reply-quote strong { display: block; color: var(--rose); margin-bottom: 2px; font-size: 11px; }
+
+.lr-reply-quote strong {
+  display: block;
+  color: var(--rose);
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .lr-bubble.mine .lr-reply-quote {
-  background: rgba(255,255,255,.18);
-  border-left-color: rgba(255,255,255,.7);
+  background: rgba(255,255,255,0.15);
+  border-left-color: rgba(255,255,255,0.6);
 }
-.lr-bubble.mine .lr-reply-quote strong { color: rgba(255,255,255,.9); }
-.lr-bubble.mine .lr-reply-quote span   { color: rgba(255,255,255,.8); }
+
+.lr-bubble.mine .lr-reply-quote strong {
+  color: rgba(255,255,255,0.9);
+}
+
+.lr-bubble.mine .lr-reply-quote span {
+  color: rgba(255,255,255,0.8);
+}
 
 /* ── File previews ── */
 .lr-img-prev {
   max-width: 240px;
-  border-radius: 10px;
+  border-radius: 12px;
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   cursor: zoom-in;
+  transition: all var(--transition);
+}
+
+.lr-img-prev:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow);
 }
 
 .lr-video-prev {
   max-width: 280px;
-  border-radius: 10px;
+  border-radius: 12px;
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .lr-audio-prev {
   width: 240px;
-  margin-top: 6px;
+  margin-top: 8px;
   display: block;
+  border-radius: 8px;
 }
 
 .lr-pdf-prev {
   width: 100%;
   height: 320px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .lr-file-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 6px;
-  padding: 7px 12px;
-  border-radius: 10px;
-  background: rgba(212,83,126,.1);
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(212,83,126,0.08);
   text-decoration: none;
   color: var(--rose);
   font-size: 13px;
   font-weight: 700;
-  transition: background .15s;
+  transition: all var(--transition);
 }
-.lr-file-chip:hover { background: rgba(212,83,126,.18); }
-.lr-bubble.mine .lr-file-chip { background: rgba(255,255,255,.22); color: #fff; }
-.lr-bubble.mine .lr-file-chip:hover { background: rgba(255,255,255,.3); }
+
+.lr-file-chip:hover {
+  background: rgba(212,83,126,0.18);
+  transform: translateY(-2px);
+}
+
+.lr-bubble.mine .lr-file-chip {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+}
+
+.lr-bubble.mine .lr-file-chip:hover {
+  background: rgba(255,255,255,0.28);
+}
 
 /* ── Typing ── */
 .lr-typing {
-  padding: 4px 20px 2px;
+  padding: 6px 24px 4px;
   font-size: 12px;
   color: var(--rose);
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 24px;
+  gap: 8px;
+  min-height: 28px;
+  background: var(--cream);
 }
 
-.lr-dots { display: flex; gap: 3px; }
+.lr-dots {
+  display: flex;
+  gap: 4px;
+}
+
 .lr-dots span {
-  width: 5px; height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--rose);
-  animation: dotBlink 1.2s infinite;
+  animation: dotBlink 1.4s infinite;
 }
-.lr-dots span:nth-child(2) { animation-delay: .2s; }
-.lr-dots span:nth-child(3) { animation-delay: .4s; }
+
+.lr-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.lr-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 @keyframes dotBlink {
-  0%,80%,100% { opacity: .2; }
-  40%          { opacity: 1; }
+  0%, 80%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 
 /* ── Reply banner ── */
 .lr-reply-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 10px;
+  padding: 10px 20px;
   background: var(--rose-light);
   border-top: 1px solid var(--border);
   font-size: 12px;
   color: var(--text2);
-  animation: slideUp .15s ease;
+  animation: slideUp 0.2s ease;
 }
-@keyframes slideUp { from { transform: translateY(6px); opacity: 0; } }
-.lr-reply-bar strong { color: var(--rose); }
+
+@keyframes slideUp {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.lr-reply-bar strong {
+  color: var(--rose);
+  font-weight: 700;
+}
+
 .lr-reply-bar-close {
   margin-left: auto;
-  background: none; border: none;
+  background: none;
+  border: none;
   cursor: pointer;
   color: var(--text3);
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
-  padding: 0 2px;
+  padding: 0 4px;
+  transition: all var(--transition);
+}
+
+.lr-reply-bar-close:hover {
+  color: var(--rose);
+  transform: rotate(90deg);
 }
 
 /* ── Lightbox ── */
 .lr-lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.82);
+  background: rgba(0,0,0,0.85);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn .18s ease;
+  animation: fadeIn 0.25s ease;
+  backdrop-filter: blur(10px);
 }
-@keyframes fadeIn { from { opacity: 0; } }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .lr-lightbox img {
-  max-width: 90vw;
+  max-width: 92vw;
   max-height: 88vh;
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: zoomIn 0.3s ease;
 }
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .lr-lightbox-close {
   position: absolute;
-  top: 18px; right: 22px;
-  font-size: 32px;
+  top: 24px;
+  right: 28px;
+  font-size: 36px;
   color: #fff;
   cursor: pointer;
   line-height: 1;
-  background: none; border: none;
+  background: none;
+  border: none;
+  transition: all var(--transition);
+}
+
+.lr-lightbox-close:hover {
+  transform: rotate(90deg) scale(1.1);
 }
 
 /* ── Input row ── */
 .lr-input-row {
-  padding: 10px 16px 14px;
+  padding: 12px 20px 16px;
   border-top: 1px solid var(--border);
   background: var(--cream);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .lr-input-row input[type="text"] {
   flex: 1;
   border: 1px solid var(--border);
   border-radius: 24px;
-  padding: 10px 18px;
+  padding: 11px 20px;
   font-size: 14px;
   outline: none;
   background: white;
   color: var(--text1);
   font-family: 'Lato', sans-serif;
-  transition: border .15s, box-shadow .15s;
+  transition: all var(--transition);
+  min-height: 44px;
 }
+
 .lr-input-row input[type="text"]:focus {
   border-color: var(--rose);
-  box-shadow: 0 0 0 3px rgba(212,83,126,.12);
+  box-shadow: 0 0 0 4px rgba(212,83,126,0.1);
 }
-.lr-input-row input[type="text"]::placeholder { color: var(--text3); }
+
+.lr-input-row input[type="text"]::placeholder {
+  color: var(--text3);
+  font-weight: 300;
+}
 
 .lr-file-label {
-  width: 38px; height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   color: var(--rose);
   font-size: 18px;
-  transition: background .15s;
+  transition: all var(--transition);
   flex-shrink: 0;
+  background: white;
 }
-.lr-file-label:hover { background: var(--rose-light); }
+
+.lr-file-label:hover {
+  background: var(--rose-light);
+  border-color: var(--rose);
+  transform: scale(1.05);
+}
 
 .lr-send-btn {
-  height: 40px;
-  padding: 0 20px;
+  height: 44px;
+  padding: 0 24px;
   border-radius: 24px;
   border: none;
   background: linear-gradient(135deg, #ED93B1, #D4537E);
@@ -2194,94 +2588,725 @@ html, body, #root { height: 100%; }
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-  transition: opacity .15s, transform .12s;
+  gap: 8px;
+  transition: all var(--transition);
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 }
-.lr-send-btn:hover  { opacity: .88; }
-.lr-send-btn:active { transform: scale(.95); }
+
+.lr-send-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #D4537E, #993556);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.lr-send-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(212,83,126,0.3);
+}
+
+.lr-send-btn:hover::before {
+  opacity: 1;
+}
+
+.lr-send-btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.lr-send-btn:active {
+  transform: scale(0.95);
+}
 
 .lr-emoji-btn {
-  width: 38px; height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: none;
+  background: white;
   cursor: pointer;
   color: var(--rose);
   font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
   flex-shrink: 0;
 }
-.lr-emoji-btn:hover { background: var(--rose-light); }
+
+.lr-emoji-btn:hover {
+  background: var(--rose-light);
+  border-color: var(--rose);
+  transform: scale(1.05) rotate(10deg);
+}
 
 /* ── Emoji picker ── */
 .lr-emoji-picker {
   position: absolute;
-  bottom: 74px;
+  bottom: 76px;
   right: 80px;
   background: white;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px;
+  border-radius: 16px;
+  padding: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  width: 240px;
-  box-shadow: var(--shadow);
+  width: 260px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.12);
   z-index: 100;
-  animation: fadeIn .15s ease;
+  animation: fadeIn 0.2s ease;
 }
+
 .lr-emoji-picker button {
-  width: 34px; height: 34px;
+  width: 36px;
+  height: 36px;
   border: none;
   background: none;
-  font-size: 18px;
+  font-size: 20px;
   cursor: pointer;
   border-radius: 8px;
-  transition: background .12s;
+  transition: all var(--transition);
 }
-.lr-emoji-picker button:hover { background: var(--rose-light); }
 
-/* ── Heart particles ── */
+.lr-emoji-picker button:hover {
+  background: var(--rose-light);
+  transform: scale(1.15);
+}
+
+/* ── Heart particles (click effect) ── */
 .lr-hearts-layer {
   position: fixed;
   pointer-events: none;
   inset: 0;
-  z-index: 500;
+  z-index: 100;
   overflow: hidden;
 }
+
 .lr-heart-p {
   position: absolute;
-  font-size: 16px;
-  animation: floatUp 2s ease-out forwards;
+  font-size: 18px;
+  animation: floatUp 2.5s ease-out forwards;
   user-select: none;
+  filter: drop-shadow(0 4px 8px rgba(212,83,126,0.3));
 }
+
 @keyframes floatUp {
-  0%   { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
-  100% { opacity: 0; transform: translateY(-120px) scale(.4) rotate(20deg); }
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-180px) scale(0.3) rotate(40deg);
+  }
 }
 
 /* ── Toast ── */
 .lr-toast {
   position: fixed;
-  bottom: 28px; left: 50%;
+  bottom: 30px;
+  left: 50%;
   transform: translateX(-50%);
-  background: rgba(44,26,34,.9);
+  background: rgba(44,26,34,0.92);
   color: #F4C0D1;
   font-size: 13px;
-  padding: 9px 20px;
-  border-radius: 24px;
+  padding: 12px 24px;
+  border-radius: 30px;
   z-index: 999;
-  animation: toastIn .2s ease;
+  animation: toastIn 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
+
 @keyframes toastIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ── Mobile Menu Toggle ── */
+.lr-mobile-toggle {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--cream);
+  color: var(--rose);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: var(--shadow);
+}
+
+.lr-mobile-toggle:hover {
+  background: var(--rose-light);
+  transform: scale(1.05);
+}
+
+.lr-mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 9;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(4px);
 }
 
 /* ── Responsive ── */
-@media (max-width: 640px) {
-  .lr-sidebar { display: none; }
+@media (max-width: 768px) {
+  .lr-mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lr-mobile-overlay.show {
+    display: block;
+  }
+
+  .lr-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 300px;
+    max-width: 80vw;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+  }
+
+  .lr-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .lr-chat-head {
+    padding: 12px 16px;
+    min-height: 64px;
+    padding-left: 64px;
+  }
+
+  .lr-messages {
+    padding: 12px 14px 8px;
+  }
+
+  .lr-bubble {
+    max-width: 80%;
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+
+  .lr-input-row {
+    padding: 8px 12px 12px;
+    gap: 8px;
+  }
+
+  .lr-input-row input[type="text"] {
+    font-size: 13px;
+    padding: 10px 16px;
+    min-height: 40px;
+  }
+
+  .lr-send-btn {
+    height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
+  }
+
+  .lr-file-label,
+  .lr-emoji-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 16px;
+  }
+
+  .lr-emoji-picker {
+    bottom: 68px;
+    right: 16px;
+    width: 220px;
+  }
+
+  .lr-emoji-picker button {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .lr-user-item {
+    padding: 10px 16px;
+  }
+
+  .lr-av {
+    width: 38px;
+    height: 38px;
+    font-size: 12px;
+  }
+
+  .lr-user-name {
+    font-size: 13px;
+  }
+
+  .lr-head-av {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .lr-head-name {
+    font-size: 14px;
+  }
+
+  .lr-icon-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .lr-reply-bar {
+    padding: 8px 14px;
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+
+  .lr-typing {
+    padding: 4px 14px;
+    font-size: 11px;
+    min-height: 24px;
+  }
+
+  .lr-img-prev,
+  .lr-video-prev {
+    max-width: 200px;
+  }
+
+  .lr-audio-prev {
+    width: 180px;
+  }
+
+  .lr-pdf-prev {
+    height: 240px;
+  }
+
+  .lr-date-sep {
+    font-size: 10px;
+    margin: 8px 0 6px;
+  }
+
+  .lr-date-sep::before,
+  .lr-date-sep::after {
+    width: 20%;
+  }
+
+  .lr-sidebar-head {
+    padding: 16px 16px 12px;
+  }
+
+  .lr-logo {
+    font-size: 17px;
+  }
+
+  .lr-logo-heart {
+    font-size: 20px;
+  }
+
+  .lr-toast {
+    font-size: 12px;
+    padding: 10px 18px;
+    bottom: 20px;
+    max-width: 90%;
+  }
+}
+
+@media (max-width: 480px) {
+  .lr-chat-head {
+    padding: 10px 12px;
+    padding-left: 56px;
+    gap: 10px;
+  }
+
+  .lr-head-name {
+    font-size: 13px;
+  }
+
+  .lr-head-status {
+    font-size: 10px;
+  }
+
+  .lr-messages {
+    padding: 8px 10px 6px;
+    gap: 6px;
+  }
+
+  .lr-bubble {
+    max-width: 85%;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 14px;
+  }
+
+  .lr-bubble-time {
+    font-size: 9px;
+    margin-top: 4px;
+  }
+
+  .lr-msg-av {
+    width: 24px;
+    height: 24px;
+    font-size: 9px;
+  }
+
+  .lr-input-row {
+    padding: 6px 8px 10px;
+    gap: 6px;
+  }
+
+  .lr-input-row input[type="text"] {
+    font-size: 12px;
+    padding: 8px 14px;
+    min-height: 36px;
+    border-radius: 20px;
+  }
+
+  .lr-send-btn {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 12px;
+    border-radius: 20px;
+  }
+
+  .lr-file-label,
+  .lr-emoji-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .lr-emoji-picker {
+    bottom: 60px;
+    right: 8px;
+    width: 180px;
+    padding: 8px;
+    gap: 4px;
+  }
+
+  .lr-emoji-picker button {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+
+  .lr-sidebar {
+    width: 280px;
+    max-width: 85vw;
+  }
+
+  .lr-img-prev,
+  .lr-video-prev {
+    max-width: 160px;
+  }
+
+  .lr-audio-prev {
+    width: 150px;
+  }
+
+  .lr-pdf-prev {
+    height: 180px;
+  }
+
+  .lr-reply-bar {
+    padding: 6px 12px;
+    font-size: 10px;
+    gap: 6px;
+  }
+
+  .lr-reply-bar-close {
+    font-size: 16px;
+  }
+
+  .lr-typing {
+    font-size: 10px;
+    min-height: 20px;
+    padding: 2px 12px;
+  }
+
+  .lr-dots span {
+    width: 4px;
+    height: 4px;
+  }
+
+  .lr-icon-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .lr-mobile-toggle {
+    width: 38px;
+    height: 38px;
+    font-size: 17px;
+    top: 8px;
+    left: 8px;
+  }
+
+  .lr-user-item {
+    padding: 8px 12px;
+    gap: 10px;
+  }
+
+  .lr-av {
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+  }
+
+  .lr-user-name {
+    font-size: 12px;
+  }
+
+  .lr-user-meta {
+    font-size: 10px;
+  }
+
+  .lr-sidebar-head {
+    padding: 12px 14px 10px;
+  }
+
+  .lr-logo {
+    font-size: 15px;
+  }
+
+  .lr-logo-heart {
+    font-size: 18px;
+  }
+
+  .lr-subtitle {
+    font-size: 10px;
+  }
+
+  .lr-sidebar-foot {
+    padding: 10px 14px;
+    font-size: 10px;
+  }
+
+  .lr-head-av {
+    width: 30px;
+    height: 30px;
+    font-size: 10px;
+  }
+
+  .lr-toast {
+    font-size: 11px;
+    padding: 8px 14px;
+    bottom: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .lr-chat-head {
+    padding-left: 48px;
+  }
+
+  .lr-bubble {
+    max-width: 90%;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  .lr-input-row input[type="text"] {
+    font-size: 11px;
+    padding: 6px 12px;
+    min-height: 32px;
+  }
+
+  .lr-send-btn {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .lr-file-label,
+  .lr-emoji-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .lr-img-prev,
+  .lr-video-prev {
+    max-width: 130px;
+  }
+
+  .lr-audio-prev {
+    width: 120px;
+  }
+}
+
+/* ── Landscape mobile ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .lr-messages {
+    padding: 6px 12px 4px;
+    gap: 4px;
+  }
+
+  .lr-chat-head {
+    padding: 6px 12px;
+    padding-left: 48px;
+    min-height: 48px;
+  }
+
+  .lr-head-av {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .lr-head-name {
+    font-size: 13px;
+  }
+
+  .lr-bubble {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .lr-input-row {
+    padding: 4px 8px 8px;
+  }
+
+  .lr-input-row input[type="text"] {
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .lr-send-btn {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+
+  .lr-msg-av {
+    width: 22px;
+    height: 22px;
+    font-size: 8px;
+  }
+
+  .lr-typing {
+    min-height: 18px;
+    padding: 2px 12px;
+    font-size: 10px;
+  }
+
+  .lr-file-label,
+  .lr-emoji-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+}
+
+/* ── Smooth scrollbar for all browsers ── */
+.lr-messages,
+.lr-users {
+  scroll-behavior: smooth;
+}
+
+/* ── Love glow effect on active elements ── */
+.lr-user-item.active .lr-av {
+  box-shadow: 0 0 20px rgba(212,83,126,0.2);
+}
+
+/* ── Floating love text ── */
+.love-text {
+  position: fixed;
+  pointer-events: none;
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--rose);
+  opacity: 0;
+  z-index: 50;
+  animation: loveTextFloat 3s ease-out forwards;
+  text-shadow: 0 4px 20px rgba(212,83,126,0.3);
+}
+
+@keyframes loveTextFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-80px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-120px) scale(0.8);
+  }
+}
+
+/* ── Scroll to bottom button ── */
+.lr-scroll-btn {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--rose);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(212,83,126,0.3);
+  transition: all var(--transition);
+  z-index: 5;
+}
+
+.lr-scroll-btn.show {
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+.lr-scroll-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 8px 24px rgba(212,83,126,0.4);
+}
+
+@media (max-width: 768px) {
+  .lr-scroll-btn {
+    bottom: 70px;
+    right: 16px;
+    width: 38px;
+    height: 38px;
+    font-size: 16px;
+  }
 }
 `;
 
@@ -2310,6 +3335,8 @@ function ChatRoom() {
   const [activeUser,  setActiveUser]  = useState<string | null>(null);
   const [uploading,   setUploading]   = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const socketRef      = useRef<Socket | null>(null);
   const chatRef        = useRef<HTMLDivElement>(null);
@@ -2317,6 +3344,7 @@ function ChatRoom() {
   const typingTimeout  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartsLayerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const particlesIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* inject CSS once */
   useEffect(() => {
@@ -2333,24 +3361,87 @@ function ChatRoom() {
     setTimeout(() => setToast(null), 2400);
   };
 
-  /* heart particles */
-  const spawnHearts = useCallback((count = 3, x?: number, y?: number) => {
+  /* ── Floating hearts background ── */
+  useEffect(() => {
+    const container = document.createElement('div');
+    container.className = 'floating-hearts-bg';
+    container.id = 'floating-hearts-bg';
+    document.body.prepend(container);
+
+    const hearts = ['♥', '💕', '❤️', '🌹', '💗'];
+    for (let i = 0; i < 20; i++) {
+      const heart = document.createElement('span');
+      heart.className = 'floating-heart';
+      heart.textContent = hearts[Math.floor(Math.random() * hearts.length)];
+      heart.style.left = Math.random() * 100 + '%';
+      heart.style.fontSize = (12 + Math.random() * 24) + 'px';
+      heart.style.animationDuration = (20 + Math.random() * 30) + 's';
+      heart.style.animationDelay = (Math.random() * 30) + 's';
+      container.appendChild(heart);
+    }
+
+    return () => {
+      container.remove();
+    };
+  }, []);
+
+  /* ── Spawn love particles on click ── */
+  const spawnLoveParticles = useCallback((x: number, y: number, count = 8) => {
+    const container = document.createElement('div');
+    container.className = 'love-particles';
+    container.style.pointerEvents = 'none';
+    document.body.appendChild(container);
+
+    const symbols = ['♥', '💕', '❤️', '✨', '💗', '🌹', '💜'];
+    const colors = ['#D4537E', '#ED93B1', '#534AB7', '#BA7517', '#FF6B8A'];
+
+    for (let i = 0; i < count; i++) {
+      const particle = document.createElement('span');
+      particle.className = 'particle';
+      particle.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+      particle.style.left = (x + (Math.random() - 0.5) * 100) + 'px';
+      particle.style.top = (y + (Math.random() - 0.5) * 40) + 'px';
+      particle.style.color = colors[Math.floor(Math.random() * colors.length)];
+      particle.style.fontSize = (12 + Math.random() * 16) + 'px';
+      particle.style.animationDuration = (2 + Math.random() * 2) + 's';
+      container.appendChild(particle);
+    }
+
+    setTimeout(() => container.remove(), 4000);
+  }, []);
+
+  /* ── Spawn love text ── */
+  const spawnLoveText = useCallback((x: number, y: number) => {
+    const texts = ['Love you ♥', 'Forever ♥', 'You & Me ♥', 'Soulmate ♥', 'Together ♥', 'Always ♥', 'Eternal ♥'];
+    const el = document.createElement('div');
+    el.className = 'love-text';
+    el.textContent = texts[Math.floor(Math.random() * texts.length)];
+    el.style.left = (x - 60) + 'px';
+    el.style.top = y + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }, []);
+
+  /* ── Heart particles ── */
+  const spawnHearts = useCallback((count = 5, x?: number, y?: number) => {
     if (!heartsLayerRef.current) return;
     const layer = heartsLayerRef.current;
-    const cx = x ?? window.innerWidth * .65;
-    const cy = y ?? window.innerHeight * .75;
-    const shapes = ['♥','🌹','💜','💕','✨'];
+    const cx = x ?? window.innerWidth * 0.65;
+    const cy = y ?? window.innerHeight * 0.7;
+    const shapes = ['♥', '💕', '❤️', '💗', '🌹'];
     for (let i = 0; i < count; i++) {
       setTimeout(() => {
         const el = document.createElement('span');
         el.className = 'lr-heart-p';
         el.textContent = shapes[Math.floor(Math.random() * shapes.length)];
-        el.style.left = (cx + (Math.random() - .5) * 80) + 'px';
-        el.style.top  = cy + 'px';
-        el.style.animationDuration = (1.4 + Math.random() * .8) + 's';
+        el.style.left = (cx + (Math.random() - 0.5) * 120) + 'px';
+        el.style.top = cy + 'px';
+        el.style.fontSize = (14 + Math.random() * 20) + 'px';
+        el.style.color = ['#D4537E', '#ED93B1', '#534AB7', '#FF6B8A', '#FFB3C6'][Math.floor(Math.random() * 5)];
+        el.style.animationDuration = (1.8 + Math.random() * 1.2) + 's';
         layer.appendChild(el);
-        setTimeout(() => el.remove(), 2200);
-      }, i * 120);
+        setTimeout(() => el.remove(), 3000);
+      }, i * 100);
     }
   }, []);
 
@@ -2367,11 +3458,9 @@ function ChatRoom() {
     if (immediate) {
       doScroll();
     } else {
-      // Clear any existing timeout
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
-      // Use requestAnimationFrame for smoother scrolling
       requestAnimationFrame(() => {
         if (scrollTimeoutRef.current) {
           clearTimeout(scrollTimeoutRef.current);
@@ -2384,23 +3473,34 @@ function ChatRoom() {
   /* ── Auto-scroll to bottom on messages change ── */
   useEffect(() => {
     if (messages.length > 0) {
-      // If it's the first load, scroll immediately
       if (isFirstLoad) {
         setIsFirstLoad(false);
-        // Small delay to ensure DOM is rendered
-        setTimeout(() => scrollToBottom(true), 100);
+        setTimeout(() => scrollToBottom(true), 150);
       } else {
         scrollToBottom(false);
       }
     }
   }, [messages, isFirstLoad, scrollToBottom]);
 
-  /* ── Also scroll when new messages are added ── */
+  /* ── Scroll listener for showing scroll button ── */
   useEffect(() => {
-    if (messages.length > 0 && !isFirstLoad) {
-      scrollToBottom(false);
+    const handleScroll = () => {
+      if (!chatRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = chatRef.current;
+      setShowScrollBtn(scrollTop < scrollHeight - clientHeight - 100);
+    };
+
+    const chat = chatRef.current;
+    if (chat) {
+      chat.addEventListener('scroll', handleScroll);
     }
-  }, [messages.length, isFirstLoad, scrollToBottom]);
+
+    return () => {
+      if (chat) {
+        chat.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
 
   /* ── Socket setup ────────────────────────────────────── */
   useEffect(() => {
@@ -2424,17 +3524,14 @@ function ChatRoom() {
       console.log('History loaded:', data.length);
       setMessages(data || []);
       
-      // Force scroll to bottom after history loads with multiple attempts
       const attemptScroll = (attempt = 0) => {
-        if (attempt > 5) return; // Max 5 attempts
+        if (attempt > 5) return;
         if (chatRef.current) {
           chatRef.current.scrollTop = chatRef.current.scrollHeight;
-          // Verify scroll worked
           setTimeout(() => {
             if (chatRef.current) {
               const { scrollHeight, scrollTop } = chatRef.current;
               if (scrollTop < scrollHeight - 10) {
-                // If not at bottom, try again
                 attemptScroll(attempt + 1);
               }
             }
@@ -2444,7 +3541,7 @@ function ChatRoom() {
         }
       };
       
-      setTimeout(() => attemptScroll(0), 100);
+      setTimeout(() => attemptScroll(0), 150);
     });
 
     socket.on('newMessage', (data: Message) => {
@@ -2452,19 +3549,28 @@ function ChatRoom() {
         if (prev.some(m => m.id === data.id)) return prev;
         return [...prev, data];
       });
-      if (data.nickname !== nickname) spawnHearts(1);
+      if (data.nickname !== nickname) {
+        spawnHearts(2);
+        // Spawn love particles at random position
+        const x = Math.random() * window.innerWidth * 0.8 + window.innerWidth * 0.1;
+        const y = Math.random() * window.innerHeight * 0.5 + window.innerHeight * 0.1;
+        spawnLoveParticles(x, y, 6);
+      }
     });
 
-    socket.on('usersList',   (data: User[]) => setUsers(data || []));
+    socket.on('usersList', (data: User[]) => setUsers(data || []));
 
-    socket.on('userOnline',  ({ nickname: n }: { nickname: string }) =>
+    socket.on('userOnline', ({ nickname: n }: { nickname: string }) =>
       setUsers(prev => prev.map(u => u.nickname === n ? { ...u, isOnline: true } : u)));
 
     socket.on('userOffline', ({ nickname: n, lastSeen }: { nickname: string; lastSeen: string }) =>
       setUsers(prev => prev.map(u => u.nickname === n ? { ...u, isOnline: false, lastSeen } : u)));
 
-    socket.on('userJoined', ({ nickname: n }: { nickname: string }) =>
-      setMessages(prev => [...prev, { nickname: 'System', message: `${n} joined ♥`, createdAt: new Date().toISOString() }]));
+    socket.on('userJoined', ({ nickname: n }: { nickname: string }) => {
+      setMessages(prev => [...prev, { nickname: 'System', message: `${n} joined ♥`, createdAt: new Date().toISOString() }]);
+      spawnLoveParticles(window.innerWidth / 2, window.innerHeight / 2, 10);
+      spawnLoveText(window.innerWidth / 2 - 60, window.innerHeight / 2 - 40);
+    });
 
     socket.on('userLeft', ({ nickname: n }: { nickname: string }) =>
       setMessages(prev => [...prev, { nickname: 'System', message: `${n} left`, createdAt: new Date().toISOString() }]));
@@ -2483,8 +3589,9 @@ function ChatRoom() {
       socket.disconnect();
       if (typingTimeout.current) clearTimeout(typingTimeout.current);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      if (particlesIntervalRef.current) clearInterval(particlesIntervalRef.current);
     };
-  }, [nickname, passcode, navigate, spawnHearts, scrollToBottom]);
+  }, [nickname, passcode, navigate, spawnHearts, spawnLoveParticles, spawnLoveText]);
 
   /* ── Send message ─────────────────────────────────── */
   const sendMessage = () => {
@@ -2499,10 +3606,16 @@ function ChatRoom() {
       replyTo: replyTo ? { id: replyTo.id, nickname: replyTo.nickname, message: replyTo.message } : null,
     });
 
+    // Spawn love particles on send
+    const x = window.innerWidth * 0.7;
+    const y = window.innerHeight * 0.8;
+    spawnLoveParticles(x, y, 12);
+    spawnHearts(5);
+    spawnLoveText(x - 60, y - 40);
+
     setMessage('');
     setReplyTo(null);
     setShowEmoji(false);
-    spawnHearts(2);
     inputRef.current?.focus();
   };
 
@@ -2537,7 +3650,10 @@ function ChatRoom() {
           replyTo: replyTo ? { id: replyTo.id, nickname: replyTo.nickname, message: replyTo.message } : null,
         });
         setReplyTo(null);
-        spawnHearts(3);
+        spawnHearts(5);
+        const x = window.innerWidth * 0.7;
+        const y = window.innerHeight * 0.8;
+        spawnLoveParticles(x, y, 10);
       } catch (err) {
         showToast('Upload failed — please try again');
         console.error(err);
@@ -2575,6 +3691,7 @@ function ChatRoom() {
           src={url}
           alt={name}
           onClick={e => { e.stopPropagation(); setLightbox(url); }}
+          loading="lazy"
         />
       );
 
@@ -2611,17 +3728,45 @@ function ChatRoom() {
         <span style={{ fontSize: 18 }}>{icon}</span>
         <span>
           <span style={{ display: 'block', fontWeight: 700, fontSize: 13 }}>{name}</span>
-          <span style={{ display: 'block', fontSize: 10, opacity: .7, fontWeight: 400 }}>{formatBytes(msg.fileSize)}</span>
+          <span style={{ display: 'block', fontSize: 10, opacity: 0.7, fontWeight: 400 }}>{formatBytes(msg.fileSize)}</span>
         </span>
       </a>
     );
   };
 
-  /* ── Sidebar active user (first other user or first user) */
+  /* ── Sidebar active user ── */
   const displayUser = users.find(u => u.nickname !== nickname) || users[0];
+
+  /* ── Close sidebar on outside click ── */
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (sidebarOpen && !target.closest('.lr-sidebar') && !target.closest('.lr-mobile-toggle')) {
+        setSidebarOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [sidebarOpen]);
 
   return (
     <>
+      {/* Mobile toggle button */}
+      <button
+        className="lr-mobile-toggle"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle sidebar"
+      >
+        {sidebarOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Mobile overlay */}
+      <div
+        className={`lr-mobile-overlay${sidebarOpen ? ' show' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* Heart particles layer */}
       <div ref={heartsLayerRef} className="lr-hearts-layer" aria-hidden="true" />
 
@@ -2638,13 +3783,13 @@ function ChatRoom() {
 
       <div className="lr-app">
         {/* ── Sidebar ── */}
-        <aside className="lr-sidebar">
+        <aside className={`lr-sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="lr-sidebar-head">
             <div className="lr-logo">
               <span className="lr-logo-heart" aria-hidden="true">♥</span>
               Our Space
             </div>
-            <p className="lr-subtitle">end-to-end encrypted</p>
+            <p className="lr-subtitle">✨ Where love speaks ✨</p>
           </div>
 
           <div className="lr-users">
@@ -2652,7 +3797,10 @@ function ChatRoom() {
               <div
                 key={user.id}
                 className={`lr-user-item${activeUser === user.nickname || (!activeUser && user.nickname !== nickname) ? ' active' : ''}`}
-                onClick={() => setActiveUser(user.nickname)}
+                onClick={() => {
+                  setActiveUser(user.nickname);
+                  if (window.innerWidth <= 768) setSidebarOpen(false);
+                }}
               >
                 <div className={`lr-av ${userColor(user.nickname)}`}>
                   {initials(user.nickname)}
@@ -2662,7 +3810,7 @@ function ChatRoom() {
                   <p className="lr-user-name">{user.nickname}</p>
                   <p className="lr-user-meta">
                     {user.isOnline
-                      ? '● Online'
+                      ? '💕 Online'
                       : user.lastSeen
                       ? `Last seen ${new Date(user.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                       : 'Offline'}
@@ -2676,8 +3824,11 @@ function ChatRoom() {
           </div>
 
           <div className="lr-sidebar-foot">
-            <span aria-hidden="true">🔒</span>
+            <span aria-hidden="true">💝</span>
             {nickname}
+            <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.6 }}>
+              {users.filter(u => u.isOnline).length} online
+            </span>
           </div>
         </aside>
 
@@ -2693,13 +3844,15 @@ function ChatRoom() {
                 <div>
                   <p className="lr-head-name">{displayUser.nickname}</p>
                   <p className={`lr-head-status${displayUser.isOnline ? ' online' : ''}`}>
-                    {displayUser.isOnline ? '● Online' : 'Offline'}
+                    {displayUser.isOnline ? 'Online 💕' : 'Offline'}
                   </p>
                 </div>
               </>
             ) : (
               <div>
-                <p className="lr-head-name">Waiting for your love…</p>
+                <p className="lr-head-name" style={{ color: 'var(--rose)' }}>
+                  💕 Waiting for love…
+                </p>
               </div>
             )}
 
@@ -2709,13 +3862,18 @@ function ChatRoom() {
                 title="Send hearts"
                 aria-label="Send hearts"
                 onClick={() => {
-                  spawnHearts(6);
+                  const x = window.innerWidth * 0.7;
+                  const y = window.innerHeight * 0.4;
+                  spawnHearts(10);
+                  spawnLoveParticles(x, y, 15);
+                  spawnLoveText(x - 60, y - 40);
                   socketRef.current?.emit('sendMessage', {
                     nickname, passcode, message: '♥♥♥', replyTo: null,
                   });
                 }}
               >
                 ♥
+                <span className="badge">💕</span>
               </button>
             </div>
           </div>
@@ -2726,7 +3884,6 @@ function ChatRoom() {
               const isMe     = msg.nickname === nickname;
               const isSystem = msg.nickname === 'System';
 
-              /* date separator */
               const msgDate  = msg.createdAt ? new Date(msg.createdAt).toDateString() : '';
               const prevDate = idx > 0 && messages[idx - 1].createdAt
                 ? new Date(messages[idx - 1].createdAt!).toDateString() : '';
@@ -2751,7 +3908,7 @@ function ChatRoom() {
                     <div
                       className={`lr-bubble${isSystem ? ' system-msg' : isMe ? ' mine' : ' theirs'}`}
                       onClick={() => !isSystem && startReply(msg)}
-                      title={isSystem ? '' : 'Click to reply'}
+                      title={isSystem ? '' : 'Click to reply 💕'}
                     >
                       {msg.replyTo && (
                         <div className="lr-reply-quote">
@@ -2777,11 +3934,20 @@ function ChatRoom() {
             })}
           </div>
 
+          {/* Scroll to bottom button */}
+          <button
+            className={`lr-scroll-btn${showScrollBtn ? ' show' : ''}`}
+            onClick={() => scrollToBottom(true)}
+            aria-label="Scroll to bottom"
+          >
+            ↓
+          </button>
+
           {/* Typing indicator */}
           <div className="lr-typing" aria-live="polite" style={{ visibility: typingUser ? 'visible' : 'hidden' }}>
             {typingUser && (
               <>
-                <span>{typingUser} is typing</span>
+                <span>💕 {typingUser} is typing</span>
                 <span className="lr-dots" aria-hidden="true">
                   <span /><span /><span />
                 </span>
@@ -2792,7 +3958,7 @@ function ChatRoom() {
           {/* Reply banner */}
           {replyTo && (
             <div className="lr-reply-bar">
-              Replying to <strong>{replyTo.nickname}</strong>:{' '}
+              💕 Replying to <strong>{replyTo.nickname}</strong>:{' '}
               <span style={{ color: 'var(--text3)' }}>
                 {replyTo.message
                   ? (replyTo.message.length > 50 ? replyTo.message.slice(0, 50) + '…' : replyTo.message)
@@ -2830,14 +3996,14 @@ function ChatRoom() {
               aria-label="Emoji picker"
               title="Emoji"
             >
-              🙂
+              😊
             </button>
 
             <input
               ref={inputRef}
               type="text"
               value={message}
-              placeholder="Write something sweet…"
+              placeholder="Write something sweet… 💕"
               onChange={e => handleInputChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage()}
               aria-label="Message input"
@@ -2846,7 +4012,10 @@ function ChatRoom() {
             <button
               className="lr-icon-btn"
               onClick={() => {
-                spawnHearts(4);
+                const x = window.innerWidth * 0.7;
+                const y = window.innerHeight * 0.8;
+                spawnHearts(6);
+                spawnLoveParticles(x, y, 10);
                 socketRef.current?.emit('sendMessage', { nickname, passcode, message: '♥', replyTo: null });
               }}
               title="Send heart"
@@ -2856,7 +4025,7 @@ function ChatRoom() {
             </button>
 
             <button className="lr-send-btn" onClick={sendMessage} aria-label="Send message">
-              Send <span aria-hidden="true">→</span>
+              <span>Send 💕</span>
             </button>
           </div>
         </main>
