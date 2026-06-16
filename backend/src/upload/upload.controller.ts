@@ -70,14 +70,17 @@ import {
 } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
-
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+
+import { extname, join } from 'path';
 
 import * as fs from 'fs';
 import { readdirSync } from 'fs';
 
-const uploadDir = './uploads';
+const uploadDir = join(
+  process.cwd(),
+  'uploads',
+);
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, {
@@ -89,13 +92,17 @@ if (!fs.existsSync(uploadDir)) {
 export class UploadController {
   @Get('files')
   files() {
-    return readdirSync(uploadDir);
+    return {
+      uploadDir,
+      files: readdirSync(uploadDir),
+    };
   }
 
   @Post('test')
   test() {
     return {
       success: true,
+      uploadDir,
     };
   }
 
@@ -116,7 +123,9 @@ export class UploadController {
             Math.round(
               Math.random() * 1e9,
             ) +
-            extname(file.originalname);
+            extname(
+              file.originalname,
+            );
 
           cb(null, uniqueName);
         },
@@ -139,8 +148,13 @@ export class UploadController {
     }
 
     console.log(
-      'Uploaded:',
+      'Uploaded file:',
       file.filename,
+    );
+
+    console.log(
+      'Saved path:',
+      file.path,
     );
 
     return {
