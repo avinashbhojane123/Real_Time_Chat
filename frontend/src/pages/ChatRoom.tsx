@@ -2309,12 +2309,14 @@ function ChatRoom() {
   const [toast,       setToast]       = useState<string | null>(null);
   const [activeUser,  setActiveUser]  = useState<string | null>(null);
   const [uploading,   setUploading]   = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   const socketRef      = useRef<Socket | null>(null);
   const chatRef        = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
   const typingTimeout  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartsLayerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* inject CSS once */
   useEffect(() => {
@@ -2352,23 +2354,53 @@ function ChatRoom() {
     }
   }, []);
 
-  /* ── Fixed Auto-scroll ── */
-  // Force scroll to bottom whenever messages array changes
-  useEffect(() => {
+  /* ── Scroll to bottom function ── */
+  const scrollToBottom = useCallback((immediate = false) => {
     if (!chatRef.current) return;
-    chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages]); // This will scroll on every messages change
-
-  // Also scroll when messages length changes (for new messages)
-  useEffect(() => {
-    if (!chatRef.current) return;
-    // Small delay to ensure DOM is updated
-    setTimeout(() => {
+    
+    const doScroll = () => {
       if (chatRef.current) {
         chatRef.current.scrollTop = chatRef.current.scrollHeight;
       }
-    }, 50);
-  }, [messages.length]);
+    };
+
+    if (immediate) {
+      doScroll();
+    } else {
+      // Clear any existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+        scrollTimeoutRef.current = setTimeout(doScroll, 50);
+      });
+    }
+  }, []);
+
+  /* ── Auto-scroll to bottom on messages change ── */
+  useEffect(() => {
+    if (messages.length > 0) {
+      // If it's the first load, scroll immediately
+      if (isFirstLoad) {
+        setIsFirstLoad(false);
+        // Small delay to ensure DOM is rendered
+        setTimeout(() => scrollToBottom(true), 100);
+      } else {
+        scrollToBottom(false);
+      }
+    }
+  }, [messages, isFirstLoad, scrollToBottom]);
+
+  /* ── Also scroll when new messages are added ── */
+  useEffect(() => {
+    if (messages.length > 0 && !isFirstLoad) {
+      scrollToBottom(false);
+    }
+  }, [messages.length, isFirstLoad, scrollToBottom]);
 
   /* ── Socket setup ────────────────────────────────────── */
   useEffect(() => {
@@ -2388,17 +2420,31 @@ function ChatRoom() {
       socket.emit('getUsers', { passcode });
     });
 
-    // Fixed chatHistory listener with logging and scroll
     socket.on('chatHistory', (data: Message[]) => {
       console.log('History loaded:', data.length);
       setMessages(data || []);
       
-      // Force scroll to bottom after history loads
-      setTimeout(() => {
+      // Force scroll to bottom after history loads with multiple attempts
+      const attemptScroll = (attempt = 0) => {
+        if (attempt > 5) return; // Max 5 attempts
         if (chatRef.current) {
           chatRef.current.scrollTop = chatRef.current.scrollHeight;
+          // Verify scroll worked
+          setTimeout(() => {
+            if (chatRef.current) {
+              const { scrollHeight, scrollTop } = chatRef.current;
+              if (scrollTop < scrollHeight - 10) {
+                // If not at bottom, try again
+                attemptScroll(attempt + 1);
+              }
+            }
+          }, 100);
+        } else {
+          setTimeout(() => attemptScroll(attempt + 1), 100);
         }
-      }, 100);
+      };
+      
+      setTimeout(() => attemptScroll(0), 100);
     });
 
     socket.on('newMessage', (data: Message) => {
@@ -2436,8 +2482,9 @@ function ChatRoom() {
       socket.removeAllListeners();
       socket.disconnect();
       if (typingTimeout.current) clearTimeout(typingTimeout.current);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [nickname, passcode, navigate, spawnHearts]);
+  }, [nickname, passcode, navigate, spawnHearts, scrollToBottom]);
 
   /* ── Send message ─────────────────────────────────── */
   const sendMessage = () => {
@@ -2520,7 +2567,6 @@ function ChatRoom() {
     const url  = resolveUrl(msg.fileUrl);
     const type = msg.fileType || '';
     const name = msg.fileName || 'file';
-    const isMine = msg.nickname === nickname;
 
     if (type.startsWith('image/'))
       return (
