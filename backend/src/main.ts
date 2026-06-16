@@ -35,10 +35,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // await app.listen(3000);
-  await app.listen(process.env.PORT || 3000);
+  await app.listen(process.env.PORT || 10000);
 
   console.log(
-    'Application running on: http://localhost:3000/api',
+    'Application running on: http://localhost:10000/api',
   );
 }
 
