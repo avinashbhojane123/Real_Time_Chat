@@ -2352,14 +2352,23 @@ function ChatRoom() {
     }
   }, []);
 
-  /* auto-scroll */
-  const scrollBottom = useCallback(() => {
+  /* ── Fixed Auto-scroll ── */
+  // Force scroll to bottom whenever messages array changes
+  useEffect(() => {
     if (!chatRef.current) return;
-    const { scrollHeight, scrollTop, clientHeight } = chatRef.current;
-    if (scrollHeight - scrollTop - clientHeight < 220) {
-      chatRef.current.scrollTop = scrollHeight;
-    }
-  }, []);
+    chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [messages]); // This will scroll on every messages change
+
+  // Also scroll when messages length changes (for new messages)
+  useEffect(() => {
+    if (!chatRef.current) return;
+    // Small delay to ensure DOM is updated
+    setTimeout(() => {
+      if (chatRef.current) {
+        chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      }
+    }, 50);
+  }, [messages.length]);
 
   /* ── Socket setup ────────────────────────────────────── */
   useEffect(() => {
@@ -2379,7 +2388,18 @@ function ChatRoom() {
       socket.emit('getUsers', { passcode });
     });
 
-    socket.on('chatHistory', (data: Message[]) => setMessages(data || []));
+    // Fixed chatHistory listener with logging and scroll
+    socket.on('chatHistory', (data: Message[]) => {
+      console.log('History loaded:', data.length);
+      setMessages(data || []);
+      
+      // Force scroll to bottom after history loads
+      setTimeout(() => {
+        if (chatRef.current) {
+          chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        }
+      }, 100);
+    });
 
     socket.on('newMessage', (data: Message) => {
       setMessages(prev => {
@@ -2418,8 +2438,6 @@ function ChatRoom() {
       if (typingTimeout.current) clearTimeout(typingTimeout.current);
     };
   }, [nickname, passcode, navigate, spawnHearts]);
-
-  useEffect(() => { scrollBottom(); }, [messages, scrollBottom]);
 
   /* ── Send message ─────────────────────────────────── */
   const sendMessage = () => {
