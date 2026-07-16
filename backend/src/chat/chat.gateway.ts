@@ -22,6 +22,12 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { TypingDto } from './dto/typing.dto';
 import { GetRoomDto } from './dto/get-room.dto';
 import {
+  EditMessageDto,
+  DeleteMessageDto,
+  ClearHistoryDto,
+  ReactToMessageDto,
+} from './dto/message-actions.dto';
+import {
   CallUserDto,
   AcceptCallDto,
   DeclineCallDto,
@@ -61,6 +67,39 @@ export class ChatGateway
       .update(User)
       .set({ isOnline: false })
       .execute();
+
+    // Start ephemeral message cleanup loop (runs every 5 seconds)
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const expiredMessages = await this.messageRepo
+          .createQueryBuilder('message')
+          .leftJoinAndSelect('message.room', 'room')
+          .where('message.expiresAt IS NOT NULL AND message.expiresAt <= :now', { now })
+          .getMany();
+
+        if (expiredMessages.length > 0) {
+          const ids = expiredMessages.map(m => m.id);
+          const roomPasscodes = Array.from(new Set(expiredMessages.map(m => m.room.passcode)));
+
+          await this.messageRepo
+            .createQueryBuilder()
+            .delete()
+            .from(Message)
+            .where('id IN (:...ids)', { ids })
+            .execute();
+
+          console.log(`[Self-Destruct] Cleaned up ${ids.length} expired messages.`);
+
+          for (const passcode of roomPasscodes) {
+            const roomIds = expiredMessages.filter(m => m.room.passcode === passcode).map(m => m.id);
+            this.server.to(passcode).emit('messagesExpired', { ids: roomIds });
+          }
+        }
+      } catch (e) {
+        console.error('Error during self-destruct messages cleanup', e);
+      }
+    }, 5000);
   }
 
   private users = new Map<
@@ -132,6 +171,7 @@ export class ChatGateway
           deviceModel: user.deviceModel,
           browser: user.browser,
           os: user.os,
+          avatarUrl: user.avatarUrl,
         })),
       );
     }
@@ -197,6 +237,7 @@ export class ChatGateway
         deviceModel: data.deviceModel,
         browser: data.browser,
         os: data.os,
+        avatarUrl: data.avatarUrl,
       });
     } else {
       user.isOnline = true;
@@ -205,6 +246,9 @@ export class ChatGateway
       user.deviceModel = data.deviceModel || user.deviceModel;
       user.browser = data.browser || user.browser;
       user.os = data.os || user.os;
+      if (data.avatarUrl) {
+        user.avatarUrl = data.avatarUrl;
+      }
     }
 
     await this.userRepo.save(user);
@@ -247,6 +291,7 @@ export class ChatGateway
         deviceModel: user.deviceModel,
         browser: user.browser,
         os: user.os,
+        avatarUrl: user.avatarUrl,
       })),
     );
 
@@ -283,6 +328,11 @@ export class ChatGateway
       };
     }
 
+    let expiresAt: Date | null = null;
+    if (data.expiresIn) {
+      expiresAt = new Date(Date.now() + data.expiresIn * 1000);
+    }
+
     const savedMessage = this.messageRepo.create({
       roomId: room.id,
       nickname: data.nickname,
@@ -292,6 +342,7 @@ export class ChatGateway
       fileName: data.fileName ?? null,
       fileType: data.fileType ?? null,
       fileSize: typeof data.fileSize === 'string' ? parseInt(data.fileSize, 10) : (data.fileSize ?? null),
+      expiresAt,
     });
 
     await this.messageRepo.save(savedMessage);
@@ -307,6 +358,10 @@ export class ChatGateway
       fileName: savedMessage.fileName,
       fileType: savedMessage.fileType,
       fileSize: savedMessage.fileSize,
+      isEdited: savedMessage.isEdited,
+      isDeleted: savedMessage.isDeleted,
+      reactions: savedMessage.reactions,
+      expiresAt: savedMessage.expiresAt,
     });
 
     return {
@@ -399,6 +454,7 @@ export class ChatGateway
         deviceModel: user.deviceModel,
         browser: user.browser,
         os: user.os,
+        avatarUrl: user.avatarUrl,
       })),
     );
   }
@@ -476,5 +532,97 @@ export class ChatGateway
   ) {
     console.log(`[EndCall] Relaying endCall in room: ${data.passcode}`);
     client.to(data.passcode).emit('callEnded');
+  }
+
+  @SubscribeMessage('editMessage')
+  async editMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: EditMessageDto,
+  ) {
+    const msg = await this.messageRepo.findOne({
+      where: { id: data.messageId },
+    });
+    if (!msg) return;
+
+    msg.message = data.newMessage;
+    msg.isEdited = true;
+    await this.messageRepo.save(msg);
+
+    this.server.to(data.passcode).emit('messageEdited', {
+      messageId: msg.id,
+      newMessage: msg.message,
+    });
+  }
+
+  @SubscribeMessage('deleteMessage')
+  async deleteMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: DeleteMessageDto,
+  ) {
+    const msg = await this.messageRepo.findOne({
+      where: { id: data.messageId },
+    });
+    if (!msg) return;
+
+    msg.isDeleted = true;
+    msg.message = 'This message was deleted';
+    msg.fileUrl = null;
+    msg.fileName = null;
+    msg.fileType = null;
+    msg.fileSize = null;
+    await this.messageRepo.save(msg);
+
+    this.server.to(data.passcode).emit('messageDeleted', {
+      messageId: msg.id,
+    });
+  }
+
+  @SubscribeMessage('clearHistory')
+  async clearHistory(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: ClearHistoryDto,
+  ) {
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode },
+    });
+    if (!room) return;
+
+    await this.messageRepo.delete({ roomId: room.id });
+
+    this.server.to(data.passcode).emit('historyCleared');
+  }
+
+  @SubscribeMessage('reactToMessage')
+  async reactToMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: ReactToMessageDto,
+  ) {
+    const msg = await this.messageRepo.findOne({
+      where: { id: data.messageId },
+    });
+    if (!msg) return;
+
+    const reactions = msg.reactions || {};
+    let reactionUsers = reactions[data.emoji] || [];
+
+    if (reactionUsers.includes(data.nickname)) {
+      reactionUsers = reactionUsers.filter(u => u !== data.nickname);
+    } else {
+      reactionUsers.push(data.nickname);
+    }
+
+    if (reactionUsers.length === 0) {
+      delete reactions[data.emoji];
+    } else {
+      reactions[data.emoji] = reactionUsers;
+    }
+
+    msg.reactions = Object.keys(reactions).length > 0 ? reactions : null;
+    await this.messageRepo.save(msg);
+
+    this.server.to(data.passcode).emit('messageReactionsUpdated', {
+      messageId: msg.id,
+      reactions: msg.reactions,
+    });
   }
 }

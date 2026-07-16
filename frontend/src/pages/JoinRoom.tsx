@@ -188,6 +188,28 @@ export default function JoinRoom() {
   const [nickname, setNickname] = useState('');
   const [passcode, setPasscode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [avatar, setAvatar] = useState(localStorage.getItem('avatarUrl') || '');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', files[0]);
+      const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Avatar upload failed');
+      setAvatar(data.fileUrl);
+      localStorage.setItem('avatarUrl', data.fileUrl);
+    } catch (err) {
+      alert('Avatar upload failed');
+      console.error(err);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const joinRoom = async () => {
     if (!nickname.trim() || !passcode.trim()) {
@@ -240,6 +262,9 @@ export default function JoinRoom() {
       setLoading(false);
     }
   };
+
+  const baseUrl = API_URL.replace('/api', '');
+
   return (
     <div className="join-wrap">
       <div className="orb o1" />
@@ -250,6 +275,36 @@ export default function JoinRoom() {
           <div className="logo neu">PC</div>
           <h1>Passcode Chat</h1>
           <p>Enter a nickname and room passcode to continue</p>
+        </div>
+
+        {/* Avatar Uploader */}
+        <div className="avatar-selection-container">
+          <div className="avatar-preview-wrap">
+            {avatar ? (
+              <img
+                src={avatar.startsWith('http') ? avatar : `${baseUrl}${avatar}`}
+                alt="Avatar"
+                className="avatar-preview-img"
+              />
+            ) : (
+              <div className="avatar-placeholder-preview">👤</div>
+            )}
+            {uploadingAvatar && (
+              <div className="avatar-spinner-overlay">
+                <span className="spinner" />
+              </div>
+            )}
+          </div>
+          <label className="avatar-upload-label">
+            <span>Upload Profile Picture</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              style={{ display: 'none' }}
+              disabled={uploadingAvatar}
+            />
+          </label>
         </div>
 
         <div className="field">
@@ -277,7 +332,7 @@ export default function JoinRoom() {
           />
         </div>
 
-        <button className="neu-btn join" onClick={joinRoom} disabled={loading}>
+        <button className="neu-btn join" onClick={joinRoom} disabled={loading || uploadingAvatar}>
           {loading ? (
             <span className="spinner" />
           ) : (
@@ -311,7 +366,7 @@ export default function JoinRoom() {
         }
         .o1 { width: 320px; height: 320px; background: #7c4dff; top: -60px; left: -60px; }
         .o2 { width: 280px; height: 280px; background: #00e5ff; bottom: -40px; right: -40px; }
-
+ 
         .glass-card {
           position: relative;
           z-index: 1;
@@ -336,6 +391,55 @@ export default function JoinRoom() {
         .brand h1 { margin: 0; font-size: 24px; letter-spacing: 0.3px; }
         .brand p { margin: 6px 0 0; font-size: 13px; opacity: 0.75; }
 
+        /* Avatar styling */
+        .avatar-selection-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-bottom: 24px;
+          gap: 8px;
+        }
+        .avatar-preview-wrap {
+          position: relative;
+          width: 84px;
+          height: 84px;
+          border-radius: 50%;
+          overflow: hidden;
+          background: rgba(0,0,0,0.25);
+          box-shadow: inset 8px 8px 16px rgba(0,0,0,0.35), inset -8px -8px 16px rgba(255,255,255,0.05);
+          display: grid;
+          place-items: center;
+          border: 2px solid rgba(255,255,255,0.2);
+        }
+        .avatar-preview-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .avatar-placeholder-preview {
+          font-size: 36px;
+          opacity: 0.75;
+          margin-top: -4px;
+        }
+        .avatar-upload-label {
+          font-size: 12px;
+          color: #5ee7df;
+          cursor: pointer;
+          font-weight: 600;
+          text-decoration: underline;
+          transition: opacity 0.2s;
+        }
+        .avatar-upload-label:hover {
+          opacity: 0.85;
+        }
+        .avatar-spinner-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.4);
+          display: grid;
+          place-items: center;
+        }
+ 
         .field { margin-bottom: 18px; }
         .field label {
           display: block;
@@ -360,7 +464,7 @@ export default function JoinRoom() {
           box-shadow: inset 6px 6px 12px rgba(0,0,0,0.4), inset -6px -6px 12px rgba(255,255,255,0.08), 0 0 0 2px rgba(124,255,178,0.25);
         }
         .neu-in::placeholder { color: rgba(233,236,255,0.5); }
-
+ 
         .neu, .neu-btn {
           background: #e6e9f5;
           box-shadow: 8px 8px 16px rgba(0,0,0,0.35), -8px -8px 16px rgba(255,255,255,0.08);
@@ -379,7 +483,7 @@ export default function JoinRoom() {
         .neu-btn:active { transform: translateY(1px); box-shadow: inset 6px 6px 12px rgba(0,0,0,0.25), inset -6px -6px 12px rgba(255,255,255,0.7); }
         .neu-btn:disabled { opacity: 0.7; cursor: not-allowed; }
         .join { margin-top: 8px; }
-
+ 
         .hint {
           text-align: center;
           font-size: 11px;

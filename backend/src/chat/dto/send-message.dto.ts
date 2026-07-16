@@ -38,4 +38,7 @@ export class SendMessageDto {
 
   @IsOptional()
   fileSize?: number | string | null;
+
+  @IsOptional()
+  expiresIn?: number | null;
 }

@@ -114,4 +114,30 @@ export class Message {
     nullable: true,
   })
   fileSize!: number | null;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  isEdited!: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  isDeleted!: boolean;
+
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+    default: null,
+  })
+  reactions!: Record<string, string[]> | null;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+    default: null,
+  })
+  expiresAt!: Date | null;
 }

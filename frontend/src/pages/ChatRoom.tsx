@@ -21,6 +21,10 @@ interface Message {
   fileType?: string;
   fileSize?: number;
   replyTo?: ReplyRef;
+  isEdited?: boolean;
+  isDeleted?: boolean;
+  reactions?: Record<string, string[]> | null;
+  expiresAt?: string;
 }
 
 interface User {
@@ -32,6 +36,7 @@ interface User {
   deviceModel?: string;
   browser?: string;
   os?: string;
+  avatarUrl?: string;
 }
 
 /* ─── Helpers ────────────────────────────────────────────── */
@@ -2197,6 +2202,11 @@ html, body, #root {
   transform: scale(1.05) rotate(135deg);
 }
 
+.lr-active-call-btn.end-call-btn:hover {
+  background: #c0392b;
+  transform: scale(1.05) rotate(135deg);
+}
+
 @media (max-width: 768px) {
   .lr-call-glass {
     height: 100%;
@@ -2211,6 +2221,291 @@ html, body, #root {
     top: 12px;
     right: 12px;
   }
+}
+
+/* ── Advanced Chat CSS ── */
+.lr-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.lr-msg-bubble-wrap {
+  position: relative;
+  max-width: 75%;
+  display: flex;
+  flex-direction: column;
+}
+.lr-msg-row.mine .lr-msg-bubble-wrap {
+  align-items: flex-end;
+}
+.lr-msg-row.theirs .lr-msg-bubble-wrap {
+  align-items: flex-start;
+}
+
+.lr-msg-action-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(26, 20, 64, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: popMenu 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.lr-msg-row.mine .lr-msg-action-menu {
+  right: 0;
+}
+.lr-msg-row.theirs .lr-msg-action-menu {
+  left: 0;
+}
+@keyframes popMenu {
+  from { opacity: 0; transform: scale(0.9) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.lr-msg-action-btn {
+  background: none;
+  border: none;
+  color: #e9ecff;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lr-msg-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #5ee7df;
+}
+.lr-msg-action-btn.delete:hover {
+  color: #ff758c;
+}
+.lr-msg-action-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+}
+.lr-msg-react-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+.lr-msg-react-emoji {
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.lr-msg-react-emoji:hover {
+  transform: scale(1.35);
+}
+
+.lr-msg-reactions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.lr-msg-row.mine .lr-msg-reactions-bar {
+  justify-content: flex-end;
+}
+.lr-msg-row.theirs .lr-msg-reactions-bar {
+  justify-content: flex-start;
+}
+
+.lr-msg-reaction-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e9ecff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.lr-msg-reaction-badge.user-reacted {
+  background: rgba(94, 231, 223, 0.15);
+  border-color: rgba(94, 231, 223, 0.3);
+  color: #5ee7df;
+}
+.lr-msg-reaction-badge:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.lr-burn-setting-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.lr-burn-setting-menu {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  z-index: 120;
+  width: 140px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(26, 20, 64, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lr-burn-setting-item {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: #e9ecff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lr-burn-setting-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ff758c;
+}
+.lr-burn-setting-item.active {
+  background: rgba(255, 117, 140, 0.15);
+  color: #ff758c;
+}
+.lr-msg-burn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #ff758c;
+  background: rgba(255, 117, 140, 0.1);
+  border: 1px solid rgba(255, 117, 140, 0.25);
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+  margin-top: 4px;
+  align-self: flex-start;
+}
+.lr-msg-row.mine .lr-msg-burn-badge {
+  align-self: flex-end;
+}
+
+.lr-editing-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 18px 18px;
+  font-size: 12px;
+  color: #e9ecff;
+}
+.lr-editing-cancel {
+  border: none;
+  background: none;
+  color: #ff758c;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-left: 8px;
+}
+.lr-edited-tag {
+  font-size: 9px;
+  opacity: 0.55;
+  margin-left: 6px;
+  font-style: italic;
+}
+
+.lr-session-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 14px;
+  margin: 16px 12px;
+}
+.lr-session-title {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #5ee7df;
+  margin-bottom: 10px;
+}
+.lr-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lr-session-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.lr-session-icon {
+  font-size: 16px;
+}
+.lr-session-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lr-session-card-name {
+  font-weight: 700;
+  color: #e9ecff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lr-session-card-meta {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.clear-history-btn {
+  background: rgba(255, 117, 140, 0.08);
+  color: #ff758c;
+  margin-right: 8px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 117, 140, 0.2);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.clear-history-btn:hover {
+  background: rgba(255, 117, 140, 0.15);
+  border-color: rgba(255, 117, 140, 0.4);
+}
+.lr-msg-deleted {
+  font-style: italic;
+  opacity: 0.6;
 }
 `;
 
@@ -2258,6 +2553,12 @@ function ChatRoom() {
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
 
+  // Advanced Chat States
+  const [burnDelay, setBurnDelay] = useState<number | null>(null); // null = Off, or seconds
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [contextMenuMsgId, setContextMenuMsgId] = useState<number | null>(null);
+  const [nowTime, setNowTime] = useState(Date.now());
+
   const callStateRef = useRef<'idle' | 'calling' | 'incoming' | 'active'>('idle');
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -2287,6 +2588,57 @@ function ChatRoom() {
     setLocalStream(stream);
     localStreamRef.current = stream;
   };
+
+  // Advanced Chat Helpers
+  const startEditMessage = (msg: Message) => {
+    setEditingMessage(msg);
+    setMessage(msg.message);
+    setContextMenuMsgId(null);
+    inputRef.current?.focus();
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessage(null);
+    setMessage('');
+  };
+
+  const handleEditMessageSubmit = () => {
+    const text = message.trim();
+    if (!text || !editingMessage || !editingMessage.id) return;
+    socketRef.current?.emit('editMessage', {
+      passcode,
+      messageId: editingMessage.id,
+      newMessage: text,
+    });
+    setEditingMessage(null);
+    setMessage('');
+  };
+
+  const handleDeleteMessage = (msgId: number) => {
+    socketRef.current?.emit('deleteMessage', { passcode, messageId: msgId });
+    setContextMenuMsgId(null);
+  };
+
+  const handleReactToMessage = (msgId: number, emoji: string) => {
+    socketRef.current?.emit('reactToMessage', {
+      passcode,
+      messageId: msgId,
+      emoji,
+      nickname,
+    });
+    setContextMenuMsgId(null);
+  };
+
+  const handleClearHistory = () => {
+    if (window.confirm('Are you sure you want to permanently clear all messages in this room? This cannot be undone.')) {
+      socketRef.current?.emit('clearHistory', { passcode });
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowTime(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const stopAudio = () => {
     try {
@@ -2730,7 +3082,12 @@ function ChatRoom() {
 
     socket.on('connect', () => {
       const meta = getDeviceMetadata();
-      socket.emit('joinRoom', { nickname, passcode, ...meta });
+      socket.emit('joinRoom', {
+        nickname,
+        passcode,
+        avatarUrl: localStorage.getItem('avatarUrl') || '',
+        ...meta
+      });
       socket.emit('getUsers', { passcode });
     });
 
@@ -2769,6 +3126,35 @@ function ChatRoom() {
         const y = Math.random() * window.innerHeight * 0.5 + window.innerHeight * 0.1;
         spawnLoveParticles(x, y, 5);
       }
+    });
+
+    socket.on('messageEdited', ({ messageId, newMessage }: { messageId: number; newMessage: string }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, message: newMessage, isEdited: true } : m));
+    });
+
+    socket.on('messageDeleted', ({ messageId }: { messageId: number }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? {
+        ...m,
+        message: 'This message was deleted',
+        fileUrl: null,
+        fileName: null,
+        fileType: null,
+        fileSize: null,
+        isDeleted: true
+      } : m));
+    });
+
+    socket.on('historyCleared', () => {
+      setMessages([]);
+      showToast('Room chat history wiped');
+    });
+
+    socket.on('messageReactionsUpdated', ({ messageId, reactions }: { messageId: number; reactions: any }) => {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
+    });
+
+    socket.on('messagesExpired', ({ ids }: { ids: number[] }) => {
+      setMessages(prev => prev.filter(m => !ids.includes(m.id!)));
     });
 
     socket.on('usersList', (data: User[]) => setUsers(data || []));
@@ -2893,12 +3279,18 @@ function ChatRoom() {
     const text = message.trim();
     if (!text || !socketRef.current?.connected) return;
 
+    if (editingMessage) {
+      handleEditMessageSubmit();
+      return;
+    }
+
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
     socketRef.current.emit('stopTyping', { nickname, passcode });
 
     socketRef.current.emit('sendMessage', {
       nickname, passcode, message: text,
       replyTo: replyTo ? { id: replyTo.id, nickname: replyTo.nickname, message: replyTo.message } : null,
+      expiresIn: burnDelay,
     });
 
     const x = window.innerWidth * 0.7;
@@ -2910,6 +3302,7 @@ function ChatRoom() {
     setMessage('');
     setReplyTo(null);
     setShowEmoji(false);
+    setBurnDelay(null);
     inputRef.current?.focus();
   };
 
@@ -2942,8 +3335,10 @@ function ChatRoom() {
           fileUrl: data.fileUrl, fileName: data.fileName,
           fileType: data.fileType, fileSize: data.fileSize,
           replyTo: replyTo ? { id: replyTo.id, nickname: replyTo.nickname, message: replyTo.message } : null,
+          expiresIn: burnDelay,
         });
         setReplyTo(null);
+        setBurnDelay(null);
         spawnHearts(4);
         const x = window.innerWidth * 0.7;
         const y = window.innerHeight * 0.8;
@@ -3239,7 +3634,11 @@ function ChatRoom() {
                 }}
               >
                 <div className={`lr-av ${userColor(user.nickname)}`}>
-                  {initials(user.nickname)}
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${SOCKET_URL}${user.avatarUrl}`} alt={user.nickname} />
+                  ) : (
+                    initials(user.nickname)
+                  )}
                   <span className={`lr-av-dot ${user.isOnline ? 'lr-dot-on' : 'lr-dot-off'}`} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -3259,6 +3658,30 @@ function ChatRoom() {
             ))}
           </div>
 
+          {/* Active Sessions Panel */}
+          <div className="lr-session-panel">
+            <div className="lr-session-title">💻 Active Devices</div>
+            <div className="lr-session-list">
+              {users.map(user => {
+                let deviceIcon = '💻';
+                if (user.deviceType === 'mobile') deviceIcon = '📱';
+                else if (user.deviceType === 'tablet') deviceIcon = '📟';
+                
+                return (
+                  <div key={`session-${user.id}`} className="lr-session-card">
+                    <span className="lr-session-icon">{deviceIcon}</span>
+                    <div className="lr-session-card-info">
+                      <span className="lr-session-card-name">{user.nickname}</span>
+                      <span className="lr-session-card-meta">
+                        {user.os ? `${user.os} · ${user.browser || 'Unknown'}` : 'Connecting...'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="lr-sidebar-foot">
             <span aria-hidden="true">💝</span>
             {nickname}
@@ -3273,7 +3696,11 @@ function ChatRoom() {
             {displayUser ? (
               <>
                 <div className={`lr-head-av lr-av ${userColor(displayUser.nickname)}`}>
-                  {initials(displayUser.nickname)}
+                  {displayUser.avatarUrl ? (
+                    <img src={displayUser.avatarUrl.startsWith('http') ? displayUser.avatarUrl : `${SOCKET_URL}${displayUser.avatarUrl}`} alt={displayUser.nickname} />
+                  ) : (
+                    initials(displayUser.nickname)
+                  )}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <p className="lr-head-name">{displayUser.nickname}</p>
@@ -3305,6 +3732,13 @@ function ChatRoom() {
                 </button>
               )}
               <button
+                className="clear-history-btn"
+                title="Wipe Space Chat History"
+                onClick={handleClearHistory}
+              >
+                🗑️ Clear Space
+              </button>
+              <button
                 className="lr-icon-btn"
                 title="Send hearts"
                 aria-label="Send hearts"
@@ -3327,7 +3761,11 @@ function ChatRoom() {
 
           {/* Messages */}
           <div className="lr-messages" ref={chatRef} role="log" aria-live="polite">
-            {messages.map((msg, idx) => {
+            {messages.filter(msg => {
+              if (!msg.expiresAt) return true;
+              const expiresAtMs = new Date(msg.expiresAt).getTime();
+              return expiresAtMs > nowTime;
+            }).map((msg, idx) => {
               const isMe     = msg.nickname === nickname;
               const isSystem = msg.nickname === 'System';
 
@@ -3335,6 +3773,9 @@ function ChatRoom() {
               const prevDate = idx > 0 && messages[idx - 1].createdAt
                 ? new Date(messages[idx - 1].createdAt!).toDateString() : '';
               const showDate = msgDate && msgDate !== prevDate;
+
+              const senderUser = users.find(u => u.nickname === msg.nickname);
+              const senderAvatar = senderUser?.avatarUrl;
 
               return (
                 <div key={msg.id ?? `${msg.nickname}-${idx}`} style={{ width: '100%' }}>
@@ -3349,30 +3790,99 @@ function ChatRoom() {
                         className={`lr-msg-av lr-av ${userColor(msg.nickname)}`}
                         title={msg.nickname}
                       >
-                        {initials(msg.nickname)}
+                        {senderAvatar ? (
+                          <img src={senderAvatar.startsWith('http') ? senderAvatar : `${SOCKET_URL}${senderAvatar}`} alt={msg.nickname} />
+                        ) : (
+                          initials(msg.nickname)
+                        )}
                       </div>
                     )}
-                    <div
-                      className={`lr-bubble${isSystem ? ' system-msg' : isMe ? ' mine' : ' theirs'}`}
-                      onClick={() => !isSystem && startReply(msg)}
-                      title={isSystem ? '' : 'Click to reply 💕'}
-                    >
-                      {msg.replyTo && (
-                        <div className="lr-reply-quote">
-                          <strong>{msg.replyTo.nickname}</strong>
-                          <span>
-                            {msg.replyTo.message
-                              ? (msg.replyTo.message.length > 50 ? msg.replyTo.message.slice(0, 50) + '…' : msg.replyTo.message)
-                              : '📎 Attachment'}
-                          </span>
+                    <div className="lr-msg-bubble-wrap">
+                      <div
+                        className={`lr-bubble${isSystem ? ' system-msg' : isMe ? ' mine' : ' theirs'}${msg.isDeleted ? ' lr-msg-deleted' : ''}`}
+                        onClick={() => !isSystem && setContextMenuMsgId(contextMenuMsgId === msg.id ? null : msg.id!)}
+                        title={isSystem ? '' : 'Click for actions 💕'}
+                      >
+                        {msg.replyTo && (
+                          <div className="lr-reply-quote">
+                            <strong>{msg.replyTo.nickname}</strong>
+                            <span>
+                              {msg.replyTo.message
+                                ? (msg.replyTo.message.length > 50 ? msg.replyTo.message.slice(0, 50) + '…' : msg.replyTo.message)
+                                : '📎 Attachment'}
+                            </span>
+                          </div>
+                        )}
+
+                        {msg.message && <span>{msg.message}</span>}
+                        {renderFile(msg)}
+
+                        {!isSystem && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                            <time className="lr-bubble-time">{fmtTime(msg.createdAt)}</time>
+                            {msg.isEdited && <span className="lr-edited-tag">(edited)</span>}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Burn Timer indicator */}
+                      {msg.expiresAt && !isSystem && (
+                        <div className="lr-msg-burn-badge">
+                          🔥 {Math.max(0, Math.round((new Date(msg.expiresAt).getTime() - nowTime) / 1000))}s
                         </div>
                       )}
 
-                      {msg.message && <span>{msg.message}</span>}
-                      {renderFile(msg)}
+                      {/* Message Reactions Bar */}
+                      {msg.reactions && Object.keys(msg.reactions).length > 0 && !isSystem && (
+                        <div className="lr-msg-reactions-bar">
+                          {Object.entries(msg.reactions).map(([emoji, reactionUsers]) => {
+                            const hasReacted = reactionUsers.includes(nickname);
+                            return (
+                              <div
+                                key={emoji}
+                                className={`lr-msg-reaction-badge${hasReacted ? ' user-reacted' : ''}`}
+                                onClick={() => handleReactToMessage(msg.id!, emoji)}
+                                title={reactionUsers.join(', ')}
+                              >
+                                <span>{emoji}</span>
+                                <span>{reactionUsers.length}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                      {!isSystem && (
-                        <time className="lr-bubble-time">{fmtTime(msg.createdAt)}</time>
+                      {/* Action context menu overlay */}
+                      {contextMenuMsgId === msg.id && !isSystem && !msg.isDeleted && (
+                        <div className="lr-msg-action-menu">
+                          <div className="lr-msg-react-picker">
+                            {['❤️', '👍', '😂', '😮', '😢'].map(emoji => (
+                              <span
+                                key={emoji}
+                                className="lr-msg-react-emoji"
+                                onClick={() => handleReactToMessage(msg.id!, emoji)}
+                              >
+                                {emoji}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="lr-msg-action-divider" />
+                          <button className="lr-msg-action-btn" onClick={() => { setReplyTo(msg); setContextMenuMsgId(null); inputRef.current?.focus(); }}>
+                            Reply
+                          </button>
+                          {isMe && (
+                            <>
+                              <div className="lr-msg-action-divider" />
+                              <button className="lr-msg-action-btn" onClick={() => startEditMessage(msg)}>
+                                Edit
+                              </button>
+                              <div className="lr-msg-action-divider" />
+                              <button className="lr-msg-action-btn delete" onClick={() => handleDeleteMessage(msg.id!)}>
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -3412,6 +3922,18 @@ function ChatRoom() {
                   : '📎 Attachment'}
               </span>
               <button className="lr-reply-bar-close" onClick={() => setReplyTo(null)} aria-label="Cancel reply">×</button>
+            </div>
+          )}
+
+          {/* Editing bar */}
+          {editingMessage && (
+            <div className="lr-editing-bar">
+              <span>
+                ✍️ Editing message: <strong style={{ opacity: 0.8 }}>"{editingMessage.message}"</strong>
+              </span>
+              <button className="lr-editing-cancel" onClick={cancelEditMessage}>
+                Cancel
+              </button>
             </div>
           )}
 
@@ -3458,6 +3980,37 @@ function ChatRoom() {
               autoCorrect="on"
               autoCapitalize="sentences"
             />
+
+            {/* Self-Destruct Menu */}
+            <div className="lr-burn-setting-container" style={{ display: 'flex', alignItems: 'center' }}>
+              <button
+                className={`lr-icon-btn${burnDelay ? ' active' : ''}`}
+                style={{ color: burnDelay ? '#ff758c' : 'inherit', marginRight: 8, fontSize: 16 }}
+                onClick={() => setContextMenuMsgId(contextMenuMsgId === -999 ? null : -999)}
+                title="Self-Destruct Timer"
+                aria-label="Self-Destruct Timer"
+              >
+                🔥{burnDelay ? ` ${burnDelay}s` : ''}
+              </button>
+              
+              {contextMenuMsgId === -999 && (
+                <div className="lr-burn-setting-menu">
+                  <div style={{ fontSize: 10, fontWeight: 800, padding: '4px 8px', opacity: 0.5, color: '#ff758c' }}>SELF-DESTRUCT</div>
+                  <button className={`lr-burn-setting-item${burnDelay === null ? ' active' : ''}`} onClick={() => { setBurnDelay(null); setContextMenuMsgId(null); }}>
+                    Off
+                  </button>
+                  {[10, 30, 60, 300].map(sec => (
+                    <button
+                      key={sec}
+                      className={`lr-burn-setting-item${burnDelay === sec ? ' active' : ''}`}
+                      onClick={() => { setBurnDelay(sec); setContextMenuMsgId(null); }}
+                    >
+                      {sec === 60 ? '1 minute' : sec === 300 ? '5 minutes' : `${sec} seconds`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               className="lr-icon-btn"
