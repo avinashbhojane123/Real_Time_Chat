@@ -47,7 +47,11 @@ export class ChatGateway
 
   async onApplicationBootstrap() {
     console.log('Resetting all users online status to offline on startup...');
-    await this.userRepo.update({}, { isOnline: false });
+    await this.userRepo
+      .createQueryBuilder()
+      .update(User)
+      .set({ isOnline: false })
+      .execute();
   }
 
   private users = new Map<
