@@ -12,18 +12,24 @@ import { Server, Socket } from 'socket.io';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UsePipes, ValidationPipe, OnApplicationBootstrap } from '@nestjs/common';
 
 import { Room } from '../rooms/room.entity';
 import { Message } from '../messages/message.entity';
 import { User } from '../users/user.entity';
+import { JoinRoomDto } from './dto/join-room.dto';
+import { SendMessageDto } from './dto/send-message.dto';
+import { TypingDto } from './dto/typing.dto';
+import { GetRoomDto } from './dto/get-room.dto';
 
+@UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
 export class ChatGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap
 {
   @WebSocketServer()
   server!: Server;
@@ -38,6 +44,11 @@ export class ChatGateway
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
   ) {}
+
+  async onApplicationBootstrap() {
+    console.log('Resetting all users online status to offline on startup...');
+    await this.userRepo.update({}, { isOnline: false });
+  }
 
   private users = new Map<
     string,
@@ -55,6 +66,17 @@ export class ChatGateway
     const userInfo = this.users.get(client.id);
 
     if (!userInfo) return;
+
+    this.users.delete(client.id);
+
+    // Check if there's another active socket connected for the same user
+    const isStillConnected = Array.from(this.users.values()).some(
+      (info) => info.nickname === userInfo.nickname && info.passcode === userInfo.passcode
+    );
+
+    if (isStillConnected) {
+      return;
+    }
 
     const room = await this.roomRepo.findOne({
       where: {
@@ -113,21 +135,12 @@ export class ChatGateway
       .emit('userLeft', {
         nickname: userInfo.nickname,
       });
-
-    this.users.delete(client.id);
   }
 
   @SubscribeMessage('joinRoom')
   async joinRoom(
     @MessageBody()
-    data: {
-      nickname: string;
-      passcode: string;
-      deviceType?: string;
-      deviceModel?: string;
-      browser?: string;
-      os?: string;
-    },
+    data: JoinRoomDto,
     @ConnectedSocket()
     client: Socket,
   ) {
@@ -242,20 +255,7 @@ export class ChatGateway
   @SubscribeMessage('sendMessage')
   async sendMessage(
     @MessageBody()
-    data: {
-      nickname: string;
-      passcode: string;
-      message: string;
-      replyTo?: {
-        id?: number;
-        nickname: string;
-        message: string;
-      };
-      fileUrl?: string;
-      fileName?: string;
-      fileType?: string;
-      fileSize?: number;
-    },
+    data: SendMessageDto,
   ) {
     const room = await this.roomRepo.findOne({
       where: {
@@ -278,7 +278,7 @@ export class ChatGateway
       fileUrl: data.fileUrl ?? null,
       fileName: data.fileName ?? null,
       fileType: data.fileType ?? null,
-      fileSize: data.fileSize ?? null,
+      fileSize: typeof data.fileSize === 'string' ? parseInt(data.fileSize, 10) : (data.fileSize ?? null),
     });
 
     await this.messageRepo.save(savedMessage);
@@ -304,9 +304,7 @@ export class ChatGateway
   @SubscribeMessage('getMessages')
   async getMessages(
     @MessageBody()
-    data: {
-      passcode: string;
-    },
+    data: GetRoomDto,
   ) {
     const room = await this.roomRepo.findOne({
       where: {
@@ -332,10 +330,7 @@ export class ChatGateway
   typing(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: {
-      nickname: string;
-      passcode: string;
-    },
+    data: TypingDto,
   ) {
     client.to(data.passcode).emit('userTyping', {
       nickname: data.nickname,
@@ -346,10 +341,7 @@ export class ChatGateway
   stopTyping(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: {
-      nickname: string;
-      passcode: string;
-    },
+    data: TypingDto,
   ) {
     client.to(data.passcode).emit('userStoppedTyping', {
       nickname: data.nickname,
@@ -359,9 +351,7 @@ export class ChatGateway
   @SubscribeMessage('getUsers')
   async getUsers(
     @MessageBody()
-    data: {
-      passcode: string;
-    },
+    data: GetRoomDto,
     @ConnectedSocket()
     client: Socket,
   ) {

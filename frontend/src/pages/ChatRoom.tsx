@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 
-const SOCKET_URL = 'https://backend-9i6w.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://backend-9i6w.onrender.com';
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface ReplyRef {
@@ -38,11 +38,13 @@ interface User {
 const resolveUrl = (url: string) =>
   url.startsWith('http') ? url : `${SOCKET_URL}${url}`;
 
-const formatBytes = (bytes?: number) => {
+const formatBytes = (bytes?: number | string) => {
   if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+  const numBytes = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
+  if (isNaN(numBytes)) return '';
+  if (numBytes < 1024) return `${numBytes} B`;
+  if (numBytes < 1048576) return `${(numBytes / 1024).toFixed(1)} KB`;
+  return `${(numBytes / 1048576).toFixed(1)} MB`;
 };
 
 const fmtTime = (iso?: string) => {
@@ -2381,6 +2383,7 @@ function ChatRoom() {
   }, [sidebarOpen]);
 
   const onlineCount = users.filter(u => u.isOnline).length;
+  const currentActive = activeUser || (displayUser ? displayUser.nickname : null);
 
   return (
     <>
@@ -2428,7 +2431,7 @@ function ChatRoom() {
             {users.map(user => (
               <div
                 key={user.id}
-                className={`lr-user-item${activeUser === user.nickname || (!activeUser && user.nickname !== nickname) ? ' active' : ''}`}
+                className={`lr-user-item${currentActive === user.nickname ? ' active' : ''}`}
                 onClick={() => {
                   setActiveUser(user.nickname);
                   if (window.innerWidth <= 768) setSidebarOpen(false);

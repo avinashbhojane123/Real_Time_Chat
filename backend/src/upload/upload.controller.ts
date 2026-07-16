@@ -131,6 +131,28 @@ export class UploadController {
         },
       }),
 
+      fileFilter: (req, file, cb) => {
+        const allowedExtensions = [
+          // Images
+          '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp',
+          // Video
+          '.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv',
+          // Audio
+          '.mp3', '.wav', '.aac', '.m4a', '.flac',
+          // PDF & Office docs
+          '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+          // Text/Data
+          '.txt', '.csv', '.json', '.xml',
+          // Archives
+          '.zip', '.tar', '.gz', '.rar', '.7z'
+        ];
+        const ext = extname(file.originalname).toLowerCase();
+        if (!allowedExtensions.includes(ext)) {
+          return cb(new BadRequestException('File type not allowed'), false);
+        }
+        cb(null, true);
+      },
+
       limits: {
         fileSize:
           100 * 1024 * 1024, // 100MB

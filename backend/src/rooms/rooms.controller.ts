@@ -1,5 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
+import { JoinRoomHttpDto } from './dto/join-room-http.dto';
 
 @Controller('rooms')
 export class RoomsController {
@@ -10,10 +11,7 @@ export class RoomsController {
   @Post('join')
   async join(
     @Body()
-    body: {
-      nickname: string;
-      passcode: string;
-    },
+    body: JoinRoomHttpDto,
   ) {
     const room =
       await this.roomService.findOrCreate(
