@@ -84,6 +84,30 @@ const getDeviceMetadata = () => {
 const initials = (name: string) =>
   name.replace(/[^\w\s]/g, '').trim().slice(0, 2).toUpperCase() || '??';
 
+const getVideoEmbed = (text: string) => {
+  if (!text) return null;
+
+  // Instagram Post / Reel / TV
+  const instaMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|tv)\/([a-zA-Z0-9-_]+)/i);
+  if (instaMatch) {
+    return {
+      type: 'instagram',
+      url: `https://www.instagram.com/p/${instaMatch[1]}/embed`
+    };
+  }
+
+  // YouTube Shorts
+  const ytMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/shorts\/|youtu\.be\/shorts\/)([a-zA-Z0-9-_]+)/i);
+  if (ytMatch) {
+    return {
+      type: 'youtube',
+      url: `https://www.youtube.com/embed/${ytMatch[1]}`
+    };
+  }
+
+  return null;
+};
+
 const EMOJIS = ['❤️', '😍', '😊', '🥰', '😘', '✨', '😄', '🤗', '👍'];
 
 /* ═══════════════════════════════════════════════════════════
@@ -950,6 +974,27 @@ function ChatRoom() {
                       <p className={`m-0 ${msg.isDeleted ? 'fst-italic opacity-50' : ''}`}>
                         {msg.message}
                       </p>
+
+                      {/* Instagram Reel / YouTube Shorts Embed preview */}
+                      {!msg.isDeleted && (() => {
+                        const embed = getVideoEmbed(msg.message);
+                        if (!embed) return null;
+                        return (
+                          <div className="video-embed-wrapper my-2" style={{ maxWidth: 280, borderRadius: 8, overflow: 'hidden' }}>
+                            <iframe
+                              src={embed.url}
+                              width="100%"
+                              height="400"
+                              frameBorder="0"
+                              scrolling="no"
+                              allowFullScreen={embed.type === 'youtube'}
+                              allow="encrypted-media; picture-in-picture"
+                              title={`${embed.type === 'instagram' ? 'Instagram Reel' : 'YouTube Shorts'} Embed`}
+                              style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.1)' }}
+                            />
+                          </div>
+                        );
+                      })()}
 
                       {renderFile(msg)}
 
