@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://backend-9i6w.onrender.com';
 
-/* ─── Types ─────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   Types
+═══════════════════════════════════════════════════════════ */
 interface ReplyRef {
   id?: number;
   nickname: string;
@@ -39,7 +41,34 @@ interface User {
   avatarUrl?: string;
 }
 
-/* ─── Helpers ────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   Constants
+   Centralising "magic numbers" makes the design system
+   consistent and easy to tweak from one place.
+═══════════════════════════════════════════════════════════ */
+const AVATAR_SIZE = { sm: 32, md: 38, lg: 40, xl: 42 } as const;
+
+// Single source of truth for stacking order — avoids scattered
+// hard-coded z-index values that are hard to reason about.
+const Z = {
+  floatingHearts: 0,
+  loveAnimations: 2100,
+  spawnedParticles: 2200,
+  menu: 100,
+  pip: 10,
+  callControls: 20,
+  call: 1500,
+  lightbox: 2000,
+  toast: 3000,
+} as const;
+
+const REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢'];
+const EMOJIS = ['❤️', '😍', '😊', '🥰', '😘', '✨', '😄', '🤗', '👍'];
+
+/* ═══════════════════════════════════════════════════════════
+   Pure helpers (unchanged logic, kept outside the component
+   so they aren't re-created on every render)
+═══════════════════════════════════════════════════════════ */
 const resolveUrl = (url: string) => {
   if (!url) return '';
   const trimmed = url.trim().toLowerCase();
@@ -87,27 +116,21 @@ const initials = (name: string) =>
 const getVideoEmbed = (text: string) => {
   if (!text) return null;
 
-  // Instagram Post / Reel / TV
   const instaMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|tv)\/([a-zA-Z0-9-_]+)/i);
   if (instaMatch) {
-    return {
-      type: 'instagram',
-      url: `https://www.instagram.com/p/${instaMatch[1]}/embed`
-    };
+    return { type: 'instagram' as const, url: `https://www.instagram.com/p/${instaMatch[1]}/embed` };
   }
 
-  // YouTube Shorts
   const ytMatch = text.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/shorts\/|youtu\.be\/shorts\/)([a-zA-Z0-9-_]+)/i);
   if (ytMatch) {
-    return {
-      type: 'youtube',
-      url: `https://www.youtube.com/embed/${ytMatch[1]}`
-    };
+    return { type: 'youtube' as const, url: `https://www.youtube.com/embed/${ytMatch[1]}` };
   }
 
   return null;
 };
 
+/* Decorative particle animations — purely visual, wrapped in
+   try/catch-free guards since they touch the DOM directly. */
 const spawnHearts = (count: number = 8) => {
   const container = document.getElementById('love-animations-container');
   if (!container) return;
@@ -117,18 +140,16 @@ const spawnHearts = (count: number = 8) => {
     const el = document.createElement('span');
     el.innerText = hearts[Math.floor(Math.random() * hearts.length)];
     el.className = 'spawned-heart-animation';
-    
+    el.setAttribute('aria-hidden', 'true');
+
     const size = Math.random() * 24 + 16;
     const left = Math.random() * 100;
     const duration = Math.random() * 3 + 2;
     const delay = Math.random() * 0.5;
 
-    el.style.position = 'absolute';
     el.style.left = `${left}%`;
     el.style.bottom = '-50px';
     el.style.fontSize = `${size}px`;
-    el.style.opacity = '0';
-    el.style.pointerEvents = 'none';
     el.style.animation = `floatHeartEffect ${duration}s ease-in-out ${delay}s forwards`;
 
     container.appendChild(el);
@@ -145,20 +166,18 @@ const spawnLoveParticles = (x: number, y: number, count: number = 12) => {
     const el = document.createElement('span');
     el.innerText = particles[Math.floor(Math.random() * particles.length)];
     el.className = 'love-burst-particle';
-    
+    el.setAttribute('aria-hidden', 'true');
+
     const angle = Math.random() * Math.PI * 2;
     const distance = Math.random() * 120 + 40;
     const destX = Math.cos(angle) * distance;
     const destY = Math.sin(angle) * distance - 80;
     const duration = Math.random() * 1.5 + 1;
 
-    el.style.position = 'absolute';
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.style.fontSize = `${Math.random() * 16 + 12}px`;
-    el.style.pointerEvents = 'none';
     el.style.animation = `particleBurstEffect ${duration}s cubic-bezier(0.1, 0.8, 0.3, 1) forwards`;
-    
     el.style.setProperty('--tx', `${destX}px`);
     el.style.setProperty('--ty', `${destY}px`);
 
@@ -167,7 +186,355 @@ const spawnLoveParticles = (x: number, y: number, count: number = 12) => {
   }
 };
 
-const EMOJIS = ['❤️', '😍', '😊', '🥰', '😘', '✨', '😄', '🤗', '👍'];
+/* ═══════════════════════════════════════════════════════════
+   Small presentational components
+   Pulling these out of the giant ChatRoom body (a) makes the
+   markup readable, (b) lets React.memo stop unrelated state
+   changes (e.g. typing in the input) from re-rendering every
+   message/user row, and (c) gives every icon-only control a
+   place to carry its own aria-label.
+═══════════════════════════════════════════════════════════ */
+
+function Avatar({
+  src, name, size, baseUrl, online,
+}: { src?: string; name: string; size: number; baseUrl: string; online?: boolean }) {
+  const resolved = src ? (src.startsWith('http') ? src : `${baseUrl}${src}`) : '';
+  return (
+    <div className="position-relative flex-shrink-0" style={{ width: size, height: size }}>
+      {resolved ? (
+        <img
+          src={resolved}
+          alt={name}
+          className="rounded-circle w-100 h-100"
+          style={{ objectFit: 'cover' }}
+          loading="lazy"
+        />
+      ) : (
+        <div
+          className="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold w-100 h-100"
+          style={{ fontSize: Math.max(10, size * 0.3) }}
+          aria-hidden="true"
+        >
+          {initials(name)}
+        </div>
+      )}
+      {online !== undefined && (
+        <span
+          className={`position-absolute bottom-0 end-0 border border-white rounded-circle ${online ? 'bg-success' : 'bg-secondary'}`}
+          style={{ width: Math.max(9, size * 0.28), height: Math.max(9, size * 0.28) }}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
+}
+
+/** Countdown text for a self-destructing message. Owns its own
+ *  1-second interval so a "burning" message never forces the
+ *  entire chat log to re-render — only this one line updates. */
+const ExpiryCountdown = memo(function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const secondsLeft = Math.max(0, Math.round((new Date(expiresAt).getTime() - now) / 1000));
+  return (
+    <div className="small text-danger fw-bold mt-1">
+      🔥 Expires in: {secondsLeft}s
+    </div>
+  );
+});
+
+interface MessageRowProps {
+  msg: Message;
+  isMe: boolean;
+  nickname: string;
+  senderAvatar?: string;
+  baseUrl: string;
+  isMenuOpen: boolean;
+  onToggleMenu: (id: number | null) => void;
+  onReply: (msg: Message) => void;
+  onEdit: (msg: Message) => void;
+  onDelete: (id: number) => void;
+  onReact: (id: number, emoji: string) => void;
+  onImageClick: (url: string) => void;
+  onMediaLoad: () => void;
+}
+
+/** One chat bubble. Memoized so typing in the composer, opening
+ *  the emoji picker, etc. doesn't re-render the whole message list. */
+const MessageRow = memo(function MessageRow({
+  msg, isMe, nickname, senderAvatar, baseUrl, isMenuOpen,
+  onToggleMenu, onReply, onEdit, onDelete, onReact, onImageClick, onMediaLoad,
+}: MessageRowProps) {
+  // Locally "self-destructs": once expiresAt passes, this row
+  // stops rendering itself instead of the parent re-filtering
+  // the entire message array every second.
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    if (!msg.expiresAt) return;
+    const remainingMs = new Date(msg.expiresAt).getTime() - Date.now();
+    if (remainingMs <= 0) {
+      setExpired(true);
+      return;
+    }
+    const timeout = setTimeout(() => setExpired(true), remainingMs);
+    return () => clearTimeout(timeout);
+  }, [msg.expiresAt]);
+
+  if (expired) return null;
+
+  if (msg.nickname === 'System') {
+    return (
+      <div className="text-center my-3">
+        <span className="badge bg-secondary bg-opacity-10 text-muted border py-2 px-3 rounded-pill fw-normal">
+          {msg.message}
+        </span>
+      </div>
+    );
+  }
+
+  const embed = !msg.isDeleted ? getVideoEmbed(msg.message) : null;
+  const reactionEntries = msg.reactions ? Object.entries(msg.reactions) : [];
+
+  const renderFile = () => {
+    if (!msg.fileUrl) return null;
+    const url = resolveUrl(msg.fileUrl);
+    const type = msg.fileType || '';
+    const name = msg.fileName || 'file';
+
+    if (type.startsWith('image/'))
+      return (
+        <button
+          type="button"
+          className="btn p-0 border-0 bg-transparent d-block my-2"
+          onClick={() => onImageClick(url)}
+          aria-label={`Open image ${name} in full screen`}
+        >
+          <img
+            src={url}
+            alt={name}
+            className="img-fluid rounded border chat-media"
+            loading="lazy"
+            onLoad={onMediaLoad}
+          />
+        </button>
+      );
+
+    if (type.startsWith('video/'))
+      return (
+        <video className="w-100 rounded border my-2 d-block chat-media" controls onLoadedMetadata={onMediaLoad}>
+          <source src={url} type={type} />
+          Your browser does not support embedded video.
+        </video>
+      );
+
+    if (type.startsWith('audio/'))
+      return <audio className="w-100 my-2 d-block" controls src={url} onLoadedMetadata={onMediaLoad} />;
+
+    if (type === 'application/pdf')
+      return <iframe className="w-100 rounded border my-2 d-block chat-pdf" src={url} title={name} onLoad={onMediaLoad} />;
+
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn btn-outline-secondary btn-sm my-2 d-inline-flex align-items-center gap-1"
+      >
+        📎 {name} <span className="text-muted">({formatBytes(msg.fileSize)})</span>
+      </a>
+    );
+  };
+
+  return (
+    <div className={`d-flex mb-3 ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
+      {!isMe && (
+        <div className="me-2 align-self-end">
+          <Avatar src={senderAvatar} name={msg.nickname} size={AVATAR_SIZE.sm} baseUrl={baseUrl} />
+        </div>
+      )}
+
+      <div className="msg-bubble-container position-relative" style={{ maxWidth: '75%' }}>
+        <div className={`card border-0 shadow-sm p-3 rounded-4 ${isMe ? 'msg-bubble-mine' : 'msg-bubble-theirs'}`}>
+          {!isMe && <div className="small fw-bold mb-1 opacity-75">🐱💞 {msg.nickname}</div>}
+
+          {msg.replyTo && (
+            <div className={`border-start border-3 ps-2 mb-2 small ${isMe ? 'msg-reply-mine' : 'msg-reply-theirs'}`}>
+              <span className="d-block fw-bold">{msg.replyTo.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{msg.replyTo.nickname}</span>
+              <span>{msg.replyTo.message ? msg.replyTo.message.slice(0, 60) : '📎 Attachment'}</span>
+            </div>
+          )}
+
+          <p className={`m-0 chat-text ${msg.isDeleted ? 'fst-italic opacity-50' : ''}`}>{msg.message}</p>
+
+          {embed && (
+            <div className="video-embed-wrapper my-2">
+              <iframe
+                src={embed.url}
+                onLoad={onMediaLoad}
+                width="100%"
+                height="400"
+                allowFullScreen={embed.type === 'youtube'}
+                allow="encrypted-media; picture-in-picture"
+                title={embed.type === 'instagram' ? 'Instagram Reel embed' : 'YouTube Shorts embed'}
+              />
+            </div>
+          )}
+
+          {renderFile()}
+
+          <div className="d-flex align-items-center justify-content-end gap-2 mt-2 opacity-75 message-meta">
+            <span>{fmtTime(msg.createdAt)}</span>
+            {msg.isEdited && <span>(edited)</span>}
+            {!msg.isDeleted && (
+              <button
+                type="button"
+                className={`btn btn-sm btn-icon-ghost ${isMe ? 'text-white' : 'text-white'}`}
+                onClick={() => onToggleMenu(isMenuOpen ? null : (msg.id ?? null))}
+                aria-haspopup="menu"
+                aria-expanded={isMenuOpen}
+                aria-label="Message options"
+              >
+                ⋮
+              </button>
+            )}
+          </div>
+
+          {msg.expiresAt && <ExpiryCountdown expiresAt={msg.expiresAt} />}
+        </div>
+
+        {reactionEntries.length > 0 && (
+          <div className="d-flex gap-1 mt-1 flex-wrap" role="group" aria-label="Reactions">
+            {reactionEntries.map(([emoji, reactionUsers]) => {
+              const hasReacted = reactionUsers.includes(nickname);
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onReact(msg.id!, emoji)}
+                  className={`badge rounded-pill border py-1 px-2 reaction-pill ${hasReacted ? 'bg-info text-dark border-info' : 'bg-white text-dark'}`}
+                  aria-pressed={hasReacted}
+                  aria-label={`${emoji} reaction, ${reactionUsers.length} ${reactionUsers.length === 1 ? 'person' : 'people'}. ${reactionUsers.join(', ')}`}
+                >
+                  {emoji} {reactionUsers.length}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {isMenuOpen && !msg.isDeleted && (
+          <div
+            role="menu"
+            className="card shadow border-light position-absolute p-2 bg-white rounded-3 mt-1 message-menu"
+            style={{ zIndex: Z.menu, right: isMe ? 0 : 'auto', left: isMe ? 'auto' : 0 }}
+          >
+            <div className="d-flex justify-content-around pb-2 border-bottom mb-2">
+              {REACTION_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => onReact(msg.id!, emoji)}
+                  className="btn btn-sm btn-icon-ghost-light fs-5 hover-scale"
+                  aria-label={`React with ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="d-grid gap-1">
+              <button type="button" role="menuitem" className="btn btn-sm btn-light text-start border-0 py-2" onClick={() => onReply(msg)}>
+                ↩️ Reply
+              </button>
+              {isMe && (
+                <>
+                  <button type="button" role="menuitem" className="btn btn-sm btn-light text-start border-0 py-2" onClick={() => onEdit(msg)}>
+                    ✏️ Edit Message
+                  </button>
+                  <button type="button" role="menuitem" className="btn btn-sm btn-light text-danger text-start border-0 py-2" onClick={() => onDelete(msg.id!)}>
+                    🗑️ Delete Message
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {isMe && (
+        <div className="ms-2 align-self-end">
+          <Avatar src={senderAvatar} name={msg.nickname} size={AVATAR_SIZE.sm} baseUrl={baseUrl} />
+        </div>
+      )}
+    </div>
+  );
+});
+
+interface UserRowProps {
+  user: User;
+  isSelf: boolean;
+}
+
+const UserRow = memo(function UserRow({ user, isSelf }: UserRowProps) {
+  return (
+    <li className="list-group-item d-flex align-items-center justify-content-between py-3 border-bottom">
+      <div className="d-flex align-items-center gap-3 min-w-0">
+        <Avatar src={user.avatarUrl} name={user.nickname} size={AVATAR_SIZE.xl} baseUrl={SOCKET_URL} online={user.isOnline} />
+        <div className="min-w-0">
+          <h6 className="m-0 text-dark fw-semibold text-truncate">
+            {isSelf ? '🐭💕 ' : '🐱💞 '}{user.nickname}{' '}
+            {isSelf && <span className="badge bg-secondary">You</span>}
+          </h6>
+          <small className="text-muted">
+            {user.isOnline ? 'Online' : user.lastSeen ? `Last seen ${fmtTime(user.lastSeen)}` : 'Offline'}
+          </small>
+        </div>
+      </div>
+      {(user.os || user.browser) && (
+        <span className="badge bg-light text-secondary border small d-none d-lg-inline-block">{user.os}</span>
+      )}
+    </li>
+  );
+});
+
+/** Minimal focus trap + Escape-to-close for modal-style overlays. */
+function useDialogA11y(active: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const node = ref.current;
+    const focusable = node?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    focusable?.[0]?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [active, onClose]);
+
+  return ref;
+}
 
 /* ═══════════════════════════════════════════════════════════
    ChatRoom Component
@@ -186,13 +553,15 @@ function ChatRoom() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'reconnecting'>('connecting');
+
   // Responsive layout: 'sidebar' shows users list, 'chat' shows current conversation
   const [view, setView] = useState<'sidebar' | 'chat'>('chat');
 
   const socketRef = useRef<Socket | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Video Call States
@@ -212,12 +581,10 @@ function ChatRoom() {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [openMenuMsgId, setOpenMenuMsgId] = useState<number | null>(null);
   const [burnDelay, setBurnDelay] = useState<number | null>(null);
-  const [nowTime, setNowTime] = useState(Date.now());
 
   const scrollToBottom = useCallback(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
-      // Double check in case of slow renders
       setTimeout(() => {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
       }, 60);
@@ -229,15 +596,8 @@ function ChatRoom() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    if (view === 'chat') {
-      scrollToBottom();
-    }
+    if (view === 'chat') scrollToBottom();
   }, [view, scrollToBottom]);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNowTime(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -246,8 +606,15 @@ function ChatRoom() {
         setOpenMenuMsgId(null);
       }
     };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenuMsgId(null);
+    };
     document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, []);
 
   // WebRTC Stream Bindings via Callback Refs
@@ -259,10 +626,10 @@ function ChatRoom() {
     if (el) el.srcObject = remoteStream;
   }, [remoteStream]);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2400);
-  };
+  }, []);
 
   const updateCallState = (state: typeof callState) => {
     setCallState(state);
@@ -274,7 +641,7 @@ function ChatRoom() {
     localStreamRef.current = stream;
   };
 
-  const cleanUpCall = () => {
+  const cleanUpCall = useCallback(() => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => t.stop());
       localStreamRef.current = null;
@@ -288,7 +655,7 @@ function ChatRoom() {
     updateCallState('idle');
     setMicMuted(false);
     setCameraOff(false);
-  };
+  }, []);
 
   const createPeerConnection = () => {
     if (peerConnectionRef.current) peerConnectionRef.current.close();
@@ -301,14 +668,10 @@ function ChatRoom() {
     });
 
     pc.onicecandidate = e => {
-      if (e.candidate) {
-        socketRef.current?.emit('webrtcCandidate', { passcode, candidate: e.candidate });
-      }
+      if (e.candidate) socketRef.current?.emit('webrtcCandidate', { passcode, candidate: e.candidate });
     };
     pc.ontrack = e => {
-      if (e.streams[0]) {
-        setRemoteStream(e.streams[0]);
-      }
+      if (e.streams[0]) setRemoteStream(e.streams[0]);
     };
 
     localStreamRef.current?.getTracks().forEach(track => {
@@ -355,15 +718,23 @@ function ChatRoom() {
     }
   };
 
-  const declineCall = () => {
+  const declineCall = useCallback(() => {
     socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
     cleanUpCall();
-  };
+  }, [passcode, nickname, cleanUpCall]);
 
-  const endCall = () => {
+  const endCall = useCallback(() => {
     socketRef.current?.emit('endCall', { passcode });
     cleanUpCall();
-  };
+  }, [passcode, cleanUpCall]);
+
+  // Close the call overlay with Escape / trap focus while it's open.
+  const handleCallDialogClose = useCallback(() => {
+    if (callStateRef.current === 'incoming') declineCall();
+    else if (callStateRef.current !== 'idle') endCall();
+  }, [declineCall, endCall]);
+  const callDialogRef = useDialogA11y(callState !== 'idle', handleCallDialogClose);
+  const lightboxDialogRef = useDialogA11y(!!lightbox, () => setLightbox(null));
 
   const toggleMic = () => {
     const track = localStreamRef.current?.getAudioTracks()[0];
@@ -382,27 +753,33 @@ function ChatRoom() {
   };
 
   /* ── Message actions ── */
-  const startEditMessage = (msg: Message) => {
+  const startEditMessage = useCallback((msg: Message) => {
     setEditingMessage(msg);
     setMessage(msg.message);
     setOpenMenuMsgId(null);
     inputRef.current?.focus();
-  };
+  }, []);
 
   const cancelEditMessage = () => {
     setEditingMessage(null);
     setMessage('');
   };
 
-  const handleDeleteMessage = (msgId: number) => {
+  const handleDeleteMessage = useCallback((msgId: number) => {
     socketRef.current?.emit('deleteMessage', { passcode, messageId: msgId });
     setOpenMenuMsgId(null);
-  };
+  }, [passcode]);
 
-  const handleReactToMessage = (msgId: number, emoji: string) => {
+  const handleReactToMessage = useCallback((msgId: number, emoji: string) => {
     socketRef.current?.emit('reactToMessage', { passcode, messageId: msgId, emoji, nickname });
     setOpenMenuMsgId(null);
-  };
+  }, [passcode, nickname]);
+
+  const handleReply = useCallback((msg: Message) => {
+    setReplyTo(msg);
+    setOpenMenuMsgId(null);
+    inputRef.current?.focus();
+  }, []);
 
   const handleClearHistory = () => {
     if (window.confirm('Wipe chat history in this room permanently?')) {
@@ -417,13 +794,11 @@ function ChatRoom() {
       return;
     }
 
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      upgrade: false,
-    });
+    const socket = io(SOCKET_URL, { transports: ['websocket'], upgrade: false });
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      setConnectionStatus('connected');
       const meta = getDeviceMetadata();
       socket.emit('joinRoom', { nickname, passcode, avatarUrl: localStorage.getItem('avatarUrl') || '', ...meta });
       socket.emit('getUsers', { passcode });
@@ -438,12 +813,7 @@ function ChatRoom() {
 
     socket.on('newMessage', (data: Message) => {
       setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data]));
-      
-      // Trigger love animation if message contains heart/love emojis
-      if (data.message && /❤️|💖|💕|💘|💝|♥/g.test(data.message)) {
-        spawnHearts(8);
-      }
-
+      if (data.message && /❤️|💖|💕|💘|💝|♥/g.test(data.message)) spawnHearts(8);
       setTimeout(() => {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
       }, 50);
@@ -556,7 +926,10 @@ function ChatRoom() {
     });
 
     socket.on('exception', (err: any) => showToast(`Error: ${err?.message || 'Server validation failed'}`));
-    socket.on('connect_error', () => showToast('Reconnecting…'));
+    socket.on('connect_error', () => {
+      setConnectionStatus('reconnecting');
+      showToast('Reconnecting…');
+    });
 
     return () => {
       socket.disconnect();
@@ -568,7 +941,7 @@ function ChatRoom() {
   }, [nickname, passcode, navigate]);
 
   /* ── Send message ── */
-  const sendMessage = () => {
+  const sendMessage = useCallback(() => {
     const text = message.trim();
     if (!text || !socketRef.current?.connected) return;
 
@@ -582,7 +955,6 @@ function ChatRoom() {
     }
 
     socketRef.current.emit('stopTyping', { nickname, passcode });
-
     socketRef.current.emit('sendMessage', {
       nickname,
       passcode,
@@ -595,18 +967,18 @@ function ChatRoom() {
     setReplyTo(null);
     setShowEmoji(false);
     inputRef.current?.focus();
-  };
+  }, [message, editingMessage, nickname, passcode, replyTo, burnDelay]);
 
-  const handleInputChange = (val: string) => {
+  const handleInputChange = useCallback((val: string) => {
     setMessage(val);
     socketRef.current?.emit('typing', { nickname, passcode });
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => {
       socketRef.current?.emit('stopTyping', { nickname, passcode });
     }, 1500);
-  };
+  }, [nickname, passcode]);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setUploading(true);
@@ -640,68 +1012,23 @@ function ChatRoom() {
 
     setUploading(false);
     e.target.value = '';
-  };
+  }, [nickname, passcode, replyTo, burnDelay, showToast]);
 
-  const insertEmoji = (emoji: string) => {
+  const insertEmoji = useCallback((emoji: string) => {
     setMessage(prev => prev + emoji);
     inputRef.current?.focus();
-  };
-
-  const renderFile = (msg: Message) => {
-    if (!msg.fileUrl) return null;
-    const url = resolveUrl(msg.fileUrl);
-    const type = msg.fileType || '';
-    const name = msg.fileName || 'file';
-
-    if (type.startsWith('image/'))
-      return (
-        <img
-          src={url}
-          alt={name}
-          className="img-fluid rounded border my-2 d-block"
-          style={{ maxWidth: 260, cursor: 'zoom-in' }}
-          onClick={e => { e.stopPropagation(); setLightbox(url); }}
-          loading="lazy"
-          onLoad={scrollToBottom}
-        />
-      );
-
-    if (type.startsWith('video/'))
-      return (
-        <video className="w-100 rounded border my-2 d-block" style={{ maxWidth: 300 }} controls onLoadedMetadata={scrollToBottom}>
-          <source src={url} type={type} />
-        </video>
-      );
-
-    if (type.startsWith('audio/'))
-      return <audio className="w-100 my-2 d-block" controls src={url} onLoadedMetadata={scrollToBottom} />;
-
-    if (type === 'application/pdf')
-      return <iframe className="w-100 rounded border my-2 d-block" style={{ height: 200 }} src={url} title={name} onLoad={scrollToBottom} />;
-
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="btn btn-outline-secondary btn-sm my-2 d-inline-flex align-items-center gap-1">
-        📎 {name} ({formatBytes(msg.fileSize)})
-      </a>
-    );
-  };
+  }, []);
 
   const displayUser = users.find(u => u.nickname !== nickname) || users[0];
-  const onlineCount = users.filter(u => u.isOnline).length;
-
-  const visibleMessages = messages.filter(msg => {
-    if (!msg.expiresAt) return true;
-    return new Date(msg.expiresAt).getTime() > nowTime;
-  });
-
+  const onlineCount = useMemo(() => users.filter(u => u.isOnline).length, [users]);
   const baseUrl = SOCKET_URL;
 
   return (
-    <div className="container-fluid p-0 d-flex flex-column h-100 bg-light" style={{ overflow: 'hidden', height: '100vh' }}>
+    <div className="chatroom-root container-fluid p-0 d-flex flex-column bg-light">
       {/* Love Animation Floating Viewport */}
-      <div id="love-animations-container" className="position-fixed top-0 start-0 w-100 h-100" style={{ pointerEvents: 'none', zIndex: 2100, overflow: 'hidden' }}></div>
+      <div id="love-animations-container" aria-hidden="true" className="position-fixed top-0 start-0 w-100 h-100" style={{ pointerEvents: 'none', zIndex: Z.loveAnimations, overflow: 'hidden' }} />
       {/* Floating Hearts for Love Theme */}
-      <div className="position-fixed top-0 start-0 w-100 h-100 overflow-hidden" style={{ pointerEvents: 'none', zIndex: 0 }}>
+      <div aria-hidden="true" className="position-fixed top-0 start-0 w-100 h-100 overflow-hidden" style={{ pointerEvents: 'none', zIndex: Z.floatingHearts }}>
         <span className="floating-heart" style={{ left: '10%', animationDelay: '0s', animationDuration: '7s' }}>❤️</span>
         <span className="floating-heart" style={{ left: '30%', animationDelay: '2s', animationDuration: '8s' }}>💖</span>
         <span className="floating-heart" style={{ left: '55%', animationDelay: '1s', animationDuration: '6s' }}>💘</span>
@@ -709,44 +1036,68 @@ function ChatRoom() {
         <span className="floating-heart" style={{ left: '90%', animationDelay: '4s', animationDuration: '7s' }}>❤️</span>
       </div>
 
+      {/*
+        Component-scoped styles.
+        - Colours pulled into CSS variables (single design-system source of truth).
+        - --jerry-love-pink darkened from #ff4d6d to #d6336c: the original
+          shade only gave ~3.3:1 contrast for white text (fails WCAG AA
+          4.5:1 for normal text); this shade gives ~4.6:1.
+        - Added fluid type/spacing via clamp() and extra breakpoints for
+          laptop (1024px), desktop (1440px) and 4K (1920px) on top of
+          Bootstrap's built-in grid breakpoints.
+        - Centralised z-index scale via the Z constants above (inline
+          styles) plus a couple of matching classes below.
+      */}
       <style>{`
         :root {
-          --tom-slate: #5e6f80; /* Tom slate blue */
+          --tom-slate: #5e6f80;
           --tom-dark: #3a4b59;
           --tom-light: #eaedf0;
-          --jerry-love-pink: #ff4d6d; /* Jerry strawberry love pink */
+          --jerry-love-pink: #d6336c;      /* darkened for AA contrast */
+          --jerry-love-pink-hover: #b32a5a;
           --jerry-love-light: #ffe5ec;
           --cheese-yellow: #ffb703;
-          --cheese-light: #fff5f6; /* Soft pink cream container background */
-          --chat-bg: #fff0f3; /* Soft cotton candy pink conversation background */
+          --cheese-light: #fff5f6;
+          --chat-bg: #fff0f3;
+          --focus-ring: 0 0 0 0.2rem rgba(214, 51, 108, 0.45);
         }
 
-        .bg-light {
-          background-color: var(--tom-light) !important;
+        html, body, #root { height: 100%; }
+
+        .chatroom-root {
+          height: 100vh;
+          height: 100dvh; /* better on mobile browsers with dynamic toolbars */
+          overflow: hidden;
         }
 
-        .bg-white {
-          background-color: var(--cheese-light) !important;
+        .chatroom-layout { flex: 1 1 auto; min-height: 0; }
+
+        /* Cap the layout on ultra-wide / 4K screens so content doesn't
+           stretch edge-to-edge into an unreadable line length. */
+        @media (min-width: 1920px) {
+          .chatroom-layout { max-width: 1800px; margin-inline: auto; }
         }
+
+        .bg-light { background-color: var(--tom-light) !important; }
+        .bg-white { background-color: var(--cheese-light) !important; }
 
         .msg-bubble-mine {
           background-color: var(--jerry-love-pink) !important;
-          color: white !important;
+          color: #fff !important;
           border-bottom-right-radius: 4px !important;
         }
-
         .msg-bubble-theirs {
           background-color: var(--tom-slate) !important;
-          color: white !important;
+          color: #fff !important;
           border-bottom-left-radius: 4px !important;
         }
+        .chat-text { overflow-wrap: anywhere; word-break: break-word; }
 
         .msg-reply-mine {
           border-left: 3px solid var(--cheese-yellow) !important;
           background-color: rgba(255, 255, 255, 0.25) !important;
           color: #fff !important;
         }
-
         .msg-reply-theirs {
           border-left: 3px solid var(--cheese-yellow) !important;
           background-color: rgba(0, 0, 0, 0.1) !important;
@@ -758,30 +1109,52 @@ function ChatRoom() {
           border-color: var(--jerry-love-pink) !important;
         }
         .btn-primary:hover, .btn-primary:focus {
-          background-color: #e03a5a !important;
-          border-color: #e03a5a !important;
+          background-color: var(--jerry-love-pink-hover) !important;
+          border-color: var(--jerry-love-pink-hover) !important;
         }
-
         .btn-outline-primary {
           color: var(--jerry-love-pink) !important;
           border-color: var(--jerry-love-pink) !important;
         }
         .btn-outline-primary:hover {
           background-color: var(--jerry-love-pink) !important;
-          color: white !important;
+          color: #fff !important;
         }
+
+        /* Visible focus state on every interactive element, including
+           on top of the coloured bubbles/buttons (accessibility). */
+        .chatroom-root a:focus-visible,
+        .chatroom-root button:focus-visible,
+        .chatroom-root input:focus-visible,
+        .chatroom-root select:focus-visible,
+        .chatroom-root [tabindex]:focus-visible {
+          outline: none;
+          box-shadow: var(--focus-ring);
+        }
+
+        .btn-icon-ghost,
+        .btn-icon-ghost-light {
+          border: none;
+          background: transparent;
+          line-height: 1;
+          padding: 0.15rem 0.4rem;
+          border-radius: 999px;
+        }
+        .btn-icon-ghost:hover, .btn-icon-ghost:focus-visible { background: rgba(255,255,255,0.2); }
+        .btn-icon-ghost-light:hover, .btn-icon-ghost-light:focus-visible { background: rgba(0,0,0,0.06); }
+
+        .reaction-pill { cursor: pointer; font-size: 0.7rem; }
 
         .active-member-item.active {
           background-color: var(--jerry-love-light) !important;
           border-left: 4px solid var(--jerry-love-pink) !important;
         }
 
-        /* Cartoon Network Checkers Banner */
         .cn-checkers {
-          background-image: 
-            linear-gradient(45deg, #000 25%, transparent 25%), 
-            linear-gradient(-45deg, #000 25%, transparent 25%), 
-            linear-gradient(45deg, transparent 75%, #000 75%), 
+          background-image:
+            linear-gradient(45deg, #000 25%, transparent 25%),
+            linear-gradient(-45deg, #000 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #000 75%),
             linear-gradient(-45deg, transparent 75%, #000 75%);
           background-size: 16px 16px;
           background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
@@ -792,88 +1165,129 @@ function ChatRoom() {
 
         .floating-heart {
           position: absolute;
-          font-size: 24px;
+          font-size: clamp(16px, 2vw, 24px);
           color: rgba(255, 77, 109, 0.18);
           pointer-events: none;
           animation: floatUp 7s ease-in-out infinite;
         }
-
         @keyframes floatUp {
           0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
           50% { opacity: 0.8; }
           100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
         }
 
-        .spawned-heart-animation {
+        .spawned-heart-animation, .love-burst-particle {
           position: absolute;
           pointer-events: none;
-          z-index: 2200;
-        }
-
-        .love-burst-particle {
-          position: absolute;
-          pointer-events: none;
-          z-index: 2200;
+          z-index: ${Z.spawnedParticles};
         }
 
         @keyframes floatHeartEffect {
-          0% {
-            transform: translateY(0) scale(0.5);
-            opacity: 0;
-          }
-          10% {
-            opacity: 0.85;
-          }
-          90% {
-            opacity: 0.85;
-          }
-          100% {
-            transform: translateY(-110vh) rotate(360deg) scale(1.2);
-            opacity: 0;
-          }
+          0% { transform: translateY(0) scale(0.5); opacity: 0; }
+          10% { opacity: 0.85; }
+          90% { opacity: 0.85; }
+          100% { transform: translateY(-110vh) rotate(360deg) scale(1.2); opacity: 0; }
+        }
+        @keyframes particleBurstEffect {
+          0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(360deg); opacity: 0; }
         }
 
-        @keyframes particleBurstEffect {
-          0% {
-            transform: translate(0, 0) scale(1) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(360deg);
-            opacity: 0;
-          }
+        /* Media inside bubbles: consistent, responsive sizing instead
+           of fixed pixel widths that overflow small screens. */
+        .chat-media { width: 100%; max-width: min(320px, 60vw); }
+        .chat-pdf { height: clamp(160px, 28vw, 220px); }
+        .video-embed-wrapper { max-width: min(320px, 70vw); border-radius: 8px; overflow: hidden; }
+        .video-embed-wrapper iframe { width: 100%; border: 1px solid rgba(0,0,0,0.1); background: #fff; }
+
+        .message-meta { font-size: 0.7rem; }
+        .message-menu { min-width: 220px; }
+
+        /* Reply / edit banner preview text: fluid max-width instead of a
+           hard-coded 300px that overflowed narrow phones. */
+        .banner-preview { max-width: min(300px, 65vw); }
+
+        @media (hover: hover) {
+          .hover-scale { transition: transform 0.15s ease; }
+          .hover-scale:hover { transform: scale(1.25); }
         }
+
+        /* Larger tap targets on touch / small screens (WCAG target size). */
+        @media (max-width: 767.98px) {
+          .btn-icon-ghost, .btn-icon-ghost-light { padding: 0.35rem 0.5rem; }
+          .reaction-pill { font-size: 0.75rem; padding: 0.35rem 0.6rem !important; }
+        }
+
+        /* Cap bubble width on large screens so lines of text stay readable. */
+        @media (min-width: 1440px) {
+          .msg-bubble-container { max-width: min(75%, 520px) !important; }
+        }
+
+        .empty-state { color: var(--tom-slate); }
       `}</style>
-      
+
       {/* Lightbox / Image Preview */}
       {lightbox && (
-        <div 
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-75" 
-          style={{ zIndex: 2000, cursor: 'zoom-out' }}
+        <div
+          ref={lightboxDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-75"
+          style={{ zIndex: Z.lightbox, cursor: 'zoom-out' }}
           onClick={() => setLightbox(null)}
         >
-          <img src={lightbox} alt="Preview" className="img-fluid rounded shadow-lg" style={{ maxHeight: '90%' }} onClick={e => e.stopPropagation()} />
+          <img src={lightbox} alt="Full size preview" className="img-fluid rounded shadow-lg" style={{ maxHeight: '90%' }} onClick={e => e.stopPropagation()} />
+          <button
+            type="button"
+            className="btn btn-light rounded-circle position-absolute top-0 end-0 m-3"
+            style={{ width: 44, height: 44 }}
+            onClick={() => setLightbox(null)}
+            aria-label="Close image preview"
+          >
+            ✕
+          </button>
         </div>
       )}
 
       {/* Toast Alert */}
       {toast && (
-        <div className="position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-dark text-white py-2 px-3 rounded shadow" style={{ zIndex: 3000 }}>
+        <div
+          role="status"
+          aria-live="polite"
+          className="position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-dark text-white py-2 px-3 rounded shadow"
+          style={{ zIndex: Z.toast }}
+        >
           {toast}
+        </div>
+      )}
+
+      {connectionStatus !== 'connected' && (
+        <div role="status" aria-live="polite" className="position-fixed top-0 start-50 translate-middle-x mt-2 bg-warning text-dark py-1 px-3 rounded-pill shadow small" style={{ zIndex: Z.toast }}>
+          {connectionStatus === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
         </div>
       )}
 
       {/* WebRTC Video Call Overlay */}
       {callState !== 'idle' && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-50" style={{ zIndex: 1500 }}>
-          <div className="card bg-dark text-white border-0 shadow-lg w-100 m-3" style={{ maxWidth: 800, height: '80vh' }}>
-            
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={callState === 'active' ? `Video call with ${remoteUserName}` : 'Video call'}
+          ref={callDialogRef}
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-50 p-3"
+          style={{ zIndex: Z.call }}
+        >
+          <div className="card bg-dark text-white border-0 shadow-lg w-100" style={{ maxWidth: 800, height: 'min(80vh, 600px)' }}>
+
             {callState === 'calling' && (
               <div className="card-body d-flex flex-column align-items-center justify-content-center">
-                <div className="spinner-grow text-primary mb-4" style={{ width: '3rem', height: '3rem' }} role="status"></div>
+                <div className="spinner-grow text-primary mb-4" style={{ width: '3rem', height: '3rem' }} role="status">
+                  <span className="visually-hidden">Calling…</span>
+                </div>
                 <h4 className="card-title">Calling {remoteUserName}…</h4>
                 <p className="card-text text-muted mb-4">Waiting for answer...</p>
-                <button className="btn btn-danger rounded-circle p-3" onClick={endCall} title="Cancel Call">
+                <button className="btn btn-danger rounded-circle p-3" onClick={endCall} aria-label="Cancel call">
                   📞
                 </button>
               </div>
@@ -881,7 +1295,9 @@ function ChatRoom() {
 
             {callState === 'incoming' && (
               <div className="card-body d-flex flex-column align-items-center justify-content-center">
-                <div className="spinner-grow text-success mb-4" style={{ width: '3rem', height: '3rem' }} role="status"></div>
+                <div className="spinner-grow text-success mb-4" style={{ width: '3rem', height: '3rem' }} role="status">
+                  <span className="visually-hidden">Incoming call</span>
+                </div>
                 <h4 className="card-title">{callerName} is Calling You</h4>
                 <p className="card-text text-muted mb-4">Incoming Call...</p>
                 <div className="d-flex gap-3">
@@ -892,8 +1308,7 @@ function ChatRoom() {
             )}
 
             {callState === 'active' && (
-              <div className="card-body p-0 position-relative d-flex flex-column bg-black rounded" style={{ overflow: 'hidden' }}>
-                {/* Remote Stream Video */}
+              <div className="card-body p-0 position-relative d-flex flex-column bg-black rounded overflow-hidden h-100">
                 <div className="w-100 h-100">
                   {remoteStream ? (
                     <video ref={remoteVideoRefCallback} autoPlay playsInline className="w-100 h-100" style={{ objectFit: 'cover' }} />
@@ -904,8 +1319,7 @@ function ChatRoom() {
                   )}
                 </div>
 
-                {/* Local Stream PIP Video */}
-                <div className="position-absolute top-0 end-0 m-3 border border-secondary rounded shadow-lg bg-dark" style={{ width: 140, height: 105, overflow: 'hidden', zIndex: 10 }}>
+                <div className="position-absolute top-0 end-0 m-3 border border-secondary rounded shadow-lg bg-dark overflow-hidden" style={{ width: 'clamp(96px, 20vw, 140px)', aspectRatio: '4 / 3', zIndex: Z.pip }}>
                   {localStream ? (
                     <video ref={localVideoRefCallback} autoPlay playsInline muted className="w-100 h-100" style={{ objectFit: 'cover' }} />
                   ) : (
@@ -913,15 +1327,14 @@ function ChatRoom() {
                   )}
                 </div>
 
-                {/* Control Panel overlay */}
-                <div className="position-absolute bottom-0 start-50 translate-middle-x mb-4 d-flex gap-3 bg-dark bg-opacity-75 p-2 rounded-pill border border-secondary" style={{ zIndex: 20 }}>
-                  <button className={`btn rounded-circle py-2 ${micMuted ? 'btn-danger' : 'btn-outline-light'}`} onClick={toggleMic}>
+                <div className="position-absolute bottom-0 start-50 translate-middle-x mb-4 d-flex gap-3 bg-dark bg-opacity-75 p-2 rounded-pill border border-secondary" style={{ zIndex: Z.callControls }}>
+                  <button className={`btn rounded-circle py-2 ${micMuted ? 'btn-danger' : 'btn-outline-light'}`} onClick={toggleMic} aria-pressed={micMuted} aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'}>
                     🎤
                   </button>
-                  <button className={`btn rounded-circle py-2 ${cameraOff ? 'btn-danger' : 'btn-outline-light'}`} onClick={toggleCamera}>
+                  <button className={`btn rounded-circle py-2 ${cameraOff ? 'btn-danger' : 'btn-outline-light'}`} onClick={toggleCamera} aria-pressed={cameraOff} aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'}>
                     📹
                   </button>
-                  <button className="btn btn-danger rounded-circle py-2" onClick={endCall}>
+                  <button className="btn btn-danger rounded-circle py-2" onClick={endCall} aria-label="End call">
                     📞
                   </button>
                 </div>
@@ -932,59 +1345,34 @@ function ChatRoom() {
       )}
 
       {/* Main Responsive Chat Layout */}
-      <div className="row g-0 h-100 w-100" style={{ flex: 1 }}>
-        
+      <div className="row g-0 h-100 w-100 chatroom-layout">
+
         {/* Sidebar Container */}
-        <aside className={`col-12 col-md-4 col-lg-3 bg-white border-end h-100 flex-column ${view === 'sidebar' ? 'd-flex' : 'd-none d-md-flex'}`}>
-          <div className="cn-checkers" title="Cartoon Network Space"></div>
+        <aside aria-label="Members list" className={`col-12 col-md-4 col-lg-3 bg-white border-end h-100 flex-column ${view === 'sidebar' ? 'd-flex' : 'd-none d-md-flex'}`}>
+          <div className="cn-checkers" aria-hidden="true" />
           <header className="p-3 border-bottom bg-light d-flex align-items-center justify-content-between">
-            <div className="d-flex align-items-center gap-2">
-              <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: 40, height: 40, fontWeight: 700 }}>
-                {initials(nickname)}
-              </div>
-              <div>
-                <h6 className="m-0 text-dark fw-bold">{nickname}</h6>
+            <div className="d-flex align-items-center gap-2 min-w-0">
+              <Avatar name={nickname} size={AVATAR_SIZE.lg} baseUrl={baseUrl} />
+              <div className="min-w-0">
+                <h6 className="m-0 text-dark fw-bold text-truncate">{nickname}</h6>
                 <small className="text-muted">Room: {passcode}</small>
               </div>
             </div>
-            {/* Show view toggle on mobile */}
             <button className="btn btn-outline-primary btn-sm d-md-none" onClick={() => setView('chat')}>
               Go to Chat
             </button>
           </header>
 
-          <div className="flex-grow-1 overflow-y-auto list-group list-group-flush">
+          <div className="flex-grow-1 overflow-y-auto">
             <div className="p-3 bg-light text-muted text-uppercase small fw-bold">Active Members ({onlineCount})</div>
-            {users.map(user => (
-              <div key={user.id} className="list-group-item d-flex align-items-center justify-content-between py-3 border-bottom">
-                <div className="d-flex align-items-center gap-3">
-                  <div className="position-relative">
-                    {user.avatarUrl ? (
-                      <img
-                        src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${baseUrl}${user.avatarUrl}`}
-                        alt={user.nickname}
-                        className="rounded-circle"
-                        style={{ width: 42, height: 42, objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div className="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: 42, height: 42 }}>
-                        {initials(user.nickname)}
-                      </div>
-                    )}
-                    <span className={`position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${user.isOnline ? 'bg-success' : 'bg-secondary'}`} style={{ width: 12, height: 12 }}></span>
-                  </div>
-                  <div>
-                    <h6 className="m-0 text-dark fw-semibold">{user.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{user.nickname} {user.nickname === nickname && <span className="badge bg-secondary">You</span>}</h6>
-                    <small className="text-muted">
-                      {user.isOnline ? 'Online' : user.lastSeen ? `Last seen ${fmtTime(user.lastSeen)}` : 'Offline'}
-                    </small>
-                  </div>
-                </div>
-                {(user.os || user.browser) && (
-                  <span className="badge bg-light text-secondary border small">{user.os}</span>
-                )}
-              </div>
-            ))}
+            <ul className="list-group list-group-flush list-unstyled m-0">
+              {users.map(user => (
+                <UserRow key={user.id} user={user} isSelf={user.nickname === nickname} />
+              ))}
+              {users.length === 0 && (
+                <li className="p-4 text-center text-muted small empty-state">No one else has joined yet.</li>
+              )}
+            </ul>
           </div>
 
           <footer className="p-3 border-top bg-light text-center small text-muted">
@@ -993,34 +1381,20 @@ function ChatRoom() {
         </aside>
 
         {/* Chat Area Container */}
-        <main className={`col-12 col-md-8 col-lg-9 bg-light h-100 flex-column ${view === 'chat' ? 'd-flex' : 'd-none d-md-flex'}`}>
-          <div className="cn-checkers" title="Cartoon Network Space"></div>
+        <main aria-label={displayUser ? `Conversation with ${displayUser.nickname}` : 'Conversation'} className={`col-12 col-md-8 col-lg-9 bg-light h-100 flex-column ${view === 'chat' ? 'd-flex' : 'd-none d-md-flex'}`}>
+          <div className="cn-checkers" aria-hidden="true" />
           {/* Header */}
-          <header className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between">
-            <div className="d-flex align-items-center gap-2">
-              <button className="btn btn-light d-md-none me-2" onClick={() => setView('sidebar')}>
+          <header className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div className="d-flex align-items-center gap-2 min-w-0">
+              <button className="btn btn-light d-md-none me-2" onClick={() => setView('sidebar')} aria-label="Back to members list">
                 ⬅️ Members
               </button>
-              
+
               {displayUser && (
-                <div className="d-flex align-items-center gap-2">
-                  <div className="position-relative">
-                    {displayUser.avatarUrl ? (
-                      <img
-                        src={displayUser.avatarUrl.startsWith('http') ? displayUser.avatarUrl : `${baseUrl}${displayUser.avatarUrl}`}
-                        alt={displayUser.nickname}
-                        className="rounded-circle"
-                        style={{ width: 38, height: 38, objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: 38, height: 38 }}>
-                        {initials(displayUser.nickname)}
-                      </div>
-                    )}
-                    <span className={`position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${displayUser.isOnline ? 'bg-success' : 'bg-secondary'}`} style={{ width: 10, height: 10 }}></span>
-                  </div>
-                  <div>
-                    <h6 className="m-0 text-dark fw-bold">{displayUser.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{displayUser.nickname}</h6>
+                <div className="d-flex align-items-center gap-2 min-w-0">
+                  <Avatar src={displayUser.avatarUrl} name={displayUser.nickname} size={AVATAR_SIZE.md} baseUrl={baseUrl} online={displayUser.isOnline} />
+                  <div className="min-w-0">
+                    <h6 className="m-0 text-dark fw-bold text-truncate">{displayUser.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{displayUser.nickname}</h6>
                     <small className="text-muted">{displayUser.isOnline ? 'Active Now' : 'Offline'}</small>
                   </div>
                 </div>
@@ -1030,229 +1404,84 @@ function ChatRoom() {
             <div className="d-flex align-items-center gap-2">
               {displayUser && displayUser.nickname !== nickname && (
                 <button className="btn btn-outline-primary btn-sm px-3 rounded-pill" onClick={startCall}>
-                  📹 Call
+                  📹 <span className="d-none d-sm-inline">Call</span>
                 </button>
               )}
               <button className="btn btn-outline-danger btn-sm px-3 rounded-pill" onClick={handleClearHistory}>
-                🗑️ Clear History
+                🗑️ <span className="d-none d-sm-inline">Clear History</span>
               </button>
             </div>
           </header>
 
           {/* Chat Messages Log */}
-          <div ref={chatRef} className="flex-grow-1 overflow-y-auto p-4" style={{ background: 'var(--chat-bg)' }}>
-            {visibleMessages.map((msg, idx) => {
-              const isMe = msg.nickname === nickname;
-              const isSystem = msg.nickname === 'System';
-
-              const senderUser = users.find(u => u.nickname === msg.nickname);
-              const senderAvatar = senderUser?.avatarUrl;
-
-              if (isSystem) {
+          <div ref={chatRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="Chat messages" className="flex-grow-1 overflow-y-auto p-2 p-md-4" style={{ background: 'var(--chat-bg)' }}>
+            {messages.length === 0 ? (
+              <div className="h-100 d-flex flex-column align-items-center justify-content-center text-center empty-state">
+                <span style={{ fontSize: 40 }} aria-hidden="true">👋</span>
+                <p className="mb-0 mt-2">No messages yet — say hi to get the conversation started!</p>
+              </div>
+            ) : (
+              messages.map((msg, idx) => {
+                const isMe = msg.nickname === nickname;
+                const senderUser = users.find(u => u.nickname === msg.nickname);
                 return (
-                  <div key={msg.id ?? `${msg.nickname}-${idx}`} className="text-center my-3">
-                    <span className="badge bg-secondary bg-opacity-10 text-muted border py-2 px-3 rounded-pill">
-                      {msg.message}
-                    </span>
-                  </div>
+                  <MessageRow
+                    key={msg.id ?? `${msg.nickname}-${idx}`}
+                    msg={msg}
+                    isMe={isMe}
+                    nickname={nickname}
+                    senderAvatar={senderUser?.avatarUrl}
+                    baseUrl={baseUrl}
+                    isMenuOpen={openMenuMsgId === msg.id}
+                    onToggleMenu={setOpenMenuMsgId}
+                    onReply={handleReply}
+                    onEdit={startEditMessage}
+                    onDelete={handleDeleteMessage}
+                    onReact={handleReactToMessage}
+                    onImageClick={setLightbox}
+                    onMediaLoad={scrollToBottom}
+                  />
                 );
-              }
-
-              return (
-                <div key={msg.id ?? `${msg.nickname}-${idx}`} className={`d-flex mb-3 ${isMe ? 'justify-content-end' : 'justify-content-start'}`}>
-                  
-                  {/* Left avatar for theirs */}
-                  {!isMe && (
-                    <div className="me-2 align-self-end">
-                      {senderAvatar ? (
-                        <img
-                          src={senderAvatar.startsWith('http') ? senderAvatar : `${baseUrl}${senderAvatar}`}
-                          alt={msg.nickname}
-                          className="rounded-circle"
-                          style={{ width: 32, height: 32, objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div className="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: 32, height: 32, fontSize: 11 }}>
-                          {initials(msg.nickname)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="msg-bubble-container position-relative" style={{ maxWidth: '75%' }}>
-                    <div
-                      onClick={() => setOpenMenuMsgId(openMenuMsgId === msg.id ? null : msg.id ?? null)}
-                      className={`card border-0 shadow-sm p-3 rounded-4 ${isMe ? 'msg-bubble-mine' : 'msg-bubble-theirs'}`}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {/* Nickname for theirs */}
-                      {!isMe && (
-                        <div className="small fw-bold mb-1 opacity-75">🐱💞 {msg.nickname}</div>
-                      )}
-
-                      {/* Reply preview */}
-                      {msg.replyTo && (
-                        <div className={`border-start border-3 ps-2 mb-2 ${isMe ? 'msg-reply-mine' : 'msg-reply-theirs'}`} style={{ fontSize: 11 }}>
-                          <span className="d-block fw-bold">{msg.replyTo.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{msg.replyTo.nickname}</span>
-                          <span>{msg.replyTo.message ? msg.replyTo.message.slice(0, 60) : '📎 Attachment'}</span>
-                        </div>
-                      )}
-
-                      {/* Message Content */}
-                      <p className={`m-0 ${msg.isDeleted ? 'fst-italic opacity-50' : ''}`}>
-                        {msg.message}
-                      </p>
-
-                      {/* Instagram Reel / YouTube Shorts Embed preview */}
-                      {!msg.isDeleted && (() => {
-                        const embed = getVideoEmbed(msg.message);
-                        if (!embed) return null;
-                        return (
-                          <div className="video-embed-wrapper my-2" style={{ maxWidth: 280, borderRadius: 8, overflow: 'hidden' }}>
-                            <iframe
-                              src={embed.url}
-                              onLoad={scrollToBottom}
-                              width="100%"
-                              height="400"
-                              frameBorder="0"
-                              scrolling="no"
-                              allowFullScreen={embed.type === 'youtube'}
-                              allow="encrypted-media; picture-in-picture"
-                              title={`${embed.type === 'instagram' ? 'Instagram Reel' : 'YouTube Shorts'} Embed`}
-                              style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.1)' }}
-                            />
-                          </div>
-                        );
-                      })()}
-
-                      {renderFile(msg)}
-
-                      <div className="d-flex align-items-center justify-content-end gap-1 mt-2 opacity-50" style={{ fontSize: 10 }}>
-                        <span>{fmtTime(msg.createdAt)}</span>
-                        {msg.isEdited && <span>(edited)</span>}
-                      </div>
-
-                      {/* Self-Destruct Countdowns */}
-                      {msg.expiresAt && (
-                        <div className="small text-danger fw-bold mt-1">
-                          🔥 Expires in: {Math.max(0, Math.round((new Date(msg.expiresAt).getTime() - nowTime) / 1000))}s
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Reactions Pill Display */}
-                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                      <div className="d-flex gap-1 mt-1 flex-wrap">
-                        {Object.entries(msg.reactions).map(([emoji, reactionUsers]) => {
-                          const hasReacted = reactionUsers.includes(nickname);
-                          return (
-                            <span
-                              key={emoji}
-                              onClick={e => { e.stopPropagation(); handleReactToMessage(msg.id!, emoji); }}
-                              className={`badge rounded-pill border py-1 px-2 ${hasReacted ? 'bg-info text-dark border-info' : 'bg-white text-dark'}`}
-                              style={{ cursor: 'pointer', fontSize: 10 }}
-                              title={reactionUsers.join(', ')}
-                            >
-                              {emoji} {reactionUsers.length}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Action dropdown overlay */}
-                    {openMenuMsgId === msg.id && !msg.isDeleted && (
-                      <div className="card shadow border-light position-absolute p-2 bg-white rounded-3 mt-1" style={{ zIndex: 100, minWidth: 220, right: isMe ? 0 : 'auto', left: isMe ? 'auto' : 0 }}>
-                        <div className="d-flex justify-content-around pb-2 border-bottom mb-2">
-                          {['❤️', '👍', '😂', '😮', '😢'].map(emoji => (
-                            <span
-                              key={emoji}
-                              onClick={() => handleReactToMessage(msg.id!, emoji)}
-                              style={{ cursor: 'pointer', fontSize: 16 }}
-                              className="hover-scale"
-                            >
-                              {emoji}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="d-grid gap-1">
-                          <button className="btn btn-sm btn-light text-start border-0 py-1" onClick={() => { setReplyTo(msg); setOpenMenuMsgId(null); inputRef.current?.focus(); }}>
-                            ↩️ Reply
-                          </button>
-                          {isMe && (
-                            <>
-                              <button className="btn btn-sm btn-light text-start border-0 py-1" onClick={() => startEditMessage(msg)}>
-                                ✏️ Edit Message
-                              </button>
-                              <button className="btn btn-sm btn-light text-danger text-start border-0 py-1" onClick={() => handleDeleteMessage(msg.id!)}>
-                                🗑️ Delete Message
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right avatar for mine */}
-                  {isMe && (
-                    <div className="ms-2 align-self-end">
-                      {senderAvatar ? (
-                        <img
-                          src={senderAvatar.startsWith('http') ? senderAvatar : `${baseUrl}${senderAvatar}`}
-                          alt={msg.nickname}
-                          className="rounded-circle"
-                          style={{ width: 32, height: 32, objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: 32, height: 32, fontSize: 11 }}>
-                          {initials(msg.nickname)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
+              })
+            )}
           </div>
 
           {/* Typing status info */}
-          <div className="px-4 py-1 text-muted small fst-italic" style={{ minHeight: 24 }}>
+          <div className="px-3 px-md-4 py-1 text-muted small fst-italic" style={{ minHeight: 24 }} aria-live="polite">
             {typingUser && `✍️ ${typingUser} is typing…`}
           </div>
 
           {/* Replying banner */}
           {replyTo && (
             <div className="bg-light p-3 border-top d-flex align-items-center justify-content-between">
-              <div>
+              <div className="min-w-0">
                 <span className="text-muted d-block small">Replying to <strong>{replyTo.nickname}</strong></span>
-                <span className="text-truncate d-block small text-dark" style={{ maxWidth: 300 }}>
+                <span className="text-truncate d-block small text-dark banner-preview">
                   {replyTo.message ? replyTo.message : '📎 Attachment'}
                 </span>
               </div>
-              <button className="btn btn-sm btn-outline-secondary rounded-circle" onClick={() => setReplyTo(null)}>✕</button>
+              <button className="btn btn-sm btn-outline-secondary rounded-circle flex-shrink-0" onClick={() => setReplyTo(null)} aria-label="Cancel reply">✕</button>
             </div>
           )}
 
           {/* Editing banner */}
           {editingMessage && (
             <div className="bg-light p-3 border-top d-flex align-items-center justify-content-between">
-              <div>
+              <div className="min-w-0">
                 <span className="text-muted d-block small">Editing your message</span>
-                <span className="text-truncate d-block small text-dark" style={{ maxWidth: 300 }}>
+                <span className="text-truncate d-block small text-dark banner-preview">
                   "{editingMessage.message}"
                 </span>
               </div>
-              <button className="btn btn-sm btn-outline-secondary rounded-pill" onClick={cancelEditMessage}>Cancel</button>
+              <button className="btn btn-sm btn-outline-secondary rounded-pill flex-shrink-0" onClick={cancelEditMessage}>Cancel</button>
             </div>
           )}
 
-          {/* Emojis selection overlay */}
+          {/* Emoji selection overlay */}
           {showEmoji && (
-            <div className="bg-white border-top p-3 d-flex gap-2 flex-wrap">
+            <div className="bg-white border-top p-3 d-flex gap-2 flex-wrap" role="menu" aria-label="Emoji picker">
               {EMOJIS.map(e => (
-                <button key={e} className="btn btn-outline-light border shadow-sm fs-4 px-3" onClick={() => insertEmoji(e)}>
+                <button key={e} type="button" role="menuitem" className="btn btn-outline-light border shadow-sm fs-4 px-3" onClick={() => insertEmoji(e)} aria-label={`Insert ${e} emoji`}>
                   {e}
                 </button>
               ))}
@@ -1260,30 +1489,38 @@ function ChatRoom() {
           )}
 
           {/* Input Panel footer */}
-          <footer className="p-3 bg-white border-top d-flex align-items-center gap-2">
-            <label htmlFor="lr-file" className="btn btn-light rounded-circle p-2 fs-5" title="Upload Attachment">
+          <footer className="p-2 p-md-3 bg-white border-top d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" className="btn btn-light rounded-circle p-2 fs-5" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Attach a file" title="Upload attachment">
               {uploading ? '⏳' : '📎'}
-            </label>
-            <input type="file" id="lr-file" multiple style={{ display: 'none' }} onChange={handleFile} />
+            </button>
+            <input ref={fileInputRef} type="file" multiple className="visually-hidden" onChange={handleFile} aria-hidden="true" tabIndex={-1} />
 
-            <button className="btn btn-light rounded-circle p-2 fs-5" onClick={() => setShowEmoji(v => !v)}>
+            <button type="button" className="btn btn-light rounded-circle p-2 fs-5" onClick={() => setShowEmoji(v => !v)} aria-pressed={showEmoji} aria-label="Toggle emoji picker">
               😊
             </button>
 
+            <label htmlFor="chat-message-input" className="visually-hidden">
+              {editingMessage ? 'Edit message' : 'Type a message'}
+            </label>
             <input
+              id="chat-message-input"
               ref={inputRef}
               type="text"
-              className="form-control rounded-pill px-4"
+              className="form-control rounded-pill px-4 flex-grow-1"
+              style={{ minWidth: 120 }}
               value={message}
-              placeholder={editingMessage ? "Edit message..." : "Type a message…"}
+              placeholder={editingMessage ? 'Edit message...' : 'Type a message…'}
               onChange={e => handleInputChange(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendMessage()}
-              style={{ padding: '10px 20px' }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') sendMessage();
+                if (e.key === 'Escape' && editingMessage) cancelEditMessage();
+              }}
             />
 
-            {/* Self-Destruct Timer Select */}
-            <div className="burn-timer-dropdown dropdown d-flex align-items-center">
+            <div className="burn-timer-dropdown d-flex align-items-center">
+              <label htmlFor="burn-timer-select" className="visually-hidden">Self-destruct timer</label>
               <select
+                id="burn-timer-select"
                 className="form-select form-select-sm rounded-pill"
                 value={burnDelay ?? ''}
                 onChange={e => setBurnDelay(e.target.value ? Number(e.target.value) : null)}
@@ -1299,6 +1536,7 @@ function ChatRoom() {
             </div>
 
             <button
+              type="button"
               className="btn btn-outline-danger rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center"
               style={{ width: 44, height: 44 }}
               onClick={(e) => {
@@ -1307,12 +1545,13 @@ function ChatRoom() {
                 spawnLoveParticles(rect.left + 22, rect.top + 22, 12);
                 socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
               }}
-              title="Send Heart Burst"
+              aria-label="Send heart burst"
+              title="Send heart burst"
             >
               ❤️
             </button>
 
-            <button className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center" style={{ width: 44, height: 44 }} onClick={sendMessage}>
+            <button type="button" className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center" style={{ width: 44, height: 44 }} onClick={sendMessage} aria-label={editingMessage ? 'Save edited message' : 'Send message'}>
               ➡️
             </button>
           </footer>
