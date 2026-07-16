@@ -214,6 +214,26 @@ function ChatRoom() {
   const [burnDelay, setBurnDelay] = useState<number | null>(null);
   const [nowTime, setNowTime] = useState(Date.now());
 
+  const scrollToBottom = useCallback(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      // Double check in case of slow renders
+      setTimeout(() => {
+        if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      }, 60);
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (view === 'chat') {
+      scrollToBottom();
+    }
+  }, [view, scrollToBottom]);
+
   useEffect(() => {
     const interval = setInterval(() => setNowTime(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -642,21 +662,22 @@ function ChatRoom() {
           style={{ maxWidth: 260, cursor: 'zoom-in' }}
           onClick={e => { e.stopPropagation(); setLightbox(url); }}
           loading="lazy"
+          onLoad={scrollToBottom}
         />
       );
 
     if (type.startsWith('video/'))
       return (
-        <video className="w-100 rounded border my-2 d-block" style={{ maxWidth: 300 }} controls>
+        <video className="w-100 rounded border my-2 d-block" style={{ maxWidth: 300 }} controls onLoadedMetadata={scrollToBottom}>
           <source src={url} type={type} />
         </video>
       );
 
     if (type.startsWith('audio/'))
-      return <audio className="w-100 my-2 d-block" controls src={url} />;
+      return <audio className="w-100 my-2 d-block" controls src={url} onLoadedMetadata={scrollToBottom} />;
 
     if (type === 'application/pdf')
-      return <iframe className="w-100 rounded border my-2 d-block" style={{ height: 200 }} src={url} title={name} />;
+      return <iframe className="w-100 rounded border my-2 d-block" style={{ height: 200 }} src={url} title={name} onLoad={scrollToBottom} />;
 
     return (
       <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="btn btn-outline-secondary btn-sm my-2 d-inline-flex align-items-center gap-1">
@@ -1090,6 +1111,7 @@ function ChatRoom() {
                           <div className="video-embed-wrapper my-2" style={{ maxWidth: 280, borderRadius: 8, overflow: 'hidden' }}>
                             <iframe
                               src={embed.url}
+                              onLoad={scrollToBottom}
                               width="100%"
                               height="400"
                               frameBorder="0"
