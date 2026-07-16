@@ -2640,6 +2640,17 @@ function ChatRoom() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.lr-msg-bubble-wrap') && !target.closest('.lr-burn-setting-container')) {
+        setContextMenuMsgId(null);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
   const stopAudio = () => {
     try {
       if (audioOscRef.current) {
@@ -3658,29 +3669,7 @@ function ChatRoom() {
             ))}
           </div>
 
-          {/* Active Sessions Panel */}
-          <div className="lr-session-panel">
-            <div className="lr-session-title">💻 Active Devices</div>
-            <div className="lr-session-list">
-              {users.map(user => {
-                let deviceIcon = '💻';
-                if (user.deviceType === 'mobile') deviceIcon = '📱';
-                else if (user.deviceType === 'tablet') deviceIcon = '📟';
-                
-                return (
-                  <div key={`session-${user.id}`} className="lr-session-card">
-                    <span className="lr-session-icon">{deviceIcon}</span>
-                    <div className="lr-session-card-info">
-                      <span className="lr-session-card-name">{user.nickname}</span>
-                      <span className="lr-session-card-meta">
-                        {user.os ? `${user.os} · ${user.browser || 'Unknown'}` : 'Connecting...'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+
 
           <div className="lr-sidebar-foot">
             <span aria-hidden="true">💝</span>
@@ -3732,11 +3721,15 @@ function ChatRoom() {
                 </button>
               )}
               <button
-                className="clear-history-btn"
+                className="lr-icon-btn clear-history-btn"
                 title="Wipe Space Chat History"
+                aria-label="Wipe Space Chat History"
                 onClick={handleClearHistory}
+                style={{ marginRight: 8 }}
               >
-                🗑️ Clear Space
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
               </button>
               <button
                 className="lr-icon-btn"

@@ -1,40 +1,3 @@
-// import {
-//   Entity,
-//   PrimaryGeneratedColumn,
-//   Column,
-//   CreateDateColumn,
-//   ManyToOne,
-//   JoinColumn,
-// } from 'typeorm';
-
-// import { Room } from '../rooms/room.entity';
-
-// @Entity('messages')
-// export class Message {
-//   @PrimaryGeneratedColumn()
-//   id!: number;
-
-//   @Column()
-//   nickname!: string;
-
-//   @Column('text')
-//   message!: string;
-
-//   @ManyToOne(() => Room, (room) => room.messages, {
-//     onDelete: 'CASCADE',
-//   })
-//   @JoinColumn({
-//     name: 'roomId',
-//   })
-//   room!: Room;
-
-//   @Column()
-//   roomId!: number;
-
-//   @CreateDateColumn()
-//   createdAt!: Date;
-// }
-
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -84,10 +47,10 @@ export class Message {
   })
   replyTo!:
     | {
-        id?: number;
-        nickname: string;
-        message: string;
-      }
+      id?: number;
+      nickname: string;
+      message: string;
+    }
     | null;
 
   // File support
@@ -114,30 +77,4 @@ export class Message {
     nullable: true,
   })
   fileSize!: number | null;
-
-  @Column({
-    type: 'boolean',
-    default: false,
-  })
-  isEdited!: boolean;
-
-  @Column({
-    type: 'boolean',
-    default: false,
-  })
-  isDeleted!: boolean;
-
-  @Column({
-    type: 'jsonb',
-    nullable: true,
-    default: null,
-  })
-  reactions!: Record<string, string[]> | null;
-
-  @Column({
-    type: 'timestamptz',
-    nullable: true,
-    default: null,
-  })
-  expiresAt!: Date | null;
 }
