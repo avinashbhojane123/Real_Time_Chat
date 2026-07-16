@@ -408,6 +408,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: CallUserDto,
   ) {
+    console.log(`[CallUser] ${data.callerName} is calling in room: ${data.passcode}`);
     client.to(data.passcode).emit('userCalling', {
       callerName: data.callerName,
     });
@@ -418,6 +419,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: AcceptCallDto,
   ) {
+    console.log(`[AcceptCall] ${data.receiverName} accepted the call in room: ${data.passcode}`);
     client.to(data.passcode).emit('callAccepted', {
       receiverName: data.receiverName,
     });
@@ -428,6 +430,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: DeclineCallDto,
   ) {
+    console.log(`[DeclineCall] ${data.receiverName} declined the call in room: ${data.passcode}`);
     client.to(data.passcode).emit('callDeclined', {
       receiverName: data.receiverName,
     });
@@ -438,6 +441,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WebrtcOfferDto,
   ) {
+    console.log(`[WebRTCOffer] Relaying WebRTC offer in room: ${data.passcode}`);
     client.to(data.passcode).emit('webrtcOfferRelay', {
       offer: data.offer,
     });
@@ -448,6 +452,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WebrtcAnswerDto,
   ) {
+    console.log(`[WebRTCAnswer] Relaying WebRTC answer in room: ${data.passcode}`);
     client.to(data.passcode).emit('webrtcAnswerRelay', {
       answer: data.answer,
     });
@@ -458,6 +463,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WebrtcCandidateDto,
   ) {
+    console.log(`[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${data.passcode}`);
     client.to(data.passcode).emit('webrtcCandidateRelay', {
       candidate: data.candidate,
     });
@@ -468,6 +474,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: EndCallDto,
   ) {
+    console.log(`[EndCall] Relaying endCall in room: ${data.passcode}`);
     client.to(data.passcode).emit('callEnded');
   }
 }

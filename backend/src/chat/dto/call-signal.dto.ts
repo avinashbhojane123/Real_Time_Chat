@@ -35,7 +35,6 @@ export class WebrtcOfferDto {
   @IsNotEmpty()
   passcode!: string;
 
-  @IsObject()
   @IsNotEmpty()
   offer!: any;
 }
@@ -45,7 +44,6 @@ export class WebrtcAnswerDto {
   @IsNotEmpty()
   passcode!: string;
 
-  @IsObject()
   @IsNotEmpty()
   answer!: any;
 }
@@ -55,7 +53,6 @@ export class WebrtcCandidateDto {
   @IsNotEmpty()
   passcode!: string;
 
-  @IsObject()
   @IsNotEmpty()
   candidate!: any;
 }

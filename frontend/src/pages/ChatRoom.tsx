@@ -2427,7 +2427,9 @@ function ChatRoom() {
   };
 
   const startCall = async () => {
+    console.log('[startCall] Initiating video call...');
     const displayUser = users.find(u => u.nickname !== nickname) || users[0];
+    console.log('[startCall] Target displayUser:', displayUser, 'localNickname:', nickname, 'usersList:', users);
     if (!displayUser || !displayUser.isOnline) {
       showToast('User is offline');
       return;
@@ -2442,16 +2444,19 @@ function ChatRoom() {
     playDialTone();
 
     try {
+      console.log('[startCall] Requesting media permissions...');
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      console.log('[startCall] getUserMedia success, stream tracks:', stream.getTracks());
       updateLocalStream(stream);
       setTimeout(() => {
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
       }, 100);
+      console.log('[startCall] Emitting callUser to socket. passcode:', passcode, 'callerName:', nickname);
       socketRef.current?.emit('callUser', { passcode, callerName: nickname });
     } catch (err) {
-      console.error('Camera/Mic permission failed', err);
+      console.error('[startCall] getUserMedia or socket emit error:', err);
       showToast('Camera and Microphone permissions are required to start a call');
       cleanUpCall();
     }
@@ -2866,6 +2871,11 @@ function ChatRoom() {
       }
     });
 
+    socket.on('exception', (err: any) => {
+      console.error('Socket validation/exception error:', err);
+      showToast(`Error: ${err?.message || 'Server validation failed'}`);
+    });
+
     socket.on('connect_error', () => showToast('Reconnecting…'));
 
     return () => {
@@ -2882,7 +2892,7 @@ function ChatRoom() {
         peerConnectionRef.current.close();
       }
     };
-  }, [nickname, passcode, navigate, spawnHearts, spawnLoveParticles, spawnLoveText, users]);
+  }, [nickname, passcode, navigate, spawnHearts, spawnLoveParticles, spawnLoveText]);
 
   /* ── Send message ─────────────────────────────────── */
   const sendMessage = () => {
