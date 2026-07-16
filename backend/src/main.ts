@@ -82,10 +82,26 @@ async function bootstrap() {
   );
 
   app.useStaticAssets(uploadPath, {
-    prefix: '/api/uploads/',
+    prefix: '/uploads/',
+    setHeaders: (res) => {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+    },
   });
 
-  app.setGlobalPrefix('api');
+  app.useStaticAssets(uploadPath, {
+    prefix: '/api/uploads/',
+    setHeaders: (res) => {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+    },
+  });
+
+  app.setGlobalPrefix('api', {
+    exclude: ['uploads/(.*)'],
+  });
 
   const port =
     process.env.PORT || 10000;

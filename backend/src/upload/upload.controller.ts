@@ -192,7 +192,7 @@ export class UploadController {
         file.size,
 
       fileUrl:
-        `/api/uploads/${file.filename}`,
+        `/uploads/${file.filename}`,
     };
   }
 }
