@@ -1938,6 +1938,280 @@ html, body, #root {
   border-radius: 12px;
   color: #1D9E75;
 }
+
+/* ── Video Call Overlay ── */
+.lr-call-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(18, 14, 20, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.4s ease;
+}
+
+.lr-call-glass {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  width: 90%;
+  max-width: 800px;
+  height: 80vh;
+  max-height: 600px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Status container (calling, incoming) */
+.lr-call-status-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  padding: 40px;
+  text-align: center;
+}
+
+.lr-call-avatar-pulse {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.lr-call-big-av {
+  width: 100px;
+  height: 100px;
+  font-size: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.lr-call-pulse-circle {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border: 2px solid var(--rose);
+  border-radius: 50%;
+  animation: pulseCalling 1.8s infinite ease-in-out;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.lr-call-avatar-pulse.ringing .lr-call-pulse-circle {
+  border-color: #1d9e75;
+}
+
+@keyframes pulseCalling {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+.lr-call-user-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.lr-call-status-text {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-bottom: 40px;
+}
+
+.lr-call-controls {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+}
+
+.lr-call-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+.lr-call-btn:hover {
+  transform: scale(1.08) translateY(-2px);
+}
+
+.lr-call-btn:active {
+  transform: scale(0.95);
+}
+
+.lr-call-btn.accept {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+}
+
+.lr-call-btn.hangup {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  transform: rotate(135deg);
+}
+
+.lr-call-btn.hangup:hover {
+  transform: scale(1.08) translateY(-2px) rotate(135deg);
+}
+
+/* Active Call UI */
+.lr-call-video-grid {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.lr-remote-video-container {
+  width: 100%;
+  height: 100%;
+  background: #110e14;
+  position: relative;
+}
+
+.lr-remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lr-video-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  gap: 16px;
+  background: #16121a;
+}
+
+.lr-local-video-container {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 160px;
+  height: 120px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  background: #1e1b22;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.lr-local-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lr-local-video-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* Active call controls */
+.lr-call-active-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  background: rgba(18, 14, 20, 0.6);
+  backdrop-filter: blur(12px);
+  padding: 10px 20px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 20;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.lr-active-call-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.lr-active-call-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.lr-active-call-btn.muted, .lr-active-call-btn.disabled {
+  background: #e74c3c;
+}
+
+.lr-active-call-btn.end-call-btn {
+  background: #e74c3c;
+  transform: rotate(135deg);
+}
+
+.lr-active-call-btn.end-call-btn:hover {
+  background: #c0392b;
+  transform: scale(1.05) rotate(135deg);
+}
+
+@media (max-width: 768px) {
+  .lr-call-glass {
+    height: 100%;
+    max-height: 100%;
+    width: 100%;
+    border-radius: 0;
+    border: none;
+  }
+  .lr-local-video-container {
+    width: 120px;
+    height: 90px;
+    top: 12px;
+    right: 12px;
+  }
+}
 `;
 
 /* ─── Color map for avatars ──────────────────────────────── */
@@ -1974,6 +2248,312 @@ function ChatRoom() {
   const typingTimeout  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartsLayerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Video Call States
+  const [callState, setCallState] = useState<'idle' | 'calling' | 'incoming' | 'active'>('idle');
+  const [callerName, setCallerName] = useState('');
+  const [remoteUserName, setRemoteUserName] = useState('');
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [micMuted, setMicMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+
+  const callStateRef = useRef<'idle' | 'calling' | 'incoming' | 'active'>('idle');
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioOscRef = useRef<OscillatorNode | null>(null);
+  const audioGainRef = useRef<GainNode | null>(null);
+
+  const updateCallState = (state: 'idle' | 'calling' | 'incoming' | 'active') => {
+    setCallState(state);
+    callStateRef.current = state;
+  };
+
+  const updateLocalStream = (stream: MediaStream | null) => {
+    setLocalStream(stream);
+    localStreamRef.current = stream;
+  };
+
+  const stopAudio = () => {
+    try {
+      if (audioOscRef.current) {
+        audioOscRef.current.stop();
+        audioOscRef.current.disconnect();
+        audioOscRef.current = null;
+      }
+      if (audioGainRef.current) {
+        audioGainRef.current.disconnect();
+        audioGainRef.current = null;
+      }
+    } catch (e) {
+      console.error('Error stopping audio', e);
+    }
+  };
+
+  const playDialTone = () => {
+    stopAudio();
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      audioCtxRef.current = ctx;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+
+      let active = true;
+      const interval = setInterval(() => {
+        if (!audioOscRef.current) {
+          clearInterval(interval);
+          return;
+        }
+        active = !active;
+        if (gain.gain) {
+          gain.gain.setValueAtTime(active ? 0.1 : 0, ctx.currentTime);
+        }
+      }, 1200);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+
+      audioOscRef.current = osc;
+      audioGainRef.current = gain;
+    } catch (e) {
+      console.error('AudioContext failed', e);
+    }
+  };
+
+  const playRingtone = () => {
+    stopAudio();
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      audioCtxRef.current = ctx;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+
+      let step = 0;
+      const interval = setInterval(() => {
+        if (!audioOscRef.current) {
+          clearInterval(interval);
+          return;
+        }
+        const now = ctx.currentTime;
+        if (step === 0) {
+          osc.frequency.setValueAtTime(587.33, now); // D5
+          gain.gain.setValueAtTime(0.15, now);
+        } else if (step === 1) {
+          gain.gain.setValueAtTime(0, now);
+        } else if (step === 2) {
+          osc.frequency.setValueAtTime(659.25, now); // E5
+          gain.gain.setValueAtTime(0.15, now);
+        } else if (step === 3) {
+          gain.gain.setValueAtTime(0, now);
+        }
+        step = (step + 1) % 10;
+      }, 200);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+
+      audioOscRef.current = osc;
+      audioGainRef.current = gain;
+    } catch (e) {
+      console.error('AudioContext failed', e);
+    }
+  };
+
+  const playChime = (type: 'connect' | 'disconnect') => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+      if (type === 'connect') {
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.15); // E5
+        osc.frequency.setValueAtTime(783.99, now + 0.3); // G5
+      } else {
+        osc.frequency.setValueAtTime(783.99, now); // G5
+        osc.frequency.setValueAtTime(659.25, now + 0.15); // E5
+        osc.frequency.setValueAtTime(523.25, now + 0.3); // C5
+      }
+
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const cleanUpCall = () => {
+    stopAudio();
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+      setLocalStream(null);
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    setRemoteStream(null);
+    updateCallState('idle');
+    setMicMuted(false);
+    setCameraOff(false);
+  };
+
+  const startCall = async () => {
+    const displayUser = users.find(u => u.nickname !== nickname) || users[0];
+    if (!displayUser || !displayUser.isOnline) {
+      showToast('User is offline');
+      return;
+    }
+    if (displayUser.nickname === nickname) {
+      showToast('Cannot call yourself');
+      return;
+    }
+
+    setRemoteUserName(displayUser.nickname);
+    updateCallState('calling');
+    playDialTone();
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      updateLocalStream(stream);
+      setTimeout(() => {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+      }, 100);
+      socketRef.current?.emit('callUser', { passcode, callerName: nickname });
+    } catch (err) {
+      console.error('Camera/Mic permission failed', err);
+      showToast('Camera and Microphone permissions are required to start a call');
+      cleanUpCall();
+    }
+  };
+
+  const acceptCall = async () => {
+    stopAudio();
+    playChime('connect');
+    updateCallState('active');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      updateLocalStream(stream);
+      setTimeout(() => {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+      }, 100);
+      socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
+    } catch (err) {
+      console.error('Camera/Mic permission failed', err);
+      showToast('Camera and Microphone permissions are required to accept a call');
+      socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
+      cleanUpCall();
+    }
+  };
+
+  const declineCall = () => {
+    stopAudio();
+    socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
+    cleanUpCall();
+  };
+
+  const endCall = () => {
+    socketRef.current?.emit('endCall', { passcode });
+    playChime('disconnect');
+    cleanUpCall();
+  };
+
+  const createPeerConnection = (isCaller: boolean) => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ],
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current) {
+        socketRef.current.emit('webrtcCandidate', {
+          passcode,
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+        setTimeout(() => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
+        }, 100);
+      }
+    };
+
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+    }
+
+    peerConnectionRef.current = pc;
+    return pc;
+  };
+
+  const toggleMic = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setMicMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleCamera = () => {
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setCameraOff(!videoTrack.enabled);
+      }
+    }
+  };
 
   /* inject CSS once */
   useEffect(() => {
@@ -2216,6 +2796,76 @@ function ChatRoom() {
       if (n !== nickname) setTypingUser('');
     });
 
+    socket.on('userCalling', ({ callerName: cName }: { callerName: string }) => {
+      if (callStateRef.current !== 'idle') {
+        socket.emit('declineCall', { passcode, receiverName: nickname });
+        return;
+      }
+      setCallerName(cName);
+      setRemoteUserName(cName);
+      updateCallState('incoming');
+      playRingtone();
+    });
+
+    socket.on('callAccepted', ({ receiverName: rName }: { receiverName: string }) => {
+      if (callStateRef.current === 'calling') {
+        stopAudio();
+        playChime('connect');
+        setRemoteUserName(rName);
+        updateCallState('active');
+        
+        const pc = createPeerConnection(true);
+        pc.createOffer()
+          .then(offer => pc.setLocalDescription(offer))
+          .then(() => {
+            socket.emit('webrtcOffer', { passcode, offer: pc.localDescription });
+          })
+          .catch(err => console.error('Error creating WebRTC offer:', err));
+      }
+    });
+
+    socket.on('callDeclined', ({ receiverName: rName }: { receiverName: string }) => {
+      if (callStateRef.current === 'calling') {
+        showToast(`${rName} declined the call`);
+        cleanUpCall();
+      }
+    });
+
+    socket.on('webrtcOfferRelay', ({ offer }: { offer: any }) => {
+      if (callStateRef.current === 'active') {
+        const pc = createPeerConnection(false);
+        pc.setRemoteDescription(new RTCSessionDescription(offer))
+          .then(() => pc.createAnswer())
+          .then(answer => pc.setLocalDescription(answer))
+          .then(() => {
+            socket.emit('webrtcAnswer', { passcode, answer: pc.localDescription });
+          })
+          .catch(err => console.error('Error setting remote offer:', err));
+      }
+    });
+
+    socket.on('webrtcAnswerRelay', ({ answer }: { answer: any }) => {
+      if (callStateRef.current === 'active' && peerConnectionRef.current) {
+        peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer))
+          .catch(err => console.error('Error setting remote answer:', err));
+      }
+    });
+
+    socket.on('webrtcCandidateRelay', ({ candidate }: { candidate: any }) => {
+      if (callStateRef.current === 'active' && peerConnectionRef.current) {
+        peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate))
+          .catch(err => console.error('Error adding ICE candidate:', err));
+      }
+    });
+
+    socket.on('callEnded', () => {
+      if (callStateRef.current !== 'idle') {
+        showToast('Call ended');
+        playChime('disconnect');
+        cleanUpCall();
+      }
+    });
+
     socket.on('connect_error', () => showToast('Reconnecting…'));
 
     return () => {
@@ -2223,8 +2873,16 @@ function ChatRoom() {
       socket.disconnect();
       if (typingTimeout.current) clearTimeout(typingTimeout.current);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      
+      stopAudio();
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
     };
-  }, [nickname, passcode, navigate, spawnHearts, spawnLoveParticles, spawnLoveText]);
+  }, [nickname, passcode, navigate, spawnHearts, spawnLoveParticles, spawnLoveText, users]);
 
   /* ── Send message ─────────────────────────────────── */
   const sendMessage = () => {
@@ -2413,6 +3071,145 @@ function ChatRoom() {
         </div>
       )}
 
+      {/* Video Call Overlay */}
+      {callState !== 'idle' && (
+        <div className="lr-call-overlay">
+          <div className="lr-call-glass">
+            
+            {/* Calling State UI */}
+            {callState === 'calling' && (
+              <div className="lr-call-status-container">
+                <div className="lr-call-avatar-pulse">
+                  <div className="lr-call-pulse-circle"></div>
+                  <div className={`lr-av lr-call-big-av ${userColor(remoteUserName)}`}>
+                    {initials(remoteUserName)}
+                  </div>
+                </div>
+                <h3 className="lr-call-user-name">Calling {remoteUserName}...</h3>
+                <p className="lr-call-status-text">Waiting for answer...</p>
+                <div className="lr-call-controls">
+                  <button className="lr-call-btn hangup" onClick={endCall} title="Cancel Call" aria-label="Cancel Call">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Incoming State UI */}
+            {callState === 'incoming' && (
+              <div className="lr-call-status-container">
+                <div className="lr-call-avatar-pulse ringing">
+                  <div className="lr-call-pulse-circle"></div>
+                  <div className={`lr-av lr-call-big-av ${userColor(callerName)}`}>
+                    {initials(callerName)}
+                  </div>
+                </div>
+                <h3 className="lr-call-user-name">Incoming Call</h3>
+                <p className="lr-call-status-text">{callerName} is calling you...</p>
+                <div className="lr-call-controls">
+                  <button className="lr-call-btn accept" onClick={acceptCall} title="Accept" aria-label="Accept Call">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                      <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.57a.987.987 0 0 0-1.01.24l-2.2 2.2a15.045 15.045 0 0 1-6.59-6.59l2.2-2.21a.96.96 0 0 0 .25-1A11.36 11.36 0 0 1 8.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/>
+                    </svg>
+                  </button>
+                  <button className="lr-call-btn hangup" onClick={declineCall} title="Decline" aria-label="Decline Call">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active Call UI */}
+            {callState === 'active' && (
+              <div className="lr-call-video-grid">
+                
+                {/* Remote Video (Full Screen background) */}
+                <div className="lr-remote-video-container">
+                  {remoteStream ? (
+                    <video
+                      ref={remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="lr-remote-video"
+                    />
+                  ) : (
+                    <div className="lr-video-placeholder">
+                      <div className={`lr-av lr-call-big-av ${userColor(remoteUserName)}`}>
+                        {initials(remoteUserName)}
+                      </div>
+                      <p style={{ marginTop: 12 }}>Connecting video stream...</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Local Video (Floating Picture-in-Picture) */}
+                <div className="lr-local-video-container">
+                  {localStream ? (
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="lr-local-video"
+                    />
+                  ) : (
+                    <div className="lr-local-video-placeholder">You</div>
+                  )}
+                </div>
+
+                {/* Controls Bar overlay */}
+                <div className="lr-call-active-controls">
+                  <button
+                    className={`lr-active-call-btn ${micMuted ? 'muted' : ''}`}
+                    onClick={toggleMic}
+                    title={micMuted ? 'Unmute Mic' : 'Mute Mic'}
+                    aria-label={micMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+                  >
+                    {micMuted ? (
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.34 3 3 3 .3 0 .59-.04.88-.12l1.55 1.55c-.75.36-1.58.57-2.43.57-2.78 0-5.22-2.24-5.22-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c1.09-.16 2.1-.56 3-1.12l3.73 3.73L21 19.73 4.27 3z"/>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                      </svg>
+                    )}
+                  </button>
+
+                  <button
+                    className={`lr-active-call-btn ${cameraOff ? 'disabled' : ''}`}
+                    onClick={toggleCamera}
+                    title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+                    aria-label={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+                  >
+                    {cameraOff ? (
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M18 10.48V6c0-1.1-.9-2-2-2H4.15L18 17.85v-7.37zM2.71 2.56L1.43 3.84 5 7.41V16c0 1.1.9 2 2 2h10c.34 0 .65-.09.93-.24l2.24 2.24 1.28-1.28L2.71 2.56zM16 16H7V9.41l6.59 6.59H16z"/>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                      </svg>
+                    )}
+                  </button>
+
+                  <button className="lr-active-call-btn end-call-btn" onClick={endCall} title="End Call" aria-label="End Call">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+            
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && <div className="lr-toast">{toast}</div>}
 
@@ -2490,6 +3287,19 @@ function ChatRoom() {
             )}
 
             <div className="lr-head-actions">
+              {displayUser && displayUser.nickname !== nickname && (
+                <button
+                  className="lr-icon-btn video-call-btn"
+                  title="Start Video Call"
+                  aria-label="Start Video Call"
+                  onClick={startCall}
+                  style={{ marginRight: 8 }}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                  </svg>
+                </button>
+              )}
               <button
                 className="lr-icon-btn"
                 title="Send hearts"

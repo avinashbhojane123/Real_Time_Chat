@@ -21,6 +21,15 @@ import { JoinRoomDto } from './dto/join-room.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { TypingDto } from './dto/typing.dto';
 import { GetRoomDto } from './dto/get-room.dto';
+import {
+  CallUserDto,
+  AcceptCallDto,
+  DeclineCallDto,
+  WebrtcOfferDto,
+  WebrtcAnswerDto,
+  WebrtcCandidateDto,
+  EndCallDto,
+} from './dto/call-signal.dto';
 
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 @WebSocketGateway({
@@ -392,5 +401,73 @@ export class ChatGateway
         os: user.os,
       })),
     );
+  }
+
+  @SubscribeMessage('callUser')
+  callUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: CallUserDto,
+  ) {
+    client.to(data.passcode).emit('userCalling', {
+      callerName: data.callerName,
+    });
+  }
+
+  @SubscribeMessage('acceptCall')
+  acceptCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: AcceptCallDto,
+  ) {
+    client.to(data.passcode).emit('callAccepted', {
+      receiverName: data.receiverName,
+    });
+  }
+
+  @SubscribeMessage('declineCall')
+  declineCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: DeclineCallDto,
+  ) {
+    client.to(data.passcode).emit('callDeclined', {
+      receiverName: data.receiverName,
+    });
+  }
+
+  @SubscribeMessage('webrtcOffer')
+  webrtcOffer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WebrtcOfferDto,
+  ) {
+    client.to(data.passcode).emit('webrtcOfferRelay', {
+      offer: data.offer,
+    });
+  }
+
+  @SubscribeMessage('webrtcAnswer')
+  webrtcAnswer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WebrtcAnswerDto,
+  ) {
+    client.to(data.passcode).emit('webrtcAnswerRelay', {
+      answer: data.answer,
+    });
+  }
+
+  @SubscribeMessage('webrtcCandidate')
+  webrtcCandidate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WebrtcCandidateDto,
+  ) {
+    client.to(data.passcode).emit('webrtcCandidateRelay', {
+      candidate: data.candidate,
+    });
+  }
+
+  @SubscribeMessage('endCall')
+  endCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: EndCallDto,
+  ) {
+    client.to(data.passcode).emit('callEnded');
   }
 }
