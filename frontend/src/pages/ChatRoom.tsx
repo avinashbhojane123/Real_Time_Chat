@@ -588,6 +588,73 @@ function ChatRoom() {
 
   return (
     <div className="container-fluid p-0 d-flex flex-column h-100 bg-light" style={{ overflow: 'hidden', height: '100vh' }}>
+      <style>{`
+        :root {
+          --tom-slate: #56697a;
+          --tom-dark: #3a4b59;
+          --tom-light: #eaedf0;
+          --jerry-orange: #e07a38;
+          --jerry-light: #fef5eb;
+          --cheese-yellow: #f4d03f;
+          --cheese-light: #fffbeb;
+          --chat-bg: #f5f2eb;
+        }
+
+        .bg-light {
+          background-color: var(--tom-light) !important;
+        }
+
+        .bg-white {
+          background-color: var(--cheese-light) !important;
+        }
+
+        .msg-bubble-mine {
+          background-color: var(--jerry-orange) !important;
+          color: white !important;
+          border-bottom-right-radius: 4px !important;
+        }
+
+        .msg-bubble-theirs {
+          background-color: var(--tom-slate) !important;
+          color: white !important;
+          border-bottom-left-radius: 4px !important;
+        }
+
+        .msg-reply-mine {
+          border-left: 3px solid var(--cheese-yellow) !important;
+          background-color: rgba(255, 255, 255, 0.15) !important;
+          color: #fff !important;
+        }
+
+        .msg-reply-theirs {
+          border-left: 3px solid var(--cheese-yellow) !important;
+          background-color: rgba(0, 0, 0, 0.1) !important;
+          color: #fff !important;
+        }
+
+        .btn-primary {
+          background-color: var(--jerry-orange) !important;
+          border-color: var(--jerry-orange) !important;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+          background-color: #c96525 !important;
+          border-color: #c96525 !important;
+        }
+
+        .btn-outline-primary {
+          color: var(--jerry-orange) !important;
+          border-color: var(--jerry-orange) !important;
+        }
+        .btn-outline-primary:hover {
+          background-color: var(--jerry-orange) !important;
+          color: white !important;
+        }
+
+        .active-member-item.active {
+          background-color: var(--jerry-light) !important;
+          border-left: 4px solid var(--jerry-orange) !important;
+        }
+      `}</style>
       
       {/* Lightbox / Image Preview */}
       {lightbox && (
@@ -717,7 +784,7 @@ function ChatRoom() {
                     <span className={`position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${user.isOnline ? 'bg-success' : 'bg-secondary'}`} style={{ width: 12, height: 12 }}></span>
                   </div>
                   <div>
-                    <h6 className="m-0 text-dark fw-semibold">{user.nickname} {user.nickname === nickname && <span className="badge bg-secondary">You</span>}</h6>
+                    <h6 className="m-0 text-dark fw-semibold">{user.nickname === nickname ? '🐭 ' : '🐱 '}{user.nickname} {user.nickname === nickname && <span className="badge bg-secondary">You</span>}</h6>
                     <small className="text-muted">
                       {user.isOnline ? 'Online' : user.lastSeen ? `Last seen ${fmtTime(user.lastSeen)}` : 'Offline'}
                     </small>
@@ -763,7 +830,7 @@ function ChatRoom() {
                     <span className={`position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${displayUser.isOnline ? 'bg-success' : 'bg-secondary'}`} style={{ width: 10, height: 10 }}></span>
                   </div>
                   <div>
-                    <h6 className="m-0 text-dark fw-bold">{displayUser.nickname}</h6>
+                    <h6 className="m-0 text-dark fw-bold">{displayUser.nickname === nickname ? '🐭 ' : '🐱 '}{displayUser.nickname}</h6>
                     <small className="text-muted">{displayUser.isOnline ? 'Active Now' : 'Offline'}</small>
                   </div>
                 </div>
@@ -783,7 +850,7 @@ function ChatRoom() {
           </header>
 
           {/* Chat Messages Log */}
-          <div ref={chatRef} className="flex-grow-1 overflow-y-auto p-4" style={{ background: '#f8f9fa' }}>
+          <div ref={chatRef} className="flex-grow-1 overflow-y-auto p-4" style={{ background: 'var(--chat-bg)' }}>
             {visibleMessages.map((msg, idx) => {
               const isMe = msg.nickname === nickname;
               const isSystem = msg.nickname === 'System';
@@ -825,18 +892,18 @@ function ChatRoom() {
                   <div className="msg-bubble-container position-relative" style={{ maxWidth: '75%' }}>
                     <div
                       onClick={() => setOpenMenuMsgId(openMenuMsgId === msg.id ? null : msg.id ?? null)}
-                      className={`card border-0 shadow-sm p-3 rounded-4 ${isMe ? 'bg-primary text-white' : 'bg-white text-dark'}`}
+                      className={`card border-0 shadow-sm p-3 rounded-4 ${isMe ? 'msg-bubble-mine' : 'msg-bubble-theirs'}`}
                       style={{ cursor: 'pointer' }}
                     >
                       {/* Nickname for theirs */}
                       {!isMe && (
-                        <div className="small fw-bold mb-1 opacity-75">{msg.nickname}</div>
+                        <div className="small fw-bold mb-1 opacity-75">🐱 {msg.nickname}</div>
                       )}
 
                       {/* Reply preview */}
                       {msg.replyTo && (
-                        <div className={`border-start border-3 ps-2 mb-2 ${isMe ? 'border-light bg-light bg-opacity-10 text-light' : 'border-primary bg-primary bg-opacity-10 text-dark'}`} style={{ fontSize: 11 }}>
-                          <span className="d-block fw-bold">{msg.replyTo.nickname}</span>
+                        <div className={`border-start border-3 ps-2 mb-2 ${isMe ? 'msg-reply-mine' : 'msg-reply-theirs'}`} style={{ fontSize: 11 }}>
+                          <span className="d-block fw-bold">{msg.replyTo.nickname === nickname ? '🐭 ' : '🐱 '}{msg.replyTo.nickname}</span>
                           <span>{msg.replyTo.message ? msg.replyTo.message.slice(0, 60) : '📎 Attachment'}</span>
                         </div>
                       )}
