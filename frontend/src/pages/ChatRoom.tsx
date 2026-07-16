@@ -2262,8 +2262,17 @@ function ChatRoom() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRefCallback = useCallback((node: HTMLVideoElement | null) => {
+    if (node) {
+      node.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  const remoteVideoRefCallback = useCallback((node: HTMLVideoElement | null) => {
+    if (node) {
+      node.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioOscRef = useRef<OscillatorNode | null>(null);
@@ -2448,11 +2457,6 @@ function ChatRoom() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       console.log('[startCall] getUserMedia success, stream tracks:', stream.getTracks());
       updateLocalStream(stream);
-      setTimeout(() => {
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-      }, 100);
       console.log('[startCall] Emitting callUser to socket. passcode:', passcode, 'callerName:', nickname);
       socketRef.current?.emit('callUser', { passcode, callerName: nickname });
     } catch (err) {
@@ -2470,11 +2474,6 @@ function ChatRoom() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       updateLocalStream(stream);
-      setTimeout(() => {
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
-      }, 100);
       socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
     } catch (err) {
       console.error('Camera/Mic permission failed', err);
@@ -2521,11 +2520,6 @@ function ChatRoom() {
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
-        setTimeout(() => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = event.streams[0];
-          }
-        }, 100);
       }
     };
 
@@ -3141,7 +3135,7 @@ function ChatRoom() {
                 <div className="lr-remote-video-container">
                   {remoteStream ? (
                     <video
-                      ref={remoteVideoRef}
+                      ref={remoteVideoRefCallback}
                       autoPlay
                       playsInline
                       className="lr-remote-video"
@@ -3160,7 +3154,7 @@ function ChatRoom() {
                 <div className="lr-local-video-container">
                   {localStream ? (
                     <video
-                      ref={localVideoRef}
+                      ref={localVideoRefCallback}
                       autoPlay
                       playsInline
                       muted
