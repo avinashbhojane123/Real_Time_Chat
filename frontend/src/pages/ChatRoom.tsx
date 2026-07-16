@@ -40,8 +40,14 @@ interface User {
 }
 
 /* ─── Helpers ────────────────────────────────────────────── */
-const resolveUrl = (url: string) =>
-  url.startsWith('http') ? url : `${SOCKET_URL}${url}`;
+const resolveUrl = (url: string) => {
+  if (!url) return '';
+  const trimmed = url.trim().toLowerCase();
+  if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) {
+    return 'about:blank';
+  }
+  return url.startsWith('http') ? url : `${SOCKET_URL}${url}`;
+};
 
 const formatBytes = (bytes?: number | string) => {
   if (!bytes) return '';

@@ -312,9 +312,17 @@ export class ChatGateway
 
   @SubscribeMessage('sendMessage')
   async sendMessage(
-    @MessageBody()
-    data: SendMessageDto,
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: SendMessageDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) {
+      return {
+        success: false,
+        message: 'Unauthorized connection details',
+      };
+    }
+
     const room = await this.roomRepo.findOne({
       where: {
         passcode: data.passcode,
@@ -335,7 +343,7 @@ export class ChatGateway
 
     const savedMessage = this.messageRepo.create({
       roomId: room.id,
-      nickname: data.nickname,
+      nickname: session.nickname,
       message: data.message,
       replyTo: data.replyTo,
       fileUrl: data.fileUrl ?? null,
@@ -539,10 +547,17 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: EditMessageDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     const msg = await this.messageRepo.findOne({
       where: { id: data.messageId },
     });
     if (!msg) return;
+
+    if (msg.nickname !== session.nickname) {
+      return; // Unauthorized edit attempt!
+    }
 
     msg.message = data.newMessage;
     msg.isEdited = true;
@@ -559,10 +574,17 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: DeleteMessageDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     const msg = await this.messageRepo.findOne({
       where: { id: data.messageId },
     });
     if (!msg) return;
+
+    if (msg.nickname !== session.nickname) {
+      return; // Unauthorized delete attempt!
+    }
 
     msg.isDeleted = true;
     msg.message = 'This message was deleted';
@@ -582,6 +604,9 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ClearHistoryDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     const room = await this.roomRepo.findOne({
       where: { passcode: data.passcode },
     });
@@ -597,18 +622,22 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ReactToMessageDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     const msg = await this.messageRepo.findOne({
       where: { id: data.messageId },
     });
     if (!msg) return;
 
     const reactions = msg.reactions || {};
+    const activeNickname = session.nickname;
     let reactionUsers = reactions[data.emoji] || [];
 
-    if (reactionUsers.includes(data.nickname)) {
-      reactionUsers = reactionUsers.filter(u => u !== data.nickname);
+    if (reactionUsers.includes(activeNickname)) {
+      reactionUsers = reactionUsers.filter(u => u !== activeNickname);
     } else {
-      reactionUsers.push(data.nickname);
+      reactionUsers.push(activeNickname);
     }
 
     if (reactionUsers.length === 0) {
