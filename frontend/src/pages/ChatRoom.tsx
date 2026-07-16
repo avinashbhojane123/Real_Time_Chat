@@ -108,6 +108,65 @@ const getVideoEmbed = (text: string) => {
   return null;
 };
 
+const spawnHearts = (count: number = 8) => {
+  const container = document.getElementById('love-animations-container');
+  if (!container) return;
+
+  const hearts = ['❤️', '💖', '💝', '💘', '💕', '💗'];
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('span');
+    el.innerText = hearts[Math.floor(Math.random() * hearts.length)];
+    el.className = 'spawned-heart-animation';
+    
+    const size = Math.random() * 24 + 16;
+    const left = Math.random() * 100;
+    const duration = Math.random() * 3 + 2;
+    const delay = Math.random() * 0.5;
+
+    el.style.position = 'absolute';
+    el.style.left = `${left}%`;
+    el.style.bottom = '-50px';
+    el.style.fontSize = `${size}px`;
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    el.style.animation = `floatHeartEffect ${duration}s ease-in-out ${delay}s forwards`;
+
+    container.appendChild(el);
+    setTimeout(() => el.remove(), (duration + delay) * 1000);
+  }
+};
+
+const spawnLoveParticles = (x: number, y: number, count: number = 12) => {
+  const container = document.getElementById('love-animations-container');
+  if (!container) return;
+
+  const particles = ['❤️', '💖', '💘', '✨', '🌸', '💕'];
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('span');
+    el.innerText = particles[Math.floor(Math.random() * particles.length)];
+    el.className = 'love-burst-particle';
+    
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 120 + 40;
+    const destX = Math.cos(angle) * distance;
+    const destY = Math.sin(angle) * distance - 80;
+    const duration = Math.random() * 1.5 + 1;
+
+    el.style.position = 'absolute';
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.fontSize = `${Math.random() * 16 + 12}px`;
+    el.style.pointerEvents = 'none';
+    el.style.animation = `particleBurstEffect ${duration}s cubic-bezier(0.1, 0.8, 0.3, 1) forwards`;
+    
+    el.style.setProperty('--tx', `${destX}px`);
+    el.style.setProperty('--ty', `${destY}px`);
+
+    container.appendChild(el);
+    setTimeout(() => el.remove(), duration * 1000);
+  }
+};
+
 const EMOJIS = ['❤️', '😍', '😊', '🥰', '😘', '✨', '😄', '🤗', '👍'];
 
 /* ═══════════════════════════════════════════════════════════
@@ -359,6 +418,12 @@ function ChatRoom() {
 
     socket.on('newMessage', (data: Message) => {
       setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data]));
+      
+      // Trigger love animation if message contains heart/love emojis
+      if (data.message && /❤️|💖|💕|💘|💝|♥/g.test(data.message)) {
+        spawnHearts(8);
+      }
+
       setTimeout(() => {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
       }, 50);
@@ -612,6 +677,8 @@ function ChatRoom() {
 
   return (
     <div className="container-fluid p-0 d-flex flex-column h-100 bg-light" style={{ overflow: 'hidden', height: '100vh' }}>
+      {/* Love Animation Floating Viewport */}
+      <div id="love-animations-container" className="position-fixed top-0 start-0 w-100 h-100" style={{ pointerEvents: 'none', zIndex: 2100, overflow: 'hidden' }}></div>
       {/* Floating Hearts for Love Theme */}
       <div className="position-fixed top-0 start-0 w-100 h-100 overflow-hidden" style={{ pointerEvents: 'none', zIndex: 0 }}>
         <span className="floating-heart" style={{ left: '10%', animationDelay: '0s', animationDuration: '7s' }}>❤️</span>
@@ -714,6 +781,46 @@ function ChatRoom() {
           0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
           50% { opacity: 0.8; }
           100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
+        }
+
+        .spawned-heart-animation {
+          position: absolute;
+          pointer-events: none;
+          z-index: 2200;
+        }
+
+        .love-burst-particle {
+          position: absolute;
+          pointer-events: none;
+          z-index: 2200;
+        }
+
+        @keyframes floatHeartEffect {
+          0% {
+            transform: translateY(0) scale(0.5);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.85;
+          }
+          90% {
+            opacity: 0.85;
+          }
+          100% {
+            transform: translateY(-110vh) rotate(360deg) scale(1.2);
+            opacity: 0;
+          }
+        }
+
+        @keyframes particleBurstEffect {
+          0% {
+            transform: translate(0, 0) scale(1) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(360deg);
+            opacity: 0;
+          }
         }
       `}</style>
       
@@ -1168,6 +1275,20 @@ function ChatRoom() {
                 <option value={300}>5m</option>
               </select>
             </div>
+
+            <button
+              className="btn btn-outline-danger rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center"
+              style={{ width: 44, height: 44 }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                spawnHearts(8);
+                spawnLoveParticles(rect.left + 22, rect.top + 22, 12);
+                socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
+              }}
+              title="Send Heart Burst"
+            >
+              ❤️
+            </button>
 
             <button className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center" style={{ width: 44, height: 44 }} onClick={sendMessage}>
               ➡️
