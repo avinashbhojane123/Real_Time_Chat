@@ -588,16 +588,25 @@ function ChatRoom() {
 
   return (
     <div className="container-fluid p-0 d-flex flex-column h-100 bg-light" style={{ overflow: 'hidden', height: '100vh' }}>
+      {/* Floating Hearts for Love Theme */}
+      <div className="position-fixed top-0 start-0 w-100 h-100 overflow-hidden" style={{ pointerEvents: 'none', zIndex: 0 }}>
+        <span className="floating-heart" style={{ left: '10%', animationDelay: '0s', animationDuration: '7s' }}>❤️</span>
+        <span className="floating-heart" style={{ left: '30%', animationDelay: '2s', animationDuration: '8s' }}>💖</span>
+        <span className="floating-heart" style={{ left: '55%', animationDelay: '1s', animationDuration: '6s' }}>💘</span>
+        <span className="floating-heart" style={{ left: '75%', animationDelay: '3s', animationDuration: '9s' }}>💝</span>
+        <span className="floating-heart" style={{ left: '90%', animationDelay: '4s', animationDuration: '7s' }}>❤️</span>
+      </div>
+
       <style>{`
         :root {
-          --tom-slate: #56697a;
+          --tom-slate: #5e6f80; /* Tom slate blue */
           --tom-dark: #3a4b59;
           --tom-light: #eaedf0;
-          --jerry-orange: #e07a38;
-          --jerry-light: #fef5eb;
-          --cheese-yellow: #f4d03f;
-          --cheese-light: #fffbeb;
-          --chat-bg: #f5f2eb;
+          --jerry-love-pink: #ff4d6d; /* Jerry strawberry love pink */
+          --jerry-love-light: #ffe5ec;
+          --cheese-yellow: #ffb703;
+          --cheese-light: #fff5f6; /* Soft pink cream container background */
+          --chat-bg: #fff0f3; /* Soft cotton candy pink conversation background */
         }
 
         .bg-light {
@@ -609,7 +618,7 @@ function ChatRoom() {
         }
 
         .msg-bubble-mine {
-          background-color: var(--jerry-orange) !important;
+          background-color: var(--jerry-love-pink) !important;
           color: white !important;
           border-bottom-right-radius: 4px !important;
         }
@@ -622,7 +631,7 @@ function ChatRoom() {
 
         .msg-reply-mine {
           border-left: 3px solid var(--cheese-yellow) !important;
-          background-color: rgba(255, 255, 255, 0.15) !important;
+          background-color: rgba(255, 255, 255, 0.25) !important;
           color: #fff !important;
         }
 
@@ -633,26 +642,54 @@ function ChatRoom() {
         }
 
         .btn-primary {
-          background-color: var(--jerry-orange) !important;
-          border-color: var(--jerry-orange) !important;
+          background-color: var(--jerry-love-pink) !important;
+          border-color: var(--jerry-love-pink) !important;
         }
         .btn-primary:hover, .btn-primary:focus {
-          background-color: #c96525 !important;
-          border-color: #c96525 !important;
+          background-color: #e03a5a !important;
+          border-color: #e03a5a !important;
         }
 
         .btn-outline-primary {
-          color: var(--jerry-orange) !important;
-          border-color: var(--jerry-orange) !important;
+          color: var(--jerry-love-pink) !important;
+          border-color: var(--jerry-love-pink) !important;
         }
         .btn-outline-primary:hover {
-          background-color: var(--jerry-orange) !important;
+          background-color: var(--jerry-love-pink) !important;
           color: white !important;
         }
 
         .active-member-item.active {
-          background-color: var(--jerry-light) !important;
-          border-left: 4px solid var(--jerry-orange) !important;
+          background-color: var(--jerry-love-light) !important;
+          border-left: 4px solid var(--jerry-love-pink) !important;
+        }
+
+        /* Cartoon Network Checkers Banner */
+        .cn-checkers {
+          background-image: 
+            linear-gradient(45deg, #000 25%, transparent 25%), 
+            linear-gradient(-45deg, #000 25%, transparent 25%), 
+            linear-gradient(45deg, transparent 75%, #000 75%), 
+            linear-gradient(-45deg, transparent 75%, #000 75%);
+          background-size: 16px 16px;
+          background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+          background-color: #fff;
+          height: 8px;
+          width: 100%;
+        }
+
+        .floating-heart {
+          position: absolute;
+          font-size: 24px;
+          color: rgba(255, 77, 109, 0.18);
+          pointer-events: none;
+          animation: floatUp 7s ease-in-out infinite;
+        }
+
+        @keyframes floatUp {
+          0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
+          50% { opacity: 0.8; }
+          100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
         }
       `}</style>
       
@@ -747,6 +784,7 @@ function ChatRoom() {
         
         {/* Sidebar Container */}
         <aside className={`col-12 col-md-4 col-lg-3 bg-white border-end h-100 flex-column ${view === 'sidebar' ? 'd-flex' : 'd-none d-md-flex'}`}>
+          <div className="cn-checkers" title="Cartoon Network Space"></div>
           <header className="p-3 border-bottom bg-light d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-2">
               <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: 40, height: 40, fontWeight: 700 }}>
@@ -784,7 +822,7 @@ function ChatRoom() {
                     <span className={`position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${user.isOnline ? 'bg-success' : 'bg-secondary'}`} style={{ width: 12, height: 12 }}></span>
                   </div>
                   <div>
-                    <h6 className="m-0 text-dark fw-semibold">{user.nickname === nickname ? '🐭 ' : '🐱 '}{user.nickname} {user.nickname === nickname && <span className="badge bg-secondary">You</span>}</h6>
+                    <h6 className="m-0 text-dark fw-semibold">{user.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{user.nickname} {user.nickname === nickname && <span className="badge bg-secondary">You</span>}</h6>
                     <small className="text-muted">
                       {user.isOnline ? 'Online' : user.lastSeen ? `Last seen ${fmtTime(user.lastSeen)}` : 'Offline'}
                     </small>
@@ -804,7 +842,7 @@ function ChatRoom() {
 
         {/* Chat Area Container */}
         <main className={`col-12 col-md-8 col-lg-9 bg-light h-100 flex-column ${view === 'chat' ? 'd-flex' : 'd-none d-md-flex'}`}>
-          
+          <div className="cn-checkers" title="Cartoon Network Space"></div>
           {/* Header */}
           <header className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-2">
@@ -830,7 +868,7 @@ function ChatRoom() {
                     <span className={`position-absolute bottom-0 end-0 p-1 border border-white rounded-circle ${displayUser.isOnline ? 'bg-success' : 'bg-secondary'}`} style={{ width: 10, height: 10 }}></span>
                   </div>
                   <div>
-                    <h6 className="m-0 text-dark fw-bold">{displayUser.nickname === nickname ? '🐭 ' : '🐱 '}{displayUser.nickname}</h6>
+                    <h6 className="m-0 text-dark fw-bold">{displayUser.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{displayUser.nickname}</h6>
                     <small className="text-muted">{displayUser.isOnline ? 'Active Now' : 'Offline'}</small>
                   </div>
                 </div>
@@ -897,13 +935,13 @@ function ChatRoom() {
                     >
                       {/* Nickname for theirs */}
                       {!isMe && (
-                        <div className="small fw-bold mb-1 opacity-75">🐱 {msg.nickname}</div>
+                        <div className="small fw-bold mb-1 opacity-75">🐱💞 {msg.nickname}</div>
                       )}
 
                       {/* Reply preview */}
                       {msg.replyTo && (
                         <div className={`border-start border-3 ps-2 mb-2 ${isMe ? 'msg-reply-mine' : 'msg-reply-theirs'}`} style={{ fontSize: 11 }}>
-                          <span className="d-block fw-bold">{msg.replyTo.nickname === nickname ? '🐭 ' : '🐱 '}{msg.replyTo.nickname}</span>
+                          <span className="d-block fw-bold">{msg.replyTo.nickname === nickname ? '🐭💕 ' : '🐱💞 '}{msg.replyTo.nickname}</span>
                           <span>{msg.replyTo.message ? msg.replyTo.message.slice(0, 60) : '📎 Attachment'}</span>
                         </div>
                       )}
