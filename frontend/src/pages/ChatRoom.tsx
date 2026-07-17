@@ -369,19 +369,34 @@ const MessageRow = memo(function MessageRow({
 
           <p className={`m-0 chat-text ${msg.isDeleted ? 'fst-italic opacity-50' : ''}`}>{msg.message}</p>
 
-          {embed && (
-            <div className="video-embed-wrapper my-2">
-              <iframe
-                src={embed.url}
-                onLoad={onMediaLoad}
-                width="100%"
-                height="400"
-                allowFullScreen={embed.type === 'youtube'}
-                allow="encrypted-media; picture-in-picture"
-                title={embed.type === 'instagram' ? 'Instagram Reel embed' : 'YouTube Shorts embed'}
-              />
-            </div>
-          )}
+          {embed && (() => {
+            const isInstagram = embed.type === 'instagram';
+            return (
+              <div className="video-embed-wrapper my-2 position-relative">
+                <iframe
+                  src={embed.url}
+                  onLoad={onMediaLoad}
+                  width="100%"
+                  height={isInstagram ? "450" : "400"}
+                  sandbox="allow-scripts allow-same-origin allow-popups"
+                  allowFullScreen={embed.type === 'youtube'}
+                  allow="encrypted-media; picture-in-picture"
+                  title={isInstagram ? 'Instagram Reel embed' : 'YouTube Shorts embed'}
+                  style={{ pointerEvents: isInstagram ? 'none' : 'auto' }}
+                />
+                {isInstagram && (
+                  <div 
+                    className="position-absolute top-0 start-0 w-100 h-100" 
+                    style={{ cursor: 'default', zIndex: 5, background: 'transparent' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })()}
 
           {renderFile()}
 
@@ -1224,6 +1239,21 @@ function ChatRoom() {
         }
 
         .empty-state { color: var(--tom-slate); }
+
+        /* Custom scrollbar for message area and user list */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background-color: rgba(0, 0, 0, 0.12);
+          border-radius: 3px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(0, 0, 0, 0.25);
+        }
       `}</style>
 
       {/* Lightbox / Image Preview */}
@@ -1489,71 +1519,135 @@ function ChatRoom() {
           )}
 
           {/* Input Panel footer */}
-          <footer className="p-2 p-md-3 bg-white border-top d-flex align-items-center gap-2 flex-wrap">
-            <button type="button" className="btn btn-light rounded-circle p-2 fs-5" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Attach a file" title="Upload attachment">
-              {uploading ? '⏳' : '📎'}
-            </button>
-            <input ref={fileInputRef} type="file" multiple className="visually-hidden" onChange={handleFile} aria-hidden="true" tabIndex={-1} />
-
-            <button type="button" className="btn btn-light rounded-circle p-2 fs-5" onClick={() => setShowEmoji(v => !v)} aria-pressed={showEmoji} aria-label="Toggle emoji picker">
-              😊
-            </button>
-
-            <label htmlFor="chat-message-input" className="visually-hidden">
-              {editingMessage ? 'Edit message' : 'Type a message'}
-            </label>
-            <input
-              id="chat-message-input"
-              ref={inputRef}
-              type="text"
-              className="form-control rounded-pill px-4 flex-grow-1"
-              style={{ minWidth: 120 }}
-              value={message}
-              placeholder={editingMessage ? 'Edit message...' : 'Type a message…'}
-              onChange={e => handleInputChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') sendMessage();
-                if (e.key === 'Escape' && editingMessage) cancelEditMessage();
-              }}
-            />
-
-            <div className="burn-timer-dropdown d-flex align-items-center">
-              <label htmlFor="burn-timer-select" className="visually-hidden">Self-destruct timer</label>
-              <select
-                id="burn-timer-select"
-                className="form-select form-select-sm rounded-pill"
-                value={burnDelay ?? ''}
-                onChange={e => setBurnDelay(e.target.value ? Number(e.target.value) : null)}
-                title="Self-destruct timer"
-                style={{ width: 100 }}
+          <footer className="p-2 p-sm-3 bg-white border-top d-flex flex-column gap-2">
+            <div className="d-flex align-items-center gap-2 w-100">
+              <button 
+                type="button" 
+                className="btn btn-light rounded-circle p-2 fs-5 flex-shrink-0" 
+                style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={uploading} 
+                aria-label="Attach a file" 
+                title="Upload attachment"
               >
-                <option value="">🔥 Off</option>
-                <option value={10}>10s</option>
-                <option value={30}>30s</option>
-                <option value={60}>1m</option>
-                <option value={300}>5m</option>
-              </select>
+                {uploading ? '⏳' : '📎'}
+              </button>
+              <input ref={fileInputRef} type="file" multiple className="visually-hidden" onChange={handleFile} aria-hidden="true" tabIndex={-1} />
+
+              <button 
+                type="button" 
+                className="btn btn-light rounded-circle p-2 fs-5 flex-shrink-0" 
+                style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                onClick={() => setShowEmoji(v => !v)} 
+                aria-pressed={showEmoji} 
+                aria-label="Toggle emoji picker"
+              >
+                😊
+              </button>
+
+              <label htmlFor="chat-message-input" className="visually-hidden">
+                {editingMessage ? 'Edit message' : 'Type a message'}
+              </label>
+              <input
+                id="chat-message-input"
+                ref={inputRef}
+                type="text"
+                className="form-control rounded-pill px-4 flex-grow-1"
+                value={message}
+                placeholder={editingMessage ? 'Edit message...' : 'Type a message…'}
+                onChange={e => handleInputChange(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') sendMessage();
+                  if (e.key === 'Escape' && editingMessage) cancelEditMessage();
+                }}
+                onFocus={scrollToBottom}
+                style={{ padding: '10px 20px' }}
+              />
+
+              {/* Desktop view extra tools (Self-Destruct + Heart) */}
+              <div className="d-none d-md-flex align-items-center gap-2">
+                <div className="burn-timer-dropdown d-flex align-items-center">
+                  <label htmlFor="burn-timer-select" className="visually-hidden">Self-destruct timer</label>
+                  <select
+                    id="burn-timer-select"
+                    className="form-select form-select-sm rounded-pill"
+                    value={burnDelay ?? ''}
+                    onChange={e => setBurnDelay(e.target.value ? Number(e.target.value) : null)}
+                    title="Self-destruct timer"
+                    style={{ width: 100 }}
+                  >
+                    <option value="">🔥 Off</option>
+                    <option value={10}>10s</option>
+                    <option value={30}>30s</option>
+                    <option value={60}>1m</option>
+                    <option value={300}>5m</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-outline-danger rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center flex-shrink-0"
+                  style={{ width: 42, height: 42 }}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    spawnHearts(8);
+                    spawnLoveParticles(rect.left + 21, rect.top + 21, 12);
+                    socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
+                  }}
+                  aria-label="Send heart burst"
+                  title="Send heart burst"
+                >
+                  ❤️
+                </button>
+              </div>
+
+              <button 
+                type="button" 
+                className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center flex-shrink-0" 
+                style={{ width: 42, height: 42 }} 
+                onClick={sendMessage} 
+                aria-label={editingMessage ? 'Save edited message' : 'Send message'}
+              >
+                ➡️
+              </button>
             </div>
 
-            <button
-              type="button"
-              className="btn btn-outline-danger rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center"
-              style={{ width: 44, height: 44 }}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                spawnHearts(8);
-                spawnLoveParticles(rect.left + 22, rect.top + 22, 12);
-                socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
-              }}
-              aria-label="Send heart burst"
-              title="Send heart burst"
-            >
-              ❤️
-            </button>
+            {/* Mobile view secondary bar for Self-Destruct select and Heart Burst */}
+            <div className="d-flex d-md-none align-items-center justify-content-between w-100 border-top pt-2 px-1">
+              <div className="d-flex align-items-center gap-2">
+                <span className="small text-muted" style={{ fontSize: '11px' }}>🔥 Self-Destruct:</span>
+                <label htmlFor="burn-timer-select-mobile" className="visually-hidden">Self-destruct timer</label>
+                <select
+                  id="burn-timer-select-mobile"
+                  className="form-select form-select-sm rounded-pill"
+                  value={burnDelay ?? ''}
+                  onChange={e => setBurnDelay(e.target.value ? Number(e.target.value) : null)}
+                  title="Self-destruct timer"
+                  style={{ width: 110, padding: '0.25rem 1.5rem 0.25rem 0.75rem' }}
+                >
+                  <option value="">Off</option>
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={300}>5m</option>
+                </select>
+              </div>
 
-            <button type="button" className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center" style={{ width: 44, height: 44 }} onClick={sendMessage} aria-label={editingMessage ? 'Save edited message' : 'Send message'}>
-              ➡️
-            </button>
+              <button
+                type="button"
+                className="btn btn-outline-danger rounded-pill px-3 py-1 btn-sm d-flex align-items-center gap-1"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  spawnHearts(8);
+                  spawnLoveParticles(rect.left + 20, rect.top + 15, 12);
+                  socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
+                }}
+                aria-label="Send heart burst"
+                title="Send heart burst"
+              >
+                ❤️ Heart Burst
+              </button>
+            </div>
           </footer>
 
         </main>
