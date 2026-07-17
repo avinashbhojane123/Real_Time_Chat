@@ -1618,9 +1618,6 @@ function ChatRoom() {
           {/* Header */}
           <header id="wa-main-header" className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2 min-w-0">
-              <button className="btn btn-light d-md-none me-2" onClick={() => setView('sidebar')} aria-label="Back to members list">
-                ⬅️ Members
-              </button>
 
               {displayUser && (
                 <div className="d-flex align-items-center gap-2 min-w-0">
