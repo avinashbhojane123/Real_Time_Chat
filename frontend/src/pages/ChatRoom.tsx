@@ -283,6 +283,46 @@ const MessageRow = memo(function MessageRow({
     return () => clearTimeout(timeout);
   }, [msg.expiresAt]);
 
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef(0);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (msg.isDeleted) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a') || target.closest('select') || target.closest('video')) {
+      return;
+    }
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    setIsDragging(true);
+    dragStartRef.current = e.clientX;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const diff = e.clientX - dragStartRef.current;
+    let offset = diff;
+    if (isMe) {
+      if (offset > 0) offset = 0;
+      if (offset < -100) offset = -100;
+    } else {
+      if (offset < 0) offset = 0;
+      if (offset > 100) offset = 100;
+    }
+    setDragOffset(offset);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (Math.abs(dragOffset) >= 50) {
+      onReply(msg);
+    }
+    setDragOffset(0);
+  };
+
   if (expired) return null;
 
   if (msg.nickname === 'System') {
@@ -357,7 +397,38 @@ const MessageRow = memo(function MessageRow({
       )}
 
       <div className="msg-bubble-container position-relative" style={{ maxWidth: '75%' }}>
-        <div className={`card border-0 shadow-sm p-3 rounded-4 ${isMe ? 'msg-bubble-mine' : 'msg-bubble-theirs'}`}>
+        {/* Reply drag icon indicator */}
+        {Math.abs(dragOffset) > 10 && (
+          <div 
+            className="position-absolute top-50 translate-middle-y d-flex align-items-center justify-content-center text-white"
+            style={{
+              left: isMe ? 'auto' : -35,
+              right: isMe ? -35 : 'auto',
+              width: 30,
+              opacity: Math.min(1, Math.abs(dragOffset) / 50),
+              transform: `scale(${Math.min(1.2, Math.abs(dragOffset) / 50)})`,
+              zIndex: 0,
+              pointerEvents: 'none'
+            }}
+          >
+            ↩️
+          </div>
+        )}
+
+        <div 
+          className={`card border-0 shadow-sm p-3 rounded-4 ${isMe ? 'msg-bubble-mine' : 'msg-bubble-theirs'}`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{
+            transform: `translateX(${dragOffset}px)`,
+            transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            cursor: msg.isDeleted ? 'default' : (isDragging ? 'grabbing' : 'grab'),
+            touchAction: 'none',
+            zIndex: 1
+          }}
+        >
           {!isMe && <div className="small fw-bold mb-1 opacity-75">🐱💞 {msg.nickname}</div>}
 
           {msg.replyTo && (
@@ -1474,6 +1545,46 @@ function ChatRoom() {
             color: #ff4d6d !important;
           }
         }
+
+        /* Attractive Glass Typing Indicator */
+        .glass-typing-indicator {
+          background: rgba(255, 255, 255, 0.06) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+          animation: fadeInIndicator 0.25s ease-out;
+        }
+        
+        .glass-typing-indicator .avatar-placeholder-sm {
+          width: 20px;
+          height: 20px;
+          background: rgba(255, 255, 255, 0.15);
+          color: #ffffff;
+          font-size: 10px;
+        }
+
+        .typing-dots .dot {
+          width: 5px;
+          height: 5px;
+          background-color: #00e5ff;
+          border-radius: 50%;
+          display: inline-block;
+          animation: bounceDot 1.4s infinite ease-in-out both;
+        }
+        
+        .typing-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounceDot {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1); }
+        }
+        
+        @keyframes fadeInIndicator {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
       {/* Lightbox / Image Preview */}
@@ -1694,8 +1805,20 @@ function ChatRoom() {
           </div>
 
           {/* Typing status info */}
-          <div className="px-3 px-md-4 py-1 text-muted small fst-italic" style={{ minHeight: 24 }} aria-live="polite">
-            {typingUser && `✍️ ${typingUser} is typing…`}
+          <div className="px-3 px-md-4 py-1" style={{ minHeight: 40 }} aria-live="polite">
+            {typingUser && (
+              <div className="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-pill glass-typing-indicator">
+                <div className="avatar-placeholder-sm rounded-circle d-flex align-items-center justify-content-center fw-bold">
+                  {typingUser.slice(0, 1).toUpperCase()}
+                </div>
+                <span className="small text-white opacity-75">{typingUser} is typing</span>
+                <div className="typing-dots d-flex gap-1 align-items-center ms-1">
+                  <span className="dot" />
+                  <span className="dot" />
+                  <span className="dot" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Replying banner */}
