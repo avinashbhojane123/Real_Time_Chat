@@ -1039,7 +1039,12 @@ function ChatRoom() {
   const baseUrl = SOCKET_URL;
 
   return (
-    <div className="chatroom-root container-fluid p-0 d-flex flex-column bg-light">
+    <div className="chatroom-root container-fluid p-0 d-flex flex-column">
+      {/* Glassmorphic shifting background orbs */}
+      <div className="orb o1" aria-hidden="true" />
+      <div className="orb o2" aria-hidden="true" />
+      <div className="orb o3" aria-hidden="true" />
+
       {/* Love Animation Floating Viewport */}
       <div id="love-animations-container" aria-hidden="true" className="position-fixed top-0 start-0 w-100 h-100" style={{ pointerEvents: 'none', zIndex: Z.loveAnimations, overflow: 'hidden' }} />
       {/* Floating Hearts for Love Theme */}
@@ -1051,100 +1056,180 @@ function ChatRoom() {
         <span className="floating-heart" style={{ left: '90%', animationDelay: '4s', animationDuration: '7s' }}>❤️</span>
       </div>
 
-      {/*
-        Component-scoped styles.
-        - Colours pulled into CSS variables (single design-system source of truth).
-        - --jerry-love-pink darkened from #ff4d6d to #d6336c: the original
-          shade only gave ~3.3:1 contrast for white text (fails WCAG AA
-          4.5:1 for normal text); this shade gives ~4.6:1.
-        - Added fluid type/spacing via clamp() and extra breakpoints for
-          laptop (1024px), desktop (1440px) and 4K (1920px) on top of
-          Bootstrap's built-in grid breakpoints.
-        - Centralised z-index scale via the Z constants above (inline
-          styles) plus a couple of matching classes below.
-      */}
       <style>{`
         :root {
-          --tom-slate: #5e6f80;
-          --tom-dark: #3a4b59;
-          --tom-light: #eaedf0;
-          --jerry-love-pink: #d6336c;      /* darkened for AA contrast */
-          --jerry-love-pink-hover: #b32a5a;
-          --jerry-love-light: #ffe5ec;
-          --cheese-yellow: #ffb703;
-          --cheese-light: #fff5f6;
-          --chat-bg: #fff0f3;
-          --focus-ring: 0 0 0 0.2rem rgba(214, 51, 108, 0.45);
+          --glass-bg: rgba(255, 255, 255, 0.03);
+          --glass-border: rgba(255, 255, 255, 0.1);
+          --glass-highlight: rgba(255, 255, 255, 0.15);
+          --text-primary: #ffffff;
+          --text-secondary: rgba(255, 255, 255, 0.6);
+          --focus-glow: 0 0 12px rgba(124, 77, 255, 0.45);
         }
 
-        html, body, #root { height: 100%; }
+        html, body, #root {
+          height: 100%;
+          background: #0c0822;
+        }
 
         .chatroom-root {
           height: 100vh;
-          height: 100dvh; /* better on mobile browsers with dynamic toolbars */
+          height: 100dvh;
           overflow: hidden;
+          background: radial-gradient(1200px 800px at 15% 10%, #4a2cb3 0%, transparent 65%),
+                      radial-gradient(1000px 700px at 85% 20%, #17a2b8 0%, transparent 60%),
+                      linear-gradient(135deg, #120e2e 0%, #070414 100%) !important;
+          color: var(--text-primary) !important;
+          font-family: Inter, system-ui, sans-serif;
+          position: relative;
         }
 
-        .chatroom-layout { flex: 1 1 auto; min-height: 0; }
+        /* Glowing background orbs */
+        .orb {
+          position: absolute;
+          filter: blur(100px);
+          opacity: 0.35;
+          border-radius: 50%;
+          z-index: 0;
+          pointer-events: none;
+          animation: floatOrb 25s ease-in-out infinite alternate;
+        }
+        .o1 { width: 450px; height: 450px; background: #7c4dff; top: -100px; left: -100px; }
+        .o2 { width: 400px; height: 400px; background: #00e5ff; bottom: -50px; right: -50px; animation-delay: -6s; }
+        .o3 { width: 350px; height: 350px; background: #e040fb; top: 35%; left: 45%; animation-delay: -12s; }
 
-        /* Cap the layout on ultra-wide / 4K screens so content doesn't
-           stretch edge-to-edge into an unreadable line length. */
+        @keyframes floatOrb {
+          0% { transform: translate(0, 0) scale(1); }
+          100% { transform: translate(140px, 90px) scale(1.15); }
+        }
+
+        .chatroom-layout {
+          position: relative;
+          z-index: 1;
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+
         @media (min-width: 1920px) {
           .chatroom-layout { max-width: 1800px; margin-inline: auto; }
         }
 
-        .bg-light { background-color: var(--tom-light) !important; }
-        .bg-white { background-color: var(--cheese-light) !important; }
+        /* Sidebar Container */
+        aside[aria-label="Members list"] {
+          background: rgba(255, 255, 255, 0.03) !important;
+          backdrop-filter: blur(25px) saturate(150%) !important;
+          -webkit-backdrop-filter: blur(25px) saturate(150%) !important;
+          border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+          color: var(--text-primary) !important;
+        }
 
+        /* Chat Area Container */
+        main[aria-label] {
+          background: rgba(255, 255, 255, 0.01) !important;
+          backdrop-filter: blur(15px) !important;
+          -webkit-backdrop-filter: blur(15px) !important;
+          color: var(--text-primary) !important;
+        }
+
+        /* Glass Headers */
+        #wa-sidebar-header, #wa-main-header {
+          background: rgba(255, 255, 255, 0.04) !important;
+          backdrop-filter: blur(12px) !important;
+          -webkit-backdrop-filter: blur(12px) !important;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+          color: var(--text-primary) !important;
+        }
+        #wa-sidebar-header h6, #wa-main-header h6 {
+          color: var(--text-primary) !important;
+        }
+        #wa-sidebar-header small, #wa-main-header small {
+          color: var(--text-secondary) !important;
+        }
+
+        /* Member rows & list group adjustments */
+        .list-group-item {
+          background: transparent !important;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+          color: var(--text-primary) !important;
+          transition: background-color 0.25s ease;
+        }
+        .list-group-item:hover {
+          background: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .active-member-item.active {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+          border-left: 4px solid #7c4dff !important;
+        }
+
+        /* Hide checkerboards & WhatsApp background patterns */
+        .cn-checkers { display: none !important; }
+        #wa-chat-log {
+          background: transparent !important;
+          background-image: none !important;
+        }
+
+        /* Message Bubbles - Glass style */
         .msg-bubble-mine {
-          background-color: var(--jerry-love-pink) !important;
-          color: #fff !important;
+          background: linear-gradient(135deg, rgba(124, 77, 255, 0.22) 0%, rgba(124, 77, 255, 0.08) 100%) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.15) !important;
           border-bottom-right-radius: 4px !important;
+          color: #ffffff !important;
+          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15) !important;
         }
         .msg-bubble-theirs {
-          background-color: var(--tom-slate) !important;
-          color: #fff !important;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
           border-bottom-left-radius: 4px !important;
+          color: #ffffff !important;
+          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1) !important;
         }
-        .chat-text { overflow-wrap: anywhere; word-break: break-word; }
+        .chat-text { overflow-wrap: anywhere; word-break: break-word; color: #ffffff !important; }
 
+        /* Reply inside bubbles */
         .msg-reply-mine {
-          border-left: 3px solid var(--cheese-yellow) !important;
-          background-color: rgba(255, 255, 255, 0.25) !important;
-          color: #fff !important;
+          border-left: 3px solid #00e5ff !important;
+          background-color: rgba(255, 255, 255, 0.12) !important;
+          color: rgba(255, 255, 255, 0.9) !important;
         }
         .msg-reply-theirs {
-          border-left: 3px solid var(--cheese-yellow) !important;
-          background-color: rgba(0, 0, 0, 0.1) !important;
-          color: #fff !important;
+          border-left: 3px solid #7c4dff !important;
+          background-color: rgba(0, 0, 0, 0.2) !important;
+          color: rgba(255, 255, 255, 0.9) !important;
         }
 
-        .btn-primary {
-          background-color: var(--jerry-love-pink) !important;
-          border-color: var(--jerry-love-pink) !important;
-        }
-        .btn-primary:hover, .btn-primary:focus {
-          background-color: var(--jerry-love-pink-hover) !important;
-          border-color: var(--jerry-love-pink-hover) !important;
-        }
-        .btn-outline-primary {
-          color: var(--jerry-love-pink) !important;
-          border-color: var(--jerry-love-pink) !important;
-        }
-        .btn-outline-primary:hover {
-          background-color: var(--jerry-love-pink) !important;
-          color: #fff !important;
-        }
-
-        /* Visible focus state on every interactive element, including
-           on top of the coloured bubbles/buttons (accessibility). */
+        /* Focus borders accessibility */
         .chatroom-root a:focus-visible,
         .chatroom-root button:focus-visible,
         .chatroom-root input:focus-visible,
         .chatroom-root select:focus-visible,
         .chatroom-root [tabindex]:focus-visible {
           outline: none;
-          box-shadow: var(--focus-ring);
+          box-shadow: 0 0 0 0.2rem rgba(124, 77, 255, 0.4) !important;
+        }
+
+        /* Buttons & Actions styling */
+        .btn-outline-primary {
+          color: #ffffff !important;
+          border-color: rgba(255, 255, 255, 0.2) !important;
+          background: rgba(255, 255, 255, 0.04) !important;
+        }
+        .btn-outline-primary:hover {
+          background: rgba(255, 255, 255, 0.12) !important;
+          border-color: rgba(255, 255, 255, 0.3) !important;
+        }
+        .btn-outline-danger {
+          color: #ff5e7e !important;
+          border-color: rgba(255, 94, 126, 0.2) !important;
+          background: rgba(255, 94, 126, 0.04) !important;
+        }
+        .btn-outline-danger:hover {
+          background: rgba(255, 94, 126, 0.15) !important;
+          border-color: rgba(255, 94, 126, 0.35) !important;
+          color: #ffffff !important;
         }
 
         .btn-icon-ghost,
@@ -1152,36 +1237,55 @@ function ChatRoom() {
           border: none;
           background: transparent;
           line-height: 1;
-          padding: 0.15rem 0.4rem;
+          padding: 0.2rem 0.45rem;
           border-radius: 999px;
+          color: rgba(255, 255, 255, 0.7) !important;
         }
-        .btn-icon-ghost:hover, .btn-icon-ghost:focus-visible { background: rgba(255,255,255,0.2); }
-        .btn-icon-ghost-light:hover, .btn-icon-ghost-light:focus-visible { background: rgba(0,0,0,0.06); }
+        .btn-icon-ghost:hover, .btn-icon-ghost:focus-visible { background: rgba(255,255,255,0.12); color: #ffffff !important; }
+        .btn-icon-ghost-light:hover, .btn-icon-ghost-light:focus-visible { background: rgba(255,255,255,0.08); color: #ffffff !important; }
 
-        .reaction-pill { cursor: pointer; font-size: 0.7rem; }
-
-        .active-member-item.active {
-          background-color: var(--jerry-love-light) !important;
-          border-left: 4px solid var(--jerry-love-pink) !important;
+        /* Reaction pills */
+        .reaction-pill {
+          cursor: pointer;
+          font-size: 0.75rem;
+          background: rgba(255, 255, 255, 0.08) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          color: #ffffff !important;
         }
-
-        .cn-checkers {
-          background-image:
-            linear-gradient(45deg, #000 25%, transparent 25%),
-            linear-gradient(-45deg, #000 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #000 75%),
-            linear-gradient(-45deg, transparent 75%, #000 75%);
-          background-size: 16px 16px;
-          background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
-          background-color: #fff;
-          height: 8px;
-          width: 100%;
+        .reaction-pill.bg-info {
+          background: rgba(0, 229, 255, 0.25) !important;
+          border-color: rgba(0, 229, 255, 0.4) !important;
+          color: #ffffff !important;
         }
 
+        /* Message Options Popover */
+        .message-menu {
+          min-width: 220px;
+          background: rgba(18, 14, 42, 0.85) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4) !important;
+        }
+        .message-menu .btn-light {
+          background: transparent !important;
+          color: #ffffff !important;
+        }
+        .message-menu .btn-light:hover {
+          background: rgba(255, 255, 255, 0.08) !important;
+        }
+        .message-menu .btn-light.text-danger {
+          color: #ff5e7e !important;
+        }
+        .message-menu .btn-light.text-danger:hover {
+          background: rgba(255, 94, 126, 0.15) !important;
+        }
+
+        /* Love Theme Decorative Animations */
         .floating-heart {
           position: absolute;
           font-size: clamp(16px, 2vw, 24px);
-          color: rgba(255, 77, 109, 0.18);
+          color: rgba(255, 77, 109, 0.15);
           pointer-events: none;
           animation: floatUp 7s ease-in-out infinite;
         }
@@ -1190,13 +1294,11 @@ function ChatRoom() {
           50% { opacity: 0.8; }
           100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
         }
-
         .spawned-heart-animation, .love-burst-particle {
           position: absolute;
           pointer-events: none;
           z-index: ${Z.spawnedParticles};
         }
-
         @keyframes floatHeartEffect {
           0% { transform: translateY(0) scale(0.5); opacity: 0; }
           10% { opacity: 0.85; }
@@ -1208,37 +1310,25 @@ function ChatRoom() {
           100% { transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(360deg); opacity: 0; }
         }
 
-        /* Media inside bubbles: consistent, responsive sizing instead
-           of fixed pixel widths that overflow small screens. */
-        .chat-media { width: 100%; max-width: min(320px, 60vw); }
-        .chat-pdf { height: clamp(160px, 28vw, 220px); }
+        /* Media styling */
+        .chat-media {
+          width: 100%;
+          max-width: min(320px, 60vw);
+          border: 1px solid rgba(255, 255, 255, 0.15) !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+          border-radius: 8px;
+        }
+        .chat-pdf { height: clamp(160px, 28vw, 220px); border-radius: 8px; }
         .video-embed-wrapper { max-width: min(320px, 70vw); border-radius: 8px; overflow: hidden; }
-        .video-embed-wrapper iframe { width: 100%; border: 1px solid rgba(0,0,0,0.1); background: #fff; }
+        .video-embed-wrapper iframe { width: 100%; border: 1px solid rgba(255,255,255,0.15); background: #120e2e; }
 
-        .message-meta { font-size: 0.7rem; }
-        .message-menu { min-width: 220px; }
-
-        /* Reply / edit banner preview text: fluid max-width instead of a
-           hard-coded 300px that overflowed narrow phones. */
+        .message-meta { font-size: 0.7rem; color: rgba(255, 255, 255, 0.5) !important; }
         .banner-preview { max-width: min(300px, 65vw); }
 
         @media (hover: hover) {
           .hover-scale { transition: transform 0.15s ease; }
           .hover-scale:hover { transform: scale(1.25); }
         }
-
-        /* Larger tap targets on touch / small screens (WCAG target size). */
-        @media (max-width: 767.98px) {
-          .btn-icon-ghost, .btn-icon-ghost-light { padding: 0.35rem 0.5rem; }
-          .reaction-pill { font-size: 0.75rem; padding: 0.35rem 0.6rem !important; }
-        }
-
-        /* Cap bubble width on large screens so lines of text stay readable. */
-        @media (min-width: 1440px) {
-          .msg-bubble-container { max-width: min(75%, 520px) !important; }
-        }
-
-        .empty-state { color: var(--tom-slate); }
 
         /* Custom scrollbar for message area and user list */
         .overflow-y-auto::-webkit-scrollbar {
@@ -1248,212 +1338,140 @@ function ChatRoom() {
           background: transparent;
         }
         .overflow-y-auto::-webkit-scrollbar-thumb {
-          background-color: rgba(0, 0, 0, 0.12);
+          background-color: rgba(255, 255, 255, 0.12);
           border-radius: 3px;
         }
         .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(0, 0, 0, 0.25);
+          background-color: rgba(255, 255, 255, 0.25);
         }
 
-        /* WhatsApp Theme Variables */
-        :root {
-          --wa-teal-dark: #008069;
-          --wa-teal-light: #00a884;
-          --wa-chat-bg: #efeae2;
-          --wa-bubble-mine: #d9fdd3;
-          --wa-bubble-theirs: #ffffff;
-          --wa-input-bg: #f0f2f5;
-          --wa-text-primary: #111b21;
-          --wa-text-secondary: #667781;
+        /* Footer Input controls */
+        #wa-input-footer {
+          background: rgba(255, 255, 255, 0.03) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+          border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+          padding: 16px 20px !important;
         }
 
-        /* Mobile WhatsApp overrides */
+        .wa-input-pill-wrapper {
+          background: rgba(0, 0, 0, 0.25) !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          border-radius: 28px !important;
+          padding: 4px 8px !important;
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+          flex-grow: 1 !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+        }
+        .wa-input-pill-wrapper:focus-within {
+          border-color: rgba(124, 77, 255, 0.5) !important;
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 0 10px rgba(124, 77, 255, 0.3) !important;
+        }
+
+        .wa-input-pill-wrapper input {
+          border: none !important;
+          background: transparent !important;
+          padding: 8px 4px !important;
+          box-shadow: none !important;
+          color: #ffffff !important;
+        }
+        .wa-input-pill-wrapper input::placeholder {
+          color: rgba(255, 255, 255, 0.45) !important;
+        }
+
+        .wa-input-pill-wrapper button, .wa-input-pill-wrapper label {
+          background: transparent !important;
+          border: none !important;
+          padding: 6px !important;
+          font-size: 1.25rem !important;
+          color: rgba(255, 255, 255, 0.6) !important;
+          border-radius: 50%;
+          transition: background-color 0.2s, color 0.2s;
+        }
+        .wa-input-pill-wrapper button:hover, .wa-input-pill-wrapper label:hover {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+          color: #ffffff !important;
+        }
+
+        .burn-timer-dropdown select {
+          background-color: rgba(255, 255, 255, 0.08) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          color: #ffffff !important;
+          border-radius: 20px !important;
+          padding: 0.25rem 1.5rem 0.25rem 0.75rem !important;
+          width: 96px !important;
+          font-size: 0.85rem !important;
+        }
+        .burn-timer-dropdown select option {
+          background-color: #120e2e !important;
+          color: #ffffff !important;
+        }
+
+        #wa-send-button {
+          background: linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%) !important;
+          border: none !important;
+          color: #ffffff !important;
+          width: 42px !important;
+          height: 42px !important;
+          border-radius: 50% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-shadow: 0 4px 15px rgba(124, 77, 255, 0.3) !important;
+          flex-shrink: 0 !important;
+          padding: 0 !important;
+          transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        }
+        #wa-send-button:hover, #wa-send-button:focus-visible {
+          transform: scale(1.06);
+          box-shadow: 0 4px 20px rgba(124, 77, 255, 0.5), 0 0 10px rgba(0, 229, 255, 0.3) !important;
+        }
+
+        /* Overlay / Dialog styling */
+        div[role="dialog"] {
+          background-color: rgba(10, 6, 28, 0.8) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+        }
+        div[role="dialog"] .card.bg-dark {
+          background: rgba(255, 255, 255, 0.05) !important;
+          backdrop-filter: blur(25px) saturate(140%) !important;
+          -webkit-backdrop-filter: blur(25px) saturate(140%) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+        }
+
+        /* Mobile specific style optimizations */
         @media (max-width: 767.98px) {
-          :root {
-            --chat-bg: var(--wa-chat-bg) !important;
-            --focus-ring: 0 0 0 0.2rem rgba(0, 168, 132, 0.3) !important;
+          #wa-main-header, #wa-sidebar-header {
+            padding: 10px 14px !important;
           }
-
-          /* Hide checkers banner on mobile */
-          .cn-checkers {
-            display: none !important;
-          }
-
-          /* Header styles */
-          #wa-main-header {
-            background-color: var(--wa-teal-dark) !important;
-            color: #ffffff !important;
-            border-bottom: none !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-          }
-          #wa-main-header h6 {
-            color: #ffffff !important;
-          }
-          #wa-main-header small {
-            color: rgba(255, 255, 255, 0.85) !important;
-          }
-          #wa-main-header button {
-            color: #ffffff !important;
-          }
-
-          #wa-sidebar-header {
-            background-color: var(--wa-teal-dark) !important;
-            color: #ffffff !important;
-            border-bottom: none !important;
-          }
-          #wa-sidebar-header h6 {
-            color: #ffffff !important;
-          }
-          #wa-sidebar-header small {
-            color: rgba(255, 255, 255, 0.85) !important;
-          }
-          #wa-sidebar-header button {
-            color: #ffffff !important;
-            border-color: rgba(255, 255, 255, 0.4) !important;
-          }
-
-          /* Chat list background */
-          aside[aria-label="Members list"] {
-            background-color: #ffffff !important;
-          }
-          aside[aria-label="Members list"] .bg-light {
-            background-color: #f0f2f5 !important;
-            color: var(--wa-text-secondary) !important;
-          }
-
-          /* Chat Log wallpaper effect */
           #wa-chat-log {
-            background-color: var(--wa-chat-bg) !important;
-            background-image: radial-gradient(rgba(0, 128, 105, 0.08) 1px, transparent 0),
-                              radial-gradient(rgba(0, 128, 105, 0.08) 1px, transparent 0) !important;
-            background-size: 24px 24px !important;
-            background-position: 0 0, 12px 12px !important;
+            padding: 12px 8px !important;
           }
-
-          /* Message bubble mine */
-          .msg-bubble-mine {
-            background-color: var(--wa-bubble-mine) !important;
-            color: var(--wa-text-primary) !important;
-            border-radius: 8px 8px 0px 8px !important;
-            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
-            border: none !important;
-            position: relative;
-          }
-          /* Message bubble theirs */
-          .msg-bubble-theirs {
-            background-color: var(--wa-bubble-theirs) !important;
-            color: var(--wa-text-primary) !important;
-            border-radius: 8px 8px 8px 0px !important;
-            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
-            border: none !important;
-            position: relative;
-          }
-          .msg-bubble-mine .chat-text, .msg-bubble-theirs .chat-text {
-            color: var(--wa-text-primary) !important;
-          }
-
-          /* Group member names inside bubble */
-          .msg-bubble-theirs .fw-bold {
-            color: #34b7f1 !important; /* WhatsApp blue user name */
-          }
-
-          /* Reply panels in bubbles */
-          .msg-reply-mine {
-            border-left: 4px solid var(--wa-teal-light) !important;
-            background-color: rgba(0, 0, 0, 0.04) !important;
-            color: var(--wa-text-primary) !important;
-          }
-          .msg-reply-theirs {
-            border-left: 4px solid #34b7f1 !important;
-            background-color: rgba(0, 0, 0, 0.04) !important;
-            color: var(--wa-text-primary) !important;
-          }
-
-          /* Meta texts inside message bubbles */
-          .message-meta {
-            color: var(--wa-text-secondary) !important;
-          }
-
-          /* Footer input panel */
           #wa-input-footer {
-            background-color: #efeae2 !important; /* matches chat bg */
-            border-top: none !important;
-            padding: 8px 6px !important;
+            padding: 10px !important;
           }
-
-          /* Floating layout for the white input pill + separated green circular send button */
           .wa-input-pill-wrapper {
-            background-color: #ffffff !important;
-            border-radius: 24px !important;
-            padding: 2px 10px !important;
-            flex-grow: 1 !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 6px !important;
-            box-shadow: 0 1px 1px rgba(0,0,0,0.1) !important;
+            padding: 2px 6px !important;
           }
-
-          .wa-input-pill-wrapper input {
-            border: none !important;
-            background: transparent !important;
-            padding: 8px 4px !important;
-            box-shadow: none !important;
-          }
-          .wa-input-pill-wrapper input:focus-visible {
-            box-shadow: none !important;
-          }
-
-          /* Separated send button as Floating Action Button (FAB) */
-          #wa-send-button {
-            background-color: var(--wa-teal-light) !important;
-            border-color: var(--wa-teal-light) !important;
-            color: #ffffff !important;
-            width: 44px !important;
-            height: 44px !important;
-            border-radius: 50% !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.25) !important;
-            flex-shrink: 0 !important;
-            padding: 0 !important;
-          }
-          #wa-send-button:hover, #wa-send-button:focus-visible {
-            background-color: var(--wa-teal-dark) !important;
-            border-color: var(--wa-teal-dark) !important;
-          }
-
-          /* Adjust attachment & emoji button sizes inside the input pill wrapper */
-          .wa-input-pill-wrapper button, .wa-input-pill-wrapper label {
-            background: transparent !important;
-            border: none !important;
-            padding: 4px !important;
-            font-size: 1.3rem !important;
-            color: var(--wa-text-secondary) !important;
-          }
-
-          /* Mobile Accessory Bar above the input pill */
           #wa-mobile-accessory-bar {
-            border-bottom: none !important;
             padding-bottom: 0 !important;
-            margin-bottom: 4px !important;
-            background: transparent !important;
-          }
-          #wa-mobile-accessory-bar span {
-            color: var(--wa-text-secondary) !important;
-            font-weight: 500;
+            margin-bottom: 6px !important;
           }
           #wa-mobile-accessory-bar select {
-            background-color: #ffffff !important;
-            border: 1px solid rgba(0,0,0,0.15) !important;
-            color: var(--wa-text-primary) !important;
-            box-shadow: 0 1px 1px rgba(0,0,0,0.05) !important;
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: #ffffff !important;
+            width: 105px !important;
           }
           #wa-mobile-accessory-bar button {
-            background-color: #ffffff !important;
-            border: 1px solid rgba(0,0,0,0.15) !important;
-            color: #d6336c !important; /* Heart color */
-            box-shadow: 0 1px 1px rgba(0,0,0,0.05) !important;
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: #ff4d6d !important;
           }
         }
       `}</style>
