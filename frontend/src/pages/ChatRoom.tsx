@@ -1254,6 +1254,208 @@ function ChatRoom() {
         .overflow-y-auto::-webkit-scrollbar-thumb:hover {
           background-color: rgba(0, 0, 0, 0.25);
         }
+
+        /* WhatsApp Theme Variables */
+        :root {
+          --wa-teal-dark: #008069;
+          --wa-teal-light: #00a884;
+          --wa-chat-bg: #efeae2;
+          --wa-bubble-mine: #d9fdd3;
+          --wa-bubble-theirs: #ffffff;
+          --wa-input-bg: #f0f2f5;
+          --wa-text-primary: #111b21;
+          --wa-text-secondary: #667781;
+        }
+
+        /* Mobile WhatsApp overrides */
+        @media (max-width: 767.98px) {
+          :root {
+            --chat-bg: var(--wa-chat-bg) !important;
+            --focus-ring: 0 0 0 0.2rem rgba(0, 168, 132, 0.3) !important;
+          }
+
+          /* Hide checkers banner on mobile */
+          .cn-checkers {
+            display: none !important;
+          }
+
+          /* Header styles */
+          #wa-main-header {
+            background-color: var(--wa-teal-dark) !important;
+            color: #ffffff !important;
+            border-bottom: none !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+          }
+          #wa-main-header h6 {
+            color: #ffffff !important;
+          }
+          #wa-main-header small {
+            color: rgba(255, 255, 255, 0.85) !important;
+          }
+          #wa-main-header button {
+            color: #ffffff !important;
+          }
+
+          #wa-sidebar-header {
+            background-color: var(--wa-teal-dark) !important;
+            color: #ffffff !important;
+            border-bottom: none !important;
+          }
+          #wa-sidebar-header h6 {
+            color: #ffffff !important;
+          }
+          #wa-sidebar-header small {
+            color: rgba(255, 255, 255, 0.85) !important;
+          }
+          #wa-sidebar-header button {
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.4) !important;
+          }
+
+          /* Chat list background */
+          aside[aria-label="Members list"] {
+            background-color: #ffffff !important;
+          }
+          aside[aria-label="Members list"] .bg-light {
+            background-color: #f0f2f5 !important;
+            color: var(--wa-text-secondary) !important;
+          }
+
+          /* Chat Log wallpaper effect */
+          #wa-chat-log {
+            background-color: var(--wa-chat-bg) !important;
+            background-image: radial-gradient(rgba(0, 128, 105, 0.08) 1px, transparent 0),
+                              radial-gradient(rgba(0, 128, 105, 0.08) 1px, transparent 0) !important;
+            background-size: 24px 24px !important;
+            background-position: 0 0, 12px 12px !important;
+          }
+
+          /* Message bubble mine */
+          .msg-bubble-mine {
+            background-color: var(--wa-bubble-mine) !important;
+            color: var(--wa-text-primary) !important;
+            border-radius: 8px 8px 0px 8px !important;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
+            border: none !important;
+            position: relative;
+          }
+          /* Message bubble theirs */
+          .msg-bubble-theirs {
+            background-color: var(--wa-bubble-theirs) !important;
+            color: var(--wa-text-primary) !important;
+            border-radius: 8px 8px 8px 0px !important;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13) !important;
+            border: none !important;
+            position: relative;
+          }
+          .msg-bubble-mine .chat-text, .msg-bubble-theirs .chat-text {
+            color: var(--wa-text-primary) !important;
+          }
+
+          /* Group member names inside bubble */
+          .msg-bubble-theirs .fw-bold {
+            color: #34b7f1 !important; /* WhatsApp blue user name */
+          }
+
+          /* Reply panels in bubbles */
+          .msg-reply-mine {
+            border-left: 4px solid var(--wa-teal-light) !important;
+            background-color: rgba(0, 0, 0, 0.04) !important;
+            color: var(--wa-text-primary) !important;
+          }
+          .msg-reply-theirs {
+            border-left: 4px solid #34b7f1 !important;
+            background-color: rgba(0, 0, 0, 0.04) !important;
+            color: var(--wa-text-primary) !important;
+          }
+
+          /* Meta texts inside message bubbles */
+          .message-meta {
+            color: var(--wa-text-secondary) !important;
+          }
+
+          /* Footer input panel */
+          #wa-input-footer {
+            background-color: #efeae2 !important; /* matches chat bg */
+            border-top: none !important;
+            padding: 8px 6px !important;
+          }
+
+          /* Floating layout for the white input pill + separated green circular send button */
+          .wa-input-pill-wrapper {
+            background-color: #ffffff !important;
+            border-radius: 24px !important;
+            padding: 2px 10px !important;
+            flex-grow: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1) !important;
+          }
+
+          .wa-input-pill-wrapper input {
+            border: none !important;
+            background: transparent !important;
+            padding: 8px 4px !important;
+            box-shadow: none !important;
+          }
+          .wa-input-pill-wrapper input:focus-visible {
+            box-shadow: none !important;
+          }
+
+          /* Separated send button as Floating Action Button (FAB) */
+          #wa-send-button {
+            background-color: var(--wa-teal-light) !important;
+            border-color: var(--wa-teal-light) !important;
+            color: #ffffff !important;
+            width: 44px !important;
+            height: 44px !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.25) !important;
+            flex-shrink: 0 !important;
+            padding: 0 !important;
+          }
+          #wa-send-button:hover, #wa-send-button:focus-visible {
+            background-color: var(--wa-teal-dark) !important;
+            border-color: var(--wa-teal-dark) !important;
+          }
+
+          /* Adjust attachment & emoji button sizes inside the input pill wrapper */
+          .wa-input-pill-wrapper button, .wa-input-pill-wrapper label {
+            background: transparent !important;
+            border: none !important;
+            padding: 4px !important;
+            font-size: 1.3rem !important;
+            color: var(--wa-text-secondary) !important;
+          }
+
+          /* Mobile Accessory Bar above the input pill */
+          #wa-mobile-accessory-bar {
+            border-bottom: none !important;
+            padding-bottom: 0 !important;
+            margin-bottom: 4px !important;
+            background: transparent !important;
+          }
+          #wa-mobile-accessory-bar span {
+            color: var(--wa-text-secondary) !important;
+            font-weight: 500;
+          }
+          #wa-mobile-accessory-bar select {
+            background-color: #ffffff !important;
+            border: 1px solid rgba(0,0,0,0.15) !important;
+            color: var(--wa-text-primary) !important;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.05) !important;
+          }
+          #wa-mobile-accessory-bar button {
+            background-color: #ffffff !important;
+            border: 1px solid rgba(0,0,0,0.15) !important;
+            color: #d6336c !important; /* Heart color */
+            box-shadow: 0 1px 1px rgba(0,0,0,0.05) !important;
+          }
+        }
       `}</style>
 
       {/* Lightbox / Image Preview */}
@@ -1380,7 +1582,7 @@ function ChatRoom() {
         {/* Sidebar Container */}
         <aside aria-label="Members list" className={`col-12 col-md-4 col-lg-3 bg-white border-end h-100 flex-column ${view === 'sidebar' ? 'd-flex' : 'd-none d-md-flex'}`}>
           <div className="cn-checkers" aria-hidden="true" />
-          <header className="p-3 border-bottom bg-light d-flex align-items-center justify-content-between">
+          <header id="wa-sidebar-header" className="p-3 border-bottom bg-light d-flex align-items-center justify-content-between">
             <div className="d-flex align-items-center gap-2 min-w-0">
               <Avatar name={nickname} size={AVATAR_SIZE.lg} baseUrl={baseUrl} />
               <div className="min-w-0">
@@ -1414,7 +1616,7 @@ function ChatRoom() {
         <main aria-label={displayUser ? `Conversation with ${displayUser.nickname}` : 'Conversation'} className={`col-12 col-md-8 col-lg-9 bg-light h-100 flex-column ${view === 'chat' ? 'd-flex' : 'd-none d-md-flex'}`}>
           <div className="cn-checkers" aria-hidden="true" />
           {/* Header */}
-          <header className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <header id="wa-main-header" className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2 min-w-0">
               <button className="btn btn-light d-md-none me-2" onClick={() => setView('sidebar')} aria-label="Back to members list">
                 ⬅️ Members
@@ -1444,7 +1646,7 @@ function ChatRoom() {
           </header>
 
           {/* Chat Messages Log */}
-          <div ref={chatRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="Chat messages" className="flex-grow-1 overflow-y-auto p-2 p-md-4" style={{ background: 'var(--chat-bg)' }}>
+          <div id="wa-chat-log" ref={chatRef} role="log" aria-live="polite" aria-relevant="additions" aria-label="Chat messages" className="flex-grow-1 overflow-y-auto p-2 p-md-4" style={{ background: 'var(--chat-bg)' }}>
             {messages.length === 0 ? (
               <div className="h-100 d-flex flex-column align-items-center justify-content-center text-center empty-state">
                 <span style={{ fontSize: 40 }} aria-hidden="true">👋</span>
@@ -1519,101 +1721,9 @@ function ChatRoom() {
           )}
 
           {/* Input Panel footer */}
-          <footer className="p-2 p-sm-3 bg-white border-top d-flex flex-column gap-2">
-            <div className="d-flex align-items-center gap-2 w-100">
-              <button 
-                type="button" 
-                className="btn btn-light rounded-circle p-2 fs-5 flex-shrink-0" 
-                style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                onClick={() => fileInputRef.current?.click()} 
-                disabled={uploading} 
-                aria-label="Attach a file" 
-                title="Upload attachment"
-              >
-                {uploading ? '⏳' : '📎'}
-              </button>
-              <input ref={fileInputRef} type="file" multiple className="visually-hidden" onChange={handleFile} aria-hidden="true" tabIndex={-1} />
-
-              <button 
-                type="button" 
-                className="btn btn-light rounded-circle p-2 fs-5 flex-shrink-0" 
-                style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                onClick={() => setShowEmoji(v => !v)} 
-                aria-pressed={showEmoji} 
-                aria-label="Toggle emoji picker"
-              >
-                😊
-              </button>
-
-              <label htmlFor="chat-message-input" className="visually-hidden">
-                {editingMessage ? 'Edit message' : 'Type a message'}
-              </label>
-              <input
-                id="chat-message-input"
-                ref={inputRef}
-                type="text"
-                className="form-control rounded-pill px-4 flex-grow-1"
-                value={message}
-                placeholder={editingMessage ? 'Edit message...' : 'Type a message…'}
-                onChange={e => handleInputChange(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') sendMessage();
-                  if (e.key === 'Escape' && editingMessage) cancelEditMessage();
-                }}
-                onFocus={scrollToBottom}
-                style={{ padding: '10px 20px' }}
-              />
-
-              {/* Desktop view extra tools (Self-Destruct + Heart) */}
-              <div className="d-none d-md-flex align-items-center gap-2">
-                <div className="burn-timer-dropdown d-flex align-items-center">
-                  <label htmlFor="burn-timer-select" className="visually-hidden">Self-destruct timer</label>
-                  <select
-                    id="burn-timer-select"
-                    className="form-select form-select-sm rounded-pill"
-                    value={burnDelay ?? ''}
-                    onChange={e => setBurnDelay(e.target.value ? Number(e.target.value) : null)}
-                    title="Self-destruct timer"
-                    style={{ width: 100 }}
-                  >
-                    <option value="">🔥 Off</option>
-                    <option value={10}>10s</option>
-                    <option value={30}>30s</option>
-                    <option value={60}>1m</option>
-                    <option value={300}>5m</option>
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-outline-danger rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 42, height: 42 }}
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    spawnHearts(8);
-                    spawnLoveParticles(rect.left + 21, rect.top + 21, 12);
-                    socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
-                  }}
-                  aria-label="Send heart burst"
-                  title="Send heart burst"
-                >
-                  ❤️
-                </button>
-              </div>
-
-              <button 
-                type="button" 
-                className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center flex-shrink-0" 
-                style={{ width: 42, height: 42 }} 
-                onClick={sendMessage} 
-                aria-label={editingMessage ? 'Save edited message' : 'Send message'}
-              >
-                ➡️
-              </button>
-            </div>
-
+          <footer id="wa-input-footer" className="p-2 p-sm-3 bg-white border-top d-flex flex-column gap-2">
             {/* Mobile view secondary bar for Self-Destruct select and Heart Burst */}
-            <div className="d-flex d-md-none align-items-center justify-content-between w-100 border-top pt-2 px-1">
+            <div id="wa-mobile-accessory-bar" className="d-flex d-md-none align-items-center justify-content-between w-100 border-top pt-2 px-1">
               <div className="d-flex align-items-center gap-2">
                 <span className="small text-muted" style={{ fontSize: '11px' }}>🔥 Self-Destruct:</span>
                 <label htmlFor="burn-timer-select-mobile" className="visually-hidden">Self-destruct timer</label>
@@ -1646,6 +1756,101 @@ function ChatRoom() {
                 title="Send heart burst"
               >
                 ❤️ Heart Burst
+              </button>
+            </div>
+
+            <div className="d-flex align-items-center gap-2 w-100">
+              <div className="wa-input-pill-wrapper">
+                <button 
+                  type="button" 
+                  className="btn btn-light rounded-circle p-2 fs-5 flex-shrink-0" 
+                  style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={uploading} 
+                  aria-label="Attach a file" 
+                  title="Upload attachment"
+                >
+                  {uploading ? '⏳' : '📎'}
+                </button>
+                <input ref={fileInputRef} type="file" multiple className="visually-hidden" onChange={handleFile} aria-hidden="true" tabIndex={-1} />
+
+                <button 
+                  type="button" 
+                  className="btn btn-light rounded-circle p-2 fs-5 flex-shrink-0" 
+                  style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                  onClick={() => setShowEmoji(v => !v)} 
+                  aria-pressed={showEmoji} 
+                  aria-label="Toggle emoji picker"
+                >
+                  😊
+                </button>
+
+                <label htmlFor="chat-message-input" className="visually-hidden">
+                  {editingMessage ? 'Edit message' : 'Type a message'}
+                </label>
+                <input
+                  id="chat-message-input"
+                  ref={inputRef}
+                  type="text"
+                  className="form-control rounded-pill px-4 flex-grow-1"
+                  value={message}
+                  placeholder={editingMessage ? 'Edit message...' : 'Type a message…'}
+                  onChange={e => handleInputChange(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') sendMessage();
+                    if (e.key === 'Escape' && editingMessage) cancelEditMessage();
+                  }}
+                  onFocus={scrollToBottom}
+                  style={{ padding: '10px 20px' }}
+                />
+
+                {/* Desktop view extra tools (Self-Destruct + Heart) */}
+                <div className="d-none d-md-flex align-items-center gap-2">
+                  <div className="burn-timer-dropdown d-flex align-items-center">
+                    <label htmlFor="burn-timer-select" className="visually-hidden">Self-destruct timer</label>
+                    <select
+                      id="burn-timer-select"
+                      className="form-select form-select-sm rounded-pill"
+                      value={burnDelay ?? ''}
+                      onChange={e => setBurnDelay(e.target.value ? Number(e.target.value) : null)}
+                      title="Self-destruct timer"
+                      style={{ width: 100 }}
+                    >
+                      <option value="">🔥 Off</option>
+                      <option value={10}>10s</option>
+                      <option value={30}>30s</option>
+                      <option value={60}>1m</option>
+                      <option value={300}>5m</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{ width: 42, height: 42 }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      spawnHearts(8);
+                      spawnLoveParticles(rect.left + 21, rect.top + 21, 12);
+                      socketRef.current?.emit('sendMessage', { nickname, passcode, message: '❤️', replyTo: null });
+                    }}
+                    aria-label="Send heart burst"
+                    title="Send heart burst"
+                  >
+                    ❤️
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                type="button" 
+                id="wa-send-button"
+                className="btn btn-primary rounded-circle p-2 fs-5 d-flex align-items-center justify-content-center flex-shrink-0" 
+                style={{ width: 42, height: 42 }} 
+                onClick={sendMessage} 
+                aria-label={editingMessage ? 'Save edited message' : 'Send message'}
+              >
+                ➡️
               </button>
             </div>
           </footer>
