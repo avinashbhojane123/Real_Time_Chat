@@ -444,9 +444,14 @@ const MessageRow = memo(function MessageRow({
               }
             }}
           />
-          <div className="image-404-fallback p-3 bg-secondary bg-opacity-10 border rounded text-muted small align-items-center gap-2" style={{ display: 'none' }}>
-            <span>⚠️</span>
-            <span>Image file erased (server restarted)</span>
+          <div className="image-404-fallback p-3 bg-dark bg-opacity-10 border border-warning rounded text-muted small flex-column gap-1" style={{ display: 'none' }}>
+            <div className="d-flex align-items-center gap-2 text-warning fw-bold">
+              <span>⚠️</span>
+              <span>Older image lost from old disk: {name}</span>
+            </div>
+            <div className="text-muted" style={{ fontSize: '11px' }}>
+              ⚡ All new images are now stored inside Supabase database permanently and will never be erased.
+            </div>
           </div>
         </button>
       );
