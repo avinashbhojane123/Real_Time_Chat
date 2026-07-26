@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, MaxLength } from 'class-validator';
 
 export class EditMessageDto {
   @IsString()
@@ -10,9 +10,13 @@ export class EditMessageDto {
   messageId!: number;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(10000)
-  newMessage!: string;
+  newMessage?: string;
+
+  @IsString()
+  @IsOptional()
+  fileUrl?: string;
 }
 
 export class DeleteMessageDto {

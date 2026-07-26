@@ -559,13 +559,19 @@ export class ChatGateway
       return; // Unauthorized edit attempt!
     }
 
-    msg.message = data.newMessage;
+    if (data.newMessage !== undefined) {
+      msg.message = data.newMessage;
+    }
+    if (data.fileUrl !== undefined) {
+      msg.fileUrl = data.fileUrl;
+    }
     msg.isEdited = true;
     await this.messageRepo.save(msg);
 
     this.server.to(data.passcode).emit('messageEdited', {
       messageId: msg.id,
       newMessage: msg.message,
+      fileUrl: msg.fileUrl,
     });
   }
 

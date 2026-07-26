@@ -321,13 +321,14 @@ interface MessageRowProps {
   onReact: (id: number, emoji: string) => void;
   onImageClick: (url: string) => void;
   onMediaLoad: () => void;
+  onRestoreImage?: (msgId: number, dataUri: string) => void;
 }
 
 /** One chat bubble. Memoized so typing in the composer, opening
  *  the emoji picker, etc. doesn't re-render the whole message list. */
 const MessageRow = memo(function MessageRow({
   msg, isMe, nickname, senderAvatar, baseUrl, isMenuOpen,
-  onToggleMenu, onReply, onEdit, onDelete, onReact, onImageClick, onMediaLoad,
+  onToggleMenu, onReply, onEdit, onDelete, onReact, onImageClick, onMediaLoad, onRestoreImage,
 }: MessageRowProps) {
   // Locally "self-destructs": once expiresAt passes, this row
   // stops rendering itself instead of the parent re-filtering
@@ -444,14 +445,27 @@ const MessageRow = memo(function MessageRow({
               }
             }}
           />
-          <div className="image-404-fallback p-3 bg-dark bg-opacity-10 border border-warning rounded text-muted small flex-column gap-1" style={{ display: 'none' }}>
-            <div className="d-flex align-items-center gap-2 text-warning fw-bold">
-              <span>⚠️</span>
-              <span>Older image lost from old disk: {name}</span>
-            </div>
-            <div className="text-muted" style={{ fontSize: '11px' }}>
-              ⚡ All new images are now stored inside Supabase database permanently and will never be erased.
-            </div>
+          <div className="image-404-fallback p-3 bg-dark bg-opacity-25 border border-secondary rounded text-center my-2 d-flex flex-column align-items-center gap-2" style={{ display: 'none' }} onClick={(e) => e.stopPropagation()}>
+            <span style={{ fontSize: 28 }}>🖼️</span>
+            <span className="small text-white fw-semibold">{name || 'Image attachment'}</span>
+            {isMe && onRestoreImage && (
+              <label className="btn btn-sm btn-primary rounded-pill px-3 py-1 mt-1 cursor-pointer shadow-sm d-inline-flex align-items-center gap-1">
+                <span>📤</span>
+                <span>Restore Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="d-none"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file && msg.id) {
+                      const dataUri = await fileToDataUri(file);
+                      onRestoreImage(msg.id, dataUri);
+                    }
+                  }}
+                />
+              </label>
+            )}
           </div>
         </button>
       );
@@ -961,6 +975,11 @@ function ChatRoom() {
     inputRef.current?.focus();
   }, []);
 
+  const handleRestoreImage = useCallback((msgId: number, dataUri: string) => {
+    socketRef.current?.emit('editMessage', { passcode, messageId: msgId, fileUrl: dataUri });
+    showToast('Image restored & saved to Supabase!');
+  }, [passcode, showToast]);
+
   const handleClearHistory = () => {
     if (window.confirm('Wipe chat history in this room permanently?')) {
       socketRef.current?.emit('clearHistory', { passcode });
@@ -999,8 +1018,8 @@ function ChatRoom() {
       }, 50);
     });
 
-    socket.on('messageEdited', ({ messageId, newMessage }: { messageId: number; newMessage: string }) => {
-      setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, message: newMessage, isEdited: true } : m)));
+    socket.on('messageEdited', ({ messageId, newMessage, fileUrl }: { messageId: number; newMessage?: string; fileUrl?: string }) => {
+      setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, message: newMessage ?? m.message, fileUrl: fileUrl ?? m.fileUrl, isEdited: true } : m)));
     });
 
     socket.on('messageDeleted', ({ messageId }: { messageId: number }) => {
@@ -1908,6 +1927,7 @@ function ChatRoom() {
                     onReact={handleReactToMessage}
                     onImageClick={setLightbox}
                     onMediaLoad={scrollToBottom}
+                    onRestoreImage={handleRestoreImage}
                   />
                 );
               })
