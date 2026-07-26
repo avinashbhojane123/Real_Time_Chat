@@ -118,13 +118,11 @@ export class UploadController {
     );
 
     let fileUrl = `/uploads/${file.filename}`;
-    if (file.mimetype && file.mimetype.startsWith('image/')) {
-      try {
-        const imageBuffer = fs.readFileSync(file.path);
-        fileUrl = `data:${file.mimetype};base64,${imageBuffer.toString('base64')}`;
-      } catch (e) {
-        console.error('Base64 image conversion error:', e);
-      }
+    try {
+      const fileBuffer = fs.readFileSync(file.path);
+      fileUrl = `data:${file.mimetype || 'application/octet-stream'};base64,${fileBuffer.toString('base64')}`;
+    } catch (e) {
+      console.error('Base64 file conversion error:', e);
     }
 
     return {
