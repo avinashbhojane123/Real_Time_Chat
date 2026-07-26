@@ -321,14 +321,13 @@ interface MessageRowProps {
   onReact: (id: number, emoji: string) => void;
   onImageClick: (url: string) => void;
   onMediaLoad: () => void;
-  onRestoreImage?: (msgId: number, dataUri: string) => void;
 }
 
 /** One chat bubble. Memoized so typing in the composer, opening
  *  the emoji picker, etc. doesn't re-render the whole message list. */
 const MessageRow = memo(function MessageRow({
   msg, isMe, nickname, senderAvatar, baseUrl, isMenuOpen,
-  onToggleMenu, onReply, onEdit, onDelete, onReact, onImageClick, onMediaLoad, onRestoreImage,
+  onToggleMenu, onReply, onEdit, onDelete, onReact, onImageClick, onMediaLoad,
 }: MessageRowProps) {
   // Locally "self-destructs": once expiresAt passes, this row
   // stops rendering itself instead of the parent re-filtering
@@ -415,7 +414,7 @@ const MessageRow = memo(function MessageRow({
       return (
         <button
           type="button"
-          className="btn p-0 border-0 bg-transparent d-block my-2 overflow-hidden text-start position-relative"
+          className="btn p-0 border-0 bg-transparent d-block my-2 overflow-hidden text-start"
           onClick={() => onImageClick(url)}
           aria-label={`Open image ${name} in full screen`}
         >
@@ -438,35 +437,8 @@ const MessageRow = memo(function MessageRow({
                 }
               }
               imgEl.style.display = 'none';
-              const parent = imgEl.parentElement;
-              if (parent) {
-                const fallback = parent.querySelector('.image-404-fallback') as HTMLElement;
-                if (fallback) fallback.style.display = 'flex';
-              }
             }}
           />
-          <div className="image-404-fallback p-3 bg-dark bg-opacity-25 border border-secondary rounded text-center my-2 d-flex flex-column align-items-center gap-2" style={{ display: 'none' }} onClick={(e) => e.stopPropagation()}>
-            <span style={{ fontSize: 28 }}>🖼️</span>
-            <span className="small text-white fw-semibold">{name || 'Image attachment'}</span>
-            {isMe && onRestoreImage && (
-              <label className="btn btn-sm btn-primary rounded-pill px-3 py-1 mt-1 cursor-pointer shadow-sm d-inline-flex align-items-center gap-1">
-                <span>📤</span>
-                <span>Restore Image</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="d-none"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file && msg.id) {
-                      const dataUri = await fileToDataUri(file);
-                      onRestoreImage(msg.id, dataUri);
-                    }
-                  }}
-                />
-              </label>
-            )}
-          </div>
         </button>
       );
 
@@ -1927,7 +1899,6 @@ function ChatRoom() {
                     onReact={handleReactToMessage}
                     onImageClick={setLightbox}
                     onMediaLoad={scrollToBottom}
-                    onRestoreImage={handleRestoreImage}
                   />
                 );
               })
