@@ -93,6 +93,61 @@ const formatBytes = (bytes?: number | string) => {
   return `${(numBytes / 1048576).toFixed(1)} MB`;
 };
 
+const fileToBase64OrCompressed = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/') || file.type.includes('svg')) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX_WIDTH = 1920;
+      const MAX_HEIGHT = 1080;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+        if (width / height > MAX_WIDTH / MAX_HEIGHT) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        } else {
+          width = Math.round((width * MAX_HEIGHT) / height);
+          height = MAX_HEIGHT;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85);
+        resolve(dataUrl);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    };
+    img.src = url;
+  });
+};
+
 const fmtTime = (iso?: string) => {
   const d = iso ? new Date(iso) : new Date();
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -359,7 +414,7 @@ const MessageRow = memo(function MessageRow({
       return (
         <button
           type="button"
-          className="btn p-0 border-0 bg-transparent d-block my-2 overflow-hidden text-start"
+          className="btn p-0 border-0 bg-transparent d-block my-2 overflow-hidden text-start position-relative"
           onClick={() => onImageClick(url)}
           aria-label={`Open image ${name} in full screen`}
         >
@@ -375,12 +430,24 @@ const MessageRow = memo(function MessageRow({
                 imgEl.dataset.retried = 'true';
                 if (url.includes('/uploads/')) {
                   imgEl.src = url.replace('/uploads/', '/api/uploads/');
+                  return;
                 } else if (url.includes('/api/uploads/')) {
                   imgEl.src = url.replace('/api/uploads/', '/uploads/');
+                  return;
                 }
+              }
+              imgEl.style.display = 'none';
+              const parent = imgEl.parentElement;
+              if (parent) {
+                const fallback = parent.querySelector('.image-404-fallback') as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
               }
             }}
           />
+          <div className="image-404-fallback p-3 bg-secondary bg-opacity-10 border rounded text-muted small align-items-center gap-2" style={{ display: 'none' }}>
+            <span>⚠️</span>
+            <span>Image file erased (server restarted)</span>
+          </div>
         </button>
       );
 
@@ -1093,20 +1160,32 @@ function ChatRoom() {
 
     for (const file of Array.from(files)) {
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch(`${SOCKET_URL}/api/upload`, { method: 'POST', body: formData });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Upload failed');
+        let fileUrl = '';
+        let fileType = file.type;
+        let fileSize = file.size;
+
+        if (file.type.startsWith('image/')) {
+          // Compress and convert image to persistent Data URI to prevent server disk reset 404s
+          fileUrl = await fileToBase64OrCompressed(file);
+        } else {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(`${SOCKET_URL}/api/upload`, { method: 'POST', body: formData });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Upload failed');
+          fileUrl = data.fileUrl;
+          fileType = data.fileType || file.type;
+          fileSize = data.fileSize || file.size;
+        }
 
         socketRef.current?.emit('sendMessage', {
           nickname,
           passcode,
           message: '',
-          fileUrl: data.fileUrl,
-          fileName: data.fileName,
-          fileType: data.fileType,
-          fileSize: data.fileSize,
+          fileUrl,
+          fileName: file.name,
+          fileType,
+          fileSize,
           replyTo: replyTo ? { id: replyTo.id, nickname: replyTo.nickname, message: replyTo.message } : null,
           expiresIn: burnDelay,
         });
