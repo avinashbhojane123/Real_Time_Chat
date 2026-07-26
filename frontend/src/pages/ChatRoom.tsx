@@ -71,11 +71,17 @@ const EMOJIS = ['❤️', '😍', '😊', '🥰', '😘', '✨', '😄', '🤗',
 ═══════════════════════════════════════════════════════════ */
 const resolveUrl = (url: string) => {
   if (!url) return '';
-  const trimmed = url.trim().toLowerCase();
-  if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) {
+  const trimmed = url.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('vbscript:')) {
     return 'about:blank';
   }
-  return url.startsWith('http') ? url : `${SOCKET_URL}${url}`;
+  if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('data:')) {
+    return trimmed;
+  }
+  const baseUrl = SOCKET_URL.replace(/\/+$/, '');
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return `${baseUrl}${cleanPath}`;
 };
 
 const formatBytes = (bytes?: number | string) => {
@@ -344,36 +350,52 @@ const MessageRow = memo(function MessageRow({
     const type = msg.fileType || '';
     const name = msg.fileName || 'file';
 
-    if (type.startsWith('image/'))
+    const isImage = type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)(\?.*)?$/i.test(url || name || msg.fileUrl);
+    const isVideo = type.startsWith('video/') || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url || name || msg.fileUrl);
+    const isAudio = type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)(\?.*)?$/i.test(url || name || msg.fileUrl);
+    const isPdf = type === 'application/pdf' || /\.pdf(\?.*)?$/i.test(url || name || msg.fileUrl);
+
+    if (isImage)
       return (
         <button
           type="button"
-          className="btn p-0 border-0 bg-transparent d-block my-2"
+          className="btn p-0 border-0 bg-transparent d-block my-2 overflow-hidden text-start"
           onClick={() => onImageClick(url)}
           aria-label={`Open image ${name} in full screen`}
         >
           <img
             src={url}
-            alt={name}
+            alt={name || 'Shared image'}
             className="img-fluid rounded border chat-media"
             loading="lazy"
             onLoad={onMediaLoad}
+            onError={(e) => {
+              const imgEl = e.currentTarget;
+              if (!imgEl.dataset.retried) {
+                imgEl.dataset.retried = 'true';
+                if (url.includes('/uploads/')) {
+                  imgEl.src = url.replace('/uploads/', '/api/uploads/');
+                } else if (url.includes('/api/uploads/')) {
+                  imgEl.src = url.replace('/api/uploads/', '/uploads/');
+                }
+              }
+            }}
           />
         </button>
       );
 
-    if (type.startsWith('video/'))
+    if (isVideo)
       return (
         <video className="w-100 rounded border my-2 d-block chat-media" controls onLoadedMetadata={onMediaLoad}>
-          <source src={url} type={type} />
+          <source src={url} type={type || 'video/mp4'} />
           Your browser does not support embedded video.
         </video>
       );
 
-    if (type.startsWith('audio/'))
+    if (isAudio)
       return <audio className="w-100 my-2 d-block" controls src={url} onLoadedMetadata={onMediaLoad} />;
 
-    if (type === 'application/pdf')
+    if (isPdf)
       return <iframe className="w-100 rounded border my-2 d-block chat-pdf" src={url} title={name} onLoad={onMediaLoad} />;
 
     return (
@@ -1594,20 +1616,39 @@ function ChatRoom() {
           role="dialog"
           aria-modal="true"
           aria-label="Image preview"
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-75"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-75 p-3"
           style={{ zIndex: Z.lightbox, cursor: 'zoom-out' }}
           onClick={() => setLightbox(null)}
         >
-          <img src={lightbox} alt="Full size preview" className="img-fluid rounded shadow-lg" style={{ maxHeight: '90%' }} onClick={e => e.stopPropagation()} />
-          <button
-            type="button"
-            className="btn btn-light rounded-circle position-absolute top-0 end-0 m-3"
-            style={{ width: 44, height: 44 }}
-            onClick={() => setLightbox(null)}
-            aria-label="Close image preview"
-          >
-            ✕
-          </button>
+          <div className="position-relative d-flex align-items-center justify-content-center" style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
+            <img
+              src={resolveUrl(lightbox)}
+              alt="Full size preview"
+              className="img-fluid rounded shadow-lg"
+              style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
+              onClick={e => e.stopPropagation()}
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                if (target.nextElementSibling) {
+                  (target.nextElementSibling as HTMLElement).style.display = 'flex';
+                }
+              }}
+            />
+            <div className="bg-dark text-white p-4 rounded shadow-lg flex-column align-items-center gap-2" style={{ display: 'none' }} onClick={e => e.stopPropagation()}>
+              <span style={{ fontSize: 36 }}>🖼️</span>
+              <p className="m-0 text-muted small">Unable to load full-size image preview</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-light rounded-circle position-absolute top-0 end-0 m-3 shadow"
+              style={{ width: 44, height: 44, zIndex: 10 }}
+              onClick={() => setLightbox(null)}
+              aria-label="Close image preview"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 

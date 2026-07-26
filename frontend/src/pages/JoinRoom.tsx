@@ -1,179 +1,4 @@
-// import { useState } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import axios from 'axios';
 
-// const SOCKET_URL =(import.meta as any).env?.VITE_SOCKET_URL || 'https://backend-9i6w.onrender.com/api';
-
-// function JoinRoom() {
-//   const navigate = useNavigate();
-
-//   const [nickname, setNickname] = useState('');
-//   const [passcode, setPasscode] = useState('');
-//   const [loading, setLoading] = useState(false);
-
-//   const joinRoom = async () => {
-//     if (!nickname.trim() || !passcode.trim()) {
-//       alert('Please enter nickname and passcode');
-//       return;
-//     }
-
-//     try {
-//       setLoading(true);
-
-//       const { data } = await axios.post(
-//         `${API_URL}/rooms/join`,
-//         {
-//           nickname: nickname.trim(),
-//           passcode: passcode.trim(),
-//         },
-//       );
-
-//       localStorage.setItem(
-//         'nickname',
-//         nickname.trim(),
-//       );
-
-//       localStorage.setItem(
-//         'passcode',
-//         passcode.trim(),
-//       );
-
-//       if (data?.room?.id) {
-//         localStorage.setItem(
-//           'roomId',
-//           data.room.id.toString(),
-//         );
-//       }
-
-//       navigate('/chat');
-//     } catch (error: any) {
-//       console.error(error);
-
-//       alert(
-//         error?.response?.data?.message ||
-//           'Unable to join room',
-//       );
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <div className="container">
-//       <div
-//         className="row justify-content-center align-items-center"
-//         style={{ minHeight: '100vh' }}
-//       >
-//         <div className="col-md-5">
-//           <div className="card shadow">
-//             <div className="card-body p-4">
-//               <h2 className="text-center mb-4">
-//                 Passcode Chat
-//               </h2>
-
-//               <div className="mb-3">
-//                 <label className="form-label">
-//                   Nickname
-//                 </label>
-
-//                 <input
-//                   type="text"
-//                   className="form-control"
-//                   placeholder="Enter nickname"
-//                   value={nickname}
-//                   onChange={(e) =>
-//                     setNickname(e.target.value)
-//                   }
-//                   onKeyDown={(e) => {
-//                     if (e.key === 'Enter') {
-//                       joinRoom();
-//                     }
-//                   }}
-//                 />
-//               </div>
-
-//               <div className="mb-4">
-//                 <label className="form-label">
-//                   Room Passcode
-//                 </label>
-
-//                 <input
-//                   type="text"
-//                   className="form-control"
-//                   placeholder="Enter passcode"
-//                   value={passcode}
-//                   onChange={(e) =>
-//                     setPasscode(e.target.value)
-//                   }
-//                   onKeyDown={(e) => {
-//                     if (e.key === 'Enter') {
-//                       joinRoom();
-//                     }
-//                   }}
-//                 />
-//               </div>
-
-//               <button
-//                 className="btn btn-primary w-100"
-//                 onClick={joinRoom}
-//                 disabled={loading}
-//               >
-//                 {loading
-//                   ? 'Joining...'
-//                   : 'Join Room'}
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default JoinRoom;
-
-
-
-
-// import { useState } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import axios from 'axios';
-
-// const API_URL =
-//   import.meta.env.VITE_API_URL ||
-//   'https://backend-9i6w.onrender.com/api';
-
-// export default function JoinRoom() {
-//   const navigate = useNavigate();
-//   const [nickname, setNickname] = useState('');
-//   const [passcode, setPasscode] = useState('');
-//   const [loading, setLoading] = useState(false);
-
-//   const joinRoom = async () => {
-//     if (!nickname.trim() || !passcode.trim()) {
-//       alert('Please enter nickname and passcode');
-//       return;
-//     }
-//     try {
-//       setLoading(true);
-//       const { data } = await axios.post(`${API_URL}/rooms/join`, {
-//         nickname: nickname.trim(),
-//         passcode: passcode.trim(),
-//       });
-
-//       localStorage.setItem('nickname', nickname.trim());
-//       localStorage.setItem('passcode', passcode.trim());
-//       if (data?.room?.id) {
-//         localStorage.setItem('roomId', data.room.id.toString());
-//       }
-//       navigate('/chat');
-//     } catch (error: any) {
-//       console.error(error);
-//       alert(error?.response?.data?.message || 'Unable to join room');
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -220,8 +45,6 @@ export default function JoinRoom() {
     try {
       setLoading(true);
 
-      console.log('API_URL:', API_URL);
-
       const response = await axios.post(
         `${API_URL}/rooms/join`,
         {
@@ -255,8 +78,8 @@ export default function JoinRoom() {
 
       alert(
         error?.response?.data?.message ||
-          error?.message ||
-          'Unable to join room',
+        error?.message ||
+        'Unable to join room',
       );
     } finally {
       setLoading(false);
@@ -269,7 +92,7 @@ export default function JoinRoom() {
     <div className="join-wrap">
       <div className="orb o1" />
       <div className="orb o2" />
-      
+
       <div className="glass-card">
         <div className="brand">
           <div className="logo neu">PC</div>
@@ -282,7 +105,7 @@ export default function JoinRoom() {
           <div className="avatar-preview-wrap">
             {avatar ? (
               <img
-                src={avatar.startsWith('http') ? avatar : `${baseUrl}${avatar}`}
+                src={avatar.startsWith('http') || avatar.startsWith('data:') ? avatar : `${baseUrl}${avatar.startsWith('/') ? '' : '/'}${avatar}`}
                 alt="Avatar"
                 className="avatar-preview-img"
               />
