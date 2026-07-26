@@ -179,6 +179,16 @@ export class UploadController {
       file.path,
     );
 
+    let fileUrl = `/uploads/${file.filename}`;
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      try {
+        const imageBuffer = fs.readFileSync(file.path);
+        fileUrl = `data:${file.mimetype};base64,${imageBuffer.toString('base64')}`;
+      } catch (e) {
+        console.error('Base64 image conversion error:', e);
+      }
+    }
+
     return {
       success: true,
 
@@ -191,8 +201,7 @@ export class UploadController {
       fileSize:
         file.size,
 
-      fileUrl:
-        `/uploads/${file.filename}`,
+      fileUrl,
     };
   }
 }
