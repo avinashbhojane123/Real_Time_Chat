@@ -270,6 +270,7 @@ function Avatar({
           className="rounded-circle w-100 h-100"
           style={{ objectFit: 'cover' }}
           loading="lazy"
+          decoding="async"
         />
       ) : (
         <div
@@ -460,6 +461,7 @@ const MessageRow = memo(function MessageRow({
             alt={name || 'Shared image'}
             className="img-fluid rounded border chat-media"
             loading="lazy"
+            decoding="async"
             onLoad={onMediaLoad}
             onError={(e) => {
               const imgEl = e.currentTarget;
@@ -960,19 +962,7 @@ function ChatRoom() {
     }
   };
 
-  /* ── Message actions ── */
-  const startEditMessage = useCallback((msg: Message) => {
-    setEditingMessage(msg);
-    setMessage(msg.message);
-    setOpenMenuMsgId(null);
-    inputRef.current?.focus();
-  }, []);
-
-  const cancelEditMessage = () => {
-    setEditingMessage(null);
-    setMessage('');
-  };
-
+  /* ── Particles & Animations ── */
   const spawnHearts = useCallback((count = 8) => {
     const container = document.getElementById('love-animations-container');
     if (!container) return;
@@ -1110,6 +1100,19 @@ function ChatRoom() {
       onComplete: () => spark.remove()
     });
   }, []);
+
+  /* ── Message actions ── */
+  const startEditMessage = useCallback((msg: Message) => {
+    setEditingMessage(msg);
+    setMessage(msg.message);
+    setOpenMenuMsgId(null);
+    inputRef.current?.focus();
+  }, []);
+
+  const cancelEditMessage = () => {
+    setEditingMessage(null);
+    setMessage('');
+  };
   const handleDeleteMessage = useCallback((msgId: number) => {
     socketRef.current?.emit('deleteMessage', { passcode, messageId: msgId });
     setOpenMenuMsgId(null);
@@ -1377,7 +1380,10 @@ function ChatRoom() {
     inputRef.current?.focus();
   }, []);
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> b2b7179 (Fix TypeScript function order and mobile chat room responsive layout)
   // AnimeJS Modal & UI Effects
   useEffect(() => {
     if (showEmoji) {
@@ -1842,14 +1848,38 @@ function ChatRoom() {
 
         /* Mobile specific style optimizations */
         @media (max-width: 767.98px) {
+          .chatroom-root {
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+          }
+          .chatroom-layout {
+            height: 100% !important;
+            min-height: 0 !important;
+          }
+          aside[aria-label="Members list"] {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 1050 !important;
+            width: 100% !important;
+          }
+          main[aria-label] {
+            width: 100% !important;
+            height: 100% !important;
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+          }
+          #wa-chat-log {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding: 12px 8px !important;
+          }
           #wa-main-header, #wa-sidebar-header {
             padding: 10px 14px !important;
           }
-          #wa-chat-log {
-            padding: 12px 8px !important;
-          }
           #wa-input-footer {
-            padding: 10px !important;
+            padding: 8px 10px !important;
           }
           .wa-input-pill-wrapper {
             padding: 2px 6px !important;
@@ -2091,6 +2121,15 @@ function ChatRoom() {
           {/* Header */}
           <header id="wa-main-header" className="p-3 border-bottom bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2 min-w-0">
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm rounded-pill d-md-none me-1 py-1 px-2 flex-shrink-0"
+                onClick={() => setView(v => (v === 'chat' ? 'sidebar' : 'chat'))}
+                aria-label="View members list"
+                title="View members"
+              >
+                👥 <span className="badge bg-info text-dark rounded-pill ms-1">{onlineCount}</span>
+              </button>
 
               {displayUser && (
                 <div className="d-flex align-items-center gap-2 min-w-0">
