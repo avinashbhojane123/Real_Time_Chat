@@ -1,7 +1,8 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { animate } from 'animejs';
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
@@ -15,6 +16,119 @@ export default function JoinRoom() {
   const [loading, setLoading] = useState(false);
   const [avatar, setAvatar] = useState(localStorage.getItem('avatarUrl') || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  const orb1Ref = useRef<HTMLDivElement>(null);
+  const orb2Ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (cardRef.current) {
+      animate(cardRef.current, {
+        opacity: [0, 1],
+        scale: [0.88, 1],
+        translateY: [30, 0],
+        duration: 900,
+        ease: 'outElastic(1, 0.75)'
+      });
+    }
+
+    if (orb1Ref.current) {
+      animate(orb1Ref.current, {
+        translateX: [-35, 35],
+        translateY: [-25, 25],
+        scale: [1, 1.15],
+        duration: 7000,
+        loop: true,
+        alternate: true,
+        ease: 'easeInOutSine'
+      });
+    }
+
+    if (orb2Ref.current) {
+      animate(orb2Ref.current, {
+        translateX: [35, -35],
+        translateY: [30, -30],
+        scale: [1, 1.2],
+        duration: 8500,
+        loop: true,
+        alternate: true,
+        ease: 'easeInOutSine'
+      });
+    }
+
+    animate('.field, .brand, .avatar-selection-container, .neu-btn.join', {
+      opacity: [0, 1],
+      translateY: [15, 0],
+      delay: (_el: Element, i: number) => 120 + i * 70,
+      duration: 600,
+      ease: 'outQuad'
+    });
+  }, []);
+
+  useEffect(() => {
+    if (avatar) {
+      animate('.avatar-preview-img', {
+        scale: [0.5, 1],
+        opacity: [0, 1],
+        rotate: ['-10deg', '0deg'],
+        duration: 500,
+        ease: 'outBack'
+      });
+    }
+  }, [avatar]);
+
+  // Extreme AnimeJS Mouse Parallax & Sparkles
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { clientX, clientY } = e;
+    const container = document.getElementById('sparkle-trail-container');
+    
+    // Parallax tilt on glass card
+    if (cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect();
+      const cardX = clientX - (rect.left + rect.width / 2);
+      const cardY = clientY - (rect.top + rect.height / 2);
+      animate(cardRef.current, {
+        rotateY: cardX * 0.03,
+        rotateX: -cardY * 0.03,
+        duration: 400,
+        ease: 'outQuad'
+      });
+    }
+
+    // Sparkle trail
+    if (container && Math.random() < 0.35) {
+      const spark = document.createElement('div');
+      spark.innerText = ['✨', '💫', '⚡', '💖'][Math.floor(Math.random() * 4)];
+      spark.style.position = 'absolute';
+      spark.style.left = `${clientX}px`;
+      spark.style.top = `${clientY}px`;
+      spark.style.fontSize = `${Math.floor(10 + Math.random() * 12)}px`;
+      spark.style.pointerEvents = 'none';
+      spark.style.zIndex = '999';
+      container.appendChild(spark);
+
+      animate(spark, {
+        translateY: [0, (Math.random() - 0.5) * 40 - 20],
+        translateX: [0, (Math.random() - 0.5) * 40],
+        scale: [0.6, 1.2, 0],
+        opacity: [1, 0],
+        duration: 800 + Math.random() * 400,
+        ease: 'outQuad',
+        onComplete: () => spark.remove()
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (cardRef.current) {
+      animate(cardRef.current, {
+        rotateY: 0,
+        rotateX: 0,
+        duration: 600,
+        ease: 'outBack'
+      });
+    }
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -89,11 +203,12 @@ export default function JoinRoom() {
   const baseUrl = API_URL.replace('/api', '');
 
   return (
-    <div className="join-wrap">
-      <div className="orb o1" />
-      <div className="orb o2" />
+    <div className="join-wrap" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+      <div id="sparkle-trail-container" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 999 }} />
+      <div ref={orb1Ref} className="orb o1" />
+      <div ref={orb2Ref} className="orb o2" />
 
-      <div className="glass-card">
+      <div ref={cardRef} className="glass-card">
         <div className="brand">
           <div className="logo neu">PC</div>
           <h1>Passcode Chat</h1>

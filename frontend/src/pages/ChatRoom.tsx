@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import { animate, stagger } from 'animejs';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://backend-9i6w.onrender.com';
 
@@ -290,6 +291,42 @@ function Avatar({
   );
 }
 
+/** AnimeJS powered Sound Wave Visualizer for audio files & live calls */
+const AudioWaveVisualizer = memo(function AudioWaveVisualizer() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      const bars = containerRef.current.querySelectorAll('.audio-bar');
+      animate(bars, {
+        scaleY: [0.2, 1, 0.25, 0.85, 0.3],
+        delay: stagger(90),
+        duration: 1100,
+        loop: true,
+        direction: 'alternate',
+        ease: 'easeInOutSine'
+      });
+    }
+  }, []);
+
+  return (
+    <div ref={containerRef} className="d-flex align-items-center gap-1 my-2 py-1 px-2 rounded-3 bg-dark bg-opacity-25" style={{ height: 28, width: 140 }}>
+      {[0.4, 0.9, 0.3, 0.7, 1.0, 0.5, 0.8, 0.3, 0.6, 0.9, 0.4].map((_, i) => (
+        <span
+          key={i}
+          className="audio-bar rounded-pill flex-grow-1"
+          style={{
+            height: '100%',
+            background: 'linear-gradient(to top, #7c4dff, #00e5ff)',
+            transformOrigin: 'bottom',
+            display: 'inline-block'
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+
 /** Countdown text for a self-destructing message. Owns its own
  *  1-second interval so a "burning" message never forces the
  *  entire chat log to re-render — only this one line updates. */
@@ -451,7 +488,12 @@ const MessageRow = memo(function MessageRow({
       );
 
     if (isAudio)
-      return <audio className="w-100 my-2 d-block" controls src={url} onLoadedMetadata={onMediaLoad} />;
+      return (
+        <div className="my-2">
+          <AudioWaveVisualizer />
+          <audio className="w-100 d-block" controls src={url} onLoadedMetadata={onMediaLoad} />
+        </div>
+      );
 
     if (isPdf)
       return <iframe className="w-100 rounded border my-2 d-block chat-pdf" src={url} title={name} onLoad={onMediaLoad} />;
@@ -938,8 +980,10 @@ function ChatRoom() {
 
   const handleReactToMessage = useCallback((msgId: number, emoji: string) => {
     socketRef.current?.emit('reactToMessage', { passcode, messageId: msgId, emoji, nickname });
+    if (/❤️|💖|💕/g.test(emoji)) spawnHearts(6);
+    else spawnConfetti(25);
     setOpenMenuMsgId(null);
-  }, [passcode, nickname]);
+  }, [passcode, nickname, spawnHearts, spawnConfetti]);
 
   const handleReply = useCallback((msg: Message) => {
     setReplyTo(msg);
@@ -979,12 +1023,21 @@ function ChatRoom() {
       setMessages(data || []);
       setTimeout(() => {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        animate('.msg-bubble-container', {
+          opacity: [0, 1],
+          translateY: [20, 0],
+          scale: [0.94, 1],
+          delay: stagger(35),
+          duration: 400,
+          ease: 'outQuad'
+        });
       }, 100);
     });
 
     socket.on('newMessage', (data: Message) => {
       setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data]));
       if (data.message && /❤️|💖|💕|💘|💝|♥/g.test(data.message)) spawnHearts(8);
+      if (data.message && /🎉|🚀|🔥|✨|🍾|🥳|💥/g.test(data.message)) spawnConfetti(30);
       setTimeout(() => {
         if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
       }, 50);
@@ -1187,12 +1240,202 @@ function ChatRoom() {
     inputRef.current?.focus();
   }, []);
 
+  const spawnHearts = useCallback((count = 8) => {
+    const container = document.getElementById('love-animations-container');
+    if (!container) return;
+
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.innerText = ['❤️', '💖', '💕', '💘', '✨', '💝'][Math.floor(Math.random() * 6)];
+      const startX = Math.random() * window.innerWidth;
+      const startY = window.innerHeight + 20;
+      const endX = startX + (Math.random() * 200 - 100);
+      const endY = -50 - Math.random() * 200;
+      const scale = 0.8 + Math.random() * 0.8;
+      const duration = 2000 + Math.random() * 2000;
+
+      el.style.position = 'absolute';
+      el.style.left = `${startX}px`;
+      el.style.top = `${startY}px`;
+      el.style.fontSize = `${Math.floor(20 + Math.random() * 24)}px`;
+      el.style.pointerEvents = 'none';
+      el.style.zIndex = '2200';
+      container.appendChild(el);
+
+      animate(el, {
+        translateX: [0, endX - startX],
+        translateY: [0, endY - startY],
+        scale: [0, scale, scale * 0.8],
+        rotate: [`0deg`, `${(Math.random() - 0.5) * 60}deg`],
+        opacity: [0, 1, 0],
+        duration: duration,
+        ease: 'outQuad',
+        onComplete: () => {
+          el.remove();
+        }
+      });
+    }
+  }, []);
+
+  const spawnLoveParticles = useCallback((x: number, y: number, count = 12) => {
+    const container = document.getElementById('love-animations-container');
+    if (!container) return;
+
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.innerText = ['💖', '✨', '💕', '🌸', '💖'][Math.floor(Math.random() * 5)];
+      const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.4 - 0.2);
+      const dist = 50 + Math.random() * 90;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+
+      p.style.position = 'absolute';
+      p.style.left = `${x}px`;
+      p.style.top = `${y}px`;
+      p.style.fontSize = '18px';
+      p.style.pointerEvents = 'none';
+      p.style.zIndex = '2300';
+      container.appendChild(p);
+
+      animate(p, {
+        translateX: [0, dx],
+        translateY: [0, dy],
+        scale: [0.5, 1.4, 0],
+        opacity: [1, 1, 0],
+        rotate: ['0deg', `${Math.random() * 360}deg`],
+        duration: 1000 + Math.random() * 500,
+        ease: 'outBack',
+        onComplete: () => {
+          p.remove();
+        }
+      });
+    }
+  }, []);
+
+  const spawnConfetti = useCallback((count = 35) => {
+    const container = document.getElementById('love-animations-container');
+    if (!container) return;
+
+    const colors = ['#7c4dff', '#00e5ff', '#ff4d6d', '#ffb703', '#5ee7df', '#b8c0ff'];
+
+    for (let i = 0; i < count; i++) {
+      const confetti = document.createElement('div');
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const startX = Math.random() * window.innerWidth;
+      const startY = -20;
+      const endX = startX + (Math.random() * 300 - 150);
+      const endY = window.innerHeight + 50;
+      const rotation = Math.random() * 720;
+      const size = 6 + Math.random() * 8;
+
+      confetti.style.position = 'absolute';
+      confetti.style.left = `${startX}px`;
+      confetti.style.top = `${startY}px`;
+      confetti.style.width = `${size}px`;
+      confetti.style.height = `${size * 1.4}px`;
+      confetti.style.backgroundColor = color;
+      confetti.style.borderRadius = '2px';
+      confetti.style.pointerEvents = 'none';
+      confetti.style.zIndex = '2400';
+      container.appendChild(confetti);
+
+      animate(confetti, {
+        translateX: [0, endX - startX],
+        translateY: [0, endY - startY],
+        rotateX: [`0deg`, `${rotation}deg`],
+        rotateY: [`0deg`, `${rotation}deg`],
+        rotateZ: [`0deg`, `${rotation}deg`],
+        opacity: [1, 1, 0],
+        duration: 2500 + Math.random() * 2000,
+        ease: 'outQuad',
+        onComplete: () => confetti.remove()
+      });
+    }
+  }, []);
+
+  const handleChatMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const container = document.getElementById('love-animations-container');
+    if (!container || Math.random() > 0.2) return;
+
+    const spark = document.createElement('div');
+    spark.innerText = ['✨', '💖', '💫', '⚡'][Math.floor(Math.random() * 4)];
+    spark.style.position = 'absolute';
+    spark.style.left = `${e.clientX}px`;
+    spark.style.top = `${e.clientY}px`;
+    spark.style.fontSize = '12px';
+    spark.style.pointerEvents = 'none';
+    spark.style.zIndex = '2500';
+    container.appendChild(spark);
+
+    animate(spark, {
+      translateY: [0, -25 - Math.random() * 20],
+      translateX: [0, (Math.random() - 0.5) * 30],
+      scale: [0.8, 1.3, 0],
+      opacity: [1, 0],
+      duration: 700 + Math.random() * 300,
+      ease: 'outQuad',
+      onComplete: () => spark.remove()
+    });
+  }, []);
+
+  // AnimeJS Modal & UI Effects
+  useEffect(() => {
+    if (showEmoji) {
+      animate('.emoji-picker-menu', {
+        opacity: [0, 1],
+        scale: [0.85, 1],
+        translateY: [15, 0],
+        duration: 350,
+        ease: 'outBack'
+      });
+    }
+  }, [showEmoji]);
+
+  useEffect(() => {
+    if (lightbox) {
+      animate('.lightbox-backdrop', {
+        opacity: [0, 1],
+        duration: 300,
+        ease: 'outQuad'
+      });
+      animate('.lightbox-content', {
+        scale: [0.75, 1],
+        opacity: [0, 1],
+        duration: 400,
+        ease: 'outBack'
+      });
+    }
+  }, [lightbox]);
+
+  useEffect(() => {
+    if (toast) {
+      animate('.toast-notification', {
+        translateY: [30, 0],
+        opacity: [0, 1],
+        scale: [0.9, 1],
+        duration: 350,
+        ease: 'outBack'
+      });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (callState !== 'idle') {
+      animate('.call-modal-card', {
+        scale: [0.8, 1],
+        opacity: [0, 1],
+        duration: 500,
+        ease: 'outElastic(1, 0.7)'
+      });
+    }
+  }, [callState]);
+
   const displayUser = users.find(u => u.nickname !== nickname) || users[0];
   const onlineCount = useMemo(() => users.filter(u => u.isOnline).length, [users]);
   const baseUrl = SOCKET_URL;
 
   return (
-    <div className="chatroom-root container-fluid p-0 d-flex flex-column">
+    <div className="chatroom-root container-fluid p-0 d-flex flex-column" onMouseMove={handleChatMouseMove}>
       {/* Glassmorphic shifting background orbs */}
       <div className="orb o1" aria-hidden="true" />
       <div className="orb o2" aria-hidden="true" />
@@ -1676,11 +1919,11 @@ function ChatRoom() {
           role="dialog"
           aria-modal="true"
           aria-label="Image preview"
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-75 p-3"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-75 p-3 lightbox-backdrop"
           style={{ zIndex: Z.lightbox, cursor: 'zoom-out' }}
           onClick={() => setLightbox(null)}
         >
-          <div className="position-relative d-flex align-items-center justify-content-center" style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
+          <div className="position-relative d-flex align-items-center justify-content-center lightbox-content" style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
             <img
               src={resolveUrl(lightbox)}
               alt="Full size preview"
@@ -1717,7 +1960,7 @@ function ChatRoom() {
         <div
           role="status"
           aria-live="polite"
-          className="position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-dark text-white py-2 px-3 rounded shadow"
+          className="position-fixed bottom-0 start-50 translate-middle-x mb-4 bg-dark text-white py-2 px-3 rounded shadow toast-notification"
           style={{ zIndex: Z.toast }}
         >
           {toast}
@@ -1740,7 +1983,7 @@ function ChatRoom() {
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-black bg-opacity-50 p-3"
           style={{ zIndex: Z.call }}
         >
-          <div className="card bg-dark text-white border-0 shadow-lg w-100" style={{ maxWidth: 800, height: 'min(80vh, 600px)' }}>
+          <div className="card bg-dark text-white border-0 shadow-lg w-100 call-modal-card" style={{ maxWidth: 800, height: 'min(80vh, 600px)' }}>
 
             {callState === 'calling' && (
               <div className="card-body d-flex flex-column align-items-center justify-content-center">
