@@ -1380,10 +1380,6 @@ function ChatRoom() {
     inputRef.current?.focus();
   }, []);
 
-<<<<<<< HEAD
-
-=======
->>>>>>> b2b7179 (Fix TypeScript function order and mobile chat room responsive layout)
   // AnimeJS Modal & UI Effects
   useEffect(() => {
     if (showEmoji) {
