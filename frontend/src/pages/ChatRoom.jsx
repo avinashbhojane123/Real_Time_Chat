@@ -4,8 +4,50 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { cleanInstagramMessage } from '../utils/instagram';
 
-function InstagramVideoPlayer({ shortcode }) {
+function InstagramVideoPlayer({ shortcode, baseUrl }) {
+  const [meta, setMeta] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!shortcode) return;
+    let isMounted = true;
+    const fetchMeta = async () => {
+      try {
+        setLoading(true);
+        const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+        const res = await axios.get(`${cleanApiUrl}/instagram/view`, {
+          params: { url: `https://www.instagram.com/reel/${shortcode}/` },
+        });
+        if (isMounted && res.data) {
+          setMeta(res.data);
+        }
+      } catch (err) {
+        console.log('Failed to fetch Instagram metadata via gallery-dl', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchMeta();
+    return () => {
+      isMounted = false;
+    };
+  }, [shortcode, baseUrl]);
+
   if (!shortcode) return null;
+
+  const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+  const proxyUrl = meta?.proxyVideoUrl
+    ? (meta.proxyVideoUrl.startsWith('http') ? meta.proxyVideoUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyVideoUrl}`)
+    : null;
+  const cleanUrl = `https://www.instagram.com/reel/${shortcode}/`;
+
+  const handleCopyCleanUrl = (e) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(cleanUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div
@@ -14,25 +56,96 @@ function InstagramVideoPlayer({ shortcode }) {
         borderRadius: '16px',
         overflow: 'hidden',
         border: '1px solid var(--m3-outline-variant)',
-        backgroundColor: '#000',
+        backgroundColor: '#0a0a0c',
         maxWidth: '380px',
         width: '100%',
         position: 'relative',
-        height: '480px',
         boxShadow: 'var(--m3-elevation-2)',
         transition: 'all 0.3s ease',
       }}
     >
-      <iframe
-        src={`https://www.instagram.com/reel/${shortcode}/embed/`}
-        width="100%"
-        height="100%"
-        allowFullScreen
-        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-        title="Instagram Video Stream"
-        style={{ border: 'none', display: 'block' }}
-      />
+      {/* Top Header Bar */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 12px',
+          backgroundColor: 'rgba(18, 18, 22, 0.95)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#e2e2e6', fontWeight: 600 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#e1306c' }}>movie</span>
+          <span>{meta?.author?.username ? `@${meta.author.username}` : 'Instagram Reel'}</span>
+        </div>
+
+        <button
+          className="m3-btn m3-btn-outlined"
+          type="button"
+          style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '10px', color: copied ? '#81c784' : '#fff', borderColor: copied ? '#81c784' : 'rgba(255,255,255,0.2)' }}
+          onClick={handleCopyCleanUrl}
+          title="Copy clean reel link without tracking tags"
+        >
+          {copied ? '✓ Clean Link Copied' : 'Copy Clean Link'}
+        </button>
+      </div>
+
+      {/* Account-Free Video Stream Player */}
+      {proxyUrl ? (
+        <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
+          <video
+            src={proxyUrl}
+            controls
+            loop
+            playsInline
+            poster={meta?.thumbnailUrl}
+            style={{ width: '100%', maxHeight: '460px', display: 'block', objectFit: 'contain' }}
+          />
+        </div>
+      ) : (
+        <div style={{ position: 'relative', height: '440px', width: '100%' }}>
+          <iframe
+            src={`https://www.instagram.com/reel/${shortcode}/embed/`}
+            width="100%"
+            height="100%"
+            allowFullScreen
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+            title="Instagram Reel Preview"
+            style={{ border: 'none', display: 'block' }}
+          />
+        </div>
+      )}
+
+      {/* Caption & Account-Free Indicator Footer */}
+      <div
+        style={{
+          padding: '8px 12px',
+          backgroundColor: 'rgba(20,20,26,0.95)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {meta?.caption ? (
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#c7c5d0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              {meta.caption}
+            </p>
+          ) : (
+            <span style={{ fontSize: '0.72rem', color: 'var(--m3-on-surface-variant)' }}>
+              {loading ? 'Resolving via gallery-dl...' : `Reel Stream (${shortcode})`}
+            </span>
+          )}
+        </div>
+
+        <span style={{ fontSize: '0.68rem', color: '#81c784', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>check_circle</span> Account Free
+        </span>
+      </div>
     </div>
   );
 }
