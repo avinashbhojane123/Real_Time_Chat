@@ -19,6 +19,12 @@ export default function ChatRoom() {
   const [inputText, setInputText] = useState('');
   const [users, setUsers] = useState([]);
 
+  // Drag to Reply State
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [dragTranslateX, setDragTranslateX] = useState(0);
+  const touchStartXRef = useRef(0);
+
   // Instagram Viewer State
   const [instaInputUrl, setInstaInputUrl] = useState('');
   const [instaResult, setInstaResult] = useState(null);
@@ -309,12 +315,65 @@ export default function ChatRoom() {
     }
   };
 
+  // Drag Gesture Handlers
+  const handleTouchStart = (msg, e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    setActiveDragId(msg.id || msg.createdAt);
+    setDragTranslateX(0);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!activeDragId) return;
+    const deltaX = e.touches[0].clientX - touchStartXRef.current;
+    if (deltaX > 0 && deltaX < 140) {
+      setDragTranslateX(deltaX);
+    }
+  };
+
+  const handleTouchEnd = (msg) => {
+    if (dragTranslateX > 40) {
+      setReplyingTo({ id: msg.id, nickname: msg.nickname, message: msg.message });
+    }
+    setActiveDragId(null);
+    setDragTranslateX(0);
+  };
+
+  const handleMouseDown = (msg, e) => {
+    touchStartXRef.current = e.clientX;
+    setActiveDragId(msg.id || msg.createdAt);
+    setDragTranslateX(0);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!activeDragId) return;
+    const deltaX = e.clientX - touchStartXRef.current;
+    if (deltaX > 0 && deltaX < 140) {
+      setDragTranslateX(deltaX);
+    }
+  };
+
+  const handleMouseUp = (msg) => {
+    if (dragTranslateX > 40) {
+      setReplyingTo({ id: msg.id, nickname: msg.nickname, message: msg.message });
+    }
+    setActiveDragId(null);
+    setDragTranslateX(0);
+  };
+
   // Messaging & File Upload
   const sendMessage = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    socketRef.current?.emit('sendMessage', { passcode, nickname, message: inputText });
+    const msgText = inputText.trim();
     setInputText('');
+
+    socketRef.current?.emit('sendMessage', {
+      passcode,
+      nickname,
+      message: msgText,
+      replyTo: replyingTo ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message } : null,
+    });
+    setReplyingTo(null);
   };
 
   const handleFileUpload = async (e) => {
@@ -331,7 +390,9 @@ export default function ChatRoom() {
           nickname,
           message: `[File Attachment] ${res.data.fileName || file.name}`,
           fileUrl: res.data.fileUrl,
+          replyTo: replyingTo ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message } : null,
         });
+        setReplyingTo(null);
       }
     } catch (err) {
       alert('File upload failed: ' + (err.response?.data?.message || err.message));
@@ -357,6 +418,13 @@ export default function ChatRoom() {
     } finally {
       setInstaLoading(false);
     }
+  };
+
+  // Instagram Shortcode Matcher
+  const getInstagramEmbed = (text) => {
+    if (!text) return null;
+    const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
+    return match ? match[1] : null;
   };
 
   return (
@@ -455,21 +523,62 @@ export default function ChatRoom() {
         <main className="m3-main-chat">
           {activeTab === 'chat' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* Chat Messages */}
+              {/* Chat Messages Area */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {messages.length === 0 && (
+                  <div style={{ textAlign: 'center', color: 'var(--m3-on-surface-variant)', padding: '40px 20px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '48px', opacity: 0.5 }}>forum</span>
+                    <p style={{ marginTop: '8px' }}>No messages in this space yet. Drag a message to reply!</p>
+                  </div>
+                )}
+
                 {messages.map((m, idx) => {
                   const isSelf = m.nickname === nickname;
+                  const msgId = m.id || idx;
+                  const isDragging = activeDragId === msgId;
+                  const currentTranslate = isDragging ? dragTranslateX : 0;
+                  const instaShortcode = getInstagramEmbed(m.message);
+
                   return (
                     <div
-                      key={m.id || idx}
+                      key={msgId}
                       style={{
                         alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                        maxWidth: '75%',
+                        maxWidth: '85%',
+                        position: 'relative',
+                        transform: `translateX(${currentTranslate}px)`,
+                        transition: isDragging ? 'none' : 'transform 0.2s ease',
+                        userSelect: 'none',
+                        cursor: 'grab',
                       }}
+                      onTouchStart={(e) => handleTouchStart(m, e)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={() => handleTouchEnd(m)}
+                      onMouseDown={(e) => handleMouseDown(m, e)}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={() => handleMouseUp(m)}
                     >
+                      {/* Drag to Reply Indicator Icon */}
+                      {currentTranslate > 20 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: '-32px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            color: 'var(--m3-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span className="material-symbols-outlined">reply</span>
+                        </div>
+                      )}
+
                       <div style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', marginBottom: '2px', paddingLeft: '4px' }}>
                         {m.nickname}
                       </div>
+
                       <div
                         style={{
                           padding: '12px 16px',
@@ -479,7 +588,28 @@ export default function ChatRoom() {
                           boxShadow: 'var(--m3-elevation-1)',
                         }}
                       >
+                        {/* Quoted Reply Card */}
+                        {m.replyTo && (
+                          <div
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: 'var(--m3-radius-s)',
+                              backgroundColor: 'rgba(0,0,0,0.25)',
+                              borderLeft: '4px solid var(--m3-primary)',
+                              marginBottom: '8px',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
+                              {m.replyTo.message}
+                            </div>
+                          </div>
+                        )}
+
                         <p style={{ margin: 0, wordBreak: 'break-word' }}>{m.message}</p>
+
+                        {/* File Attachment Preview */}
                         {m.fileUrl && (
                           <div style={{ marginTop: '8px' }}>
                             <a
@@ -494,12 +624,56 @@ export default function ChatRoom() {
                             </a>
                           </div>
                         )}
+
+                        {/* Direct In-Chat Instagram Video Preview Player */}
+                        {instaShortcode && (
+                          <div style={{ marginTop: '10px', borderRadius: 'var(--m3-radius-m)', overflow: 'hidden', border: '1px solid var(--m3-outline-variant)', backgroundColor: '#000' }}>
+                            <iframe
+                              src={`https://www.instagram.com/p/${instaShortcode}/embed/`}
+                              width="100%"
+                              height="460"
+                              allowFullScreen
+                              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                              title="Instagram Reel Direct Stream"
+                              style={{ border: 'none', display: 'block' }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
                 <div ref={chatBottomRef} />
               </div>
+
+              {/* Replying-To Active Banner */}
+              {replyingTo && (
+                <div
+                  style={{
+                    padding: '8px 20px',
+                    backgroundColor: 'var(--m3-surface-container-highest)',
+                    borderTop: '1px solid var(--m3-outline-variant)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--m3-primary)' }}>reply</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Replying to <strong>{replyingTo.nickname}</strong>: <em>"{replyingTo.message}"</em>
+                    </span>
+                  </div>
+                  <button
+                    className="m3-btn m3-btn-icon m3-btn-outlined"
+                    style={{ width: '28px', height: '28px', flexShrink: 0 }}
+                    onClick={() => setReplyingTo(null)}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                  </button>
+                </div>
+              )}
 
               {/* Chat Input Bar */}
               <div style={{ padding: '16px 20px', backgroundColor: 'var(--m3-surface-container)', borderTop: '1px solid var(--m3-outline-variant)' }}>
@@ -515,7 +689,7 @@ export default function ChatRoom() {
                     style={{ borderRadius: 'var(--m3-radius-full)' }}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Type a message..."
+                    placeholder={replyingTo ? `Reply to ${replyingTo.nickname}...` : 'Type a message (or drag message to reply)...'}
                   />
 
                   <button type="submit" className="m3-btn m3-btn-filled m3-btn-icon" style={{ flexShrink: 0 }}>
@@ -530,10 +704,10 @@ export default function ChatRoom() {
             <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
               <div className="m3-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--m3-primary)', marginBottom: '12px' }}>
-                  📸 Instagram Stream Viewer (Backend API)
+                  📸 Direct In-Chat Instagram Reel Player
                 </h3>
                 <p style={{ fontSize: '0.875rem', color: 'var(--m3-on-surface-variant)', marginBottom: '20px' }}>
-                  Enter any public Instagram Reel, Post, IGTV, or Profile link to view live stream without downloading files.
+                  Enter any public Instagram Reel or Post link to watch directly inside the app without needing an Instagram account.
                 </p>
 
                 <form onSubmit={handleViewInstagram} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
@@ -549,7 +723,7 @@ export default function ChatRoom() {
                   </button>
                 </form>
 
-                {instaLoading && <p style={{ color: 'var(--m3-primary)' }}>Resolving stream from NestJS backend API...</p>}
+                {instaLoading && <p style={{ color: 'var(--m3-primary)' }}>Loading stream player from backend...</p>}
                 {instaError && <p style={{ color: 'var(--m3-error)' }}>Error: {instaError}</p>}
 
                 {instaResult && (
@@ -560,13 +734,15 @@ export default function ChatRoom() {
                     </div>
 
                     {instaResult.embedUrl && (
-                      <div style={{ borderRadius: 'var(--m3-radius-m)', overflow: 'hidden', border: '1px solid var(--m3-outline)' }}>
+                      <div style={{ borderRadius: 'var(--m3-radius-m)', overflow: 'hidden', border: '1px solid var(--m3-outline)', backgroundColor: '#000' }}>
                         <iframe
                           src={instaResult.embedUrl}
                           width="100%"
                           height="480"
+                          allowFullScreen
+                          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                           title="Instagram Stream Embed"
-                          style={{ border: 'none' }}
+                          style={{ border: 'none', display: 'block' }}
                         />
                       </div>
                     )}
@@ -664,7 +840,6 @@ export default function ChatRoom() {
 
             {callState === 'active' && (
               <div style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#000' }}>
-                {/* Remote Stream Video */}
                 <video
                   ref={remoteVideoCallback}
                   autoPlay
@@ -672,7 +847,6 @@ export default function ChatRoom() {
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
 
-                {/* Local Stream PIP Preview */}
                 <div
                   style={{
                     position: 'absolute',
@@ -695,7 +869,6 @@ export default function ChatRoom() {
                   />
                 </div>
 
-                {/* Call Action Controls Bar */}
                 <div
                   style={{
                     position: 'absolute',
