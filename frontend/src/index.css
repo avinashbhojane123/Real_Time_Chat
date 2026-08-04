@@ -83,6 +83,7 @@ body {
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  font-display: swap;
   -webkit-font-smoothing: antialiased;
 }
 
