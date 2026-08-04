@@ -355,12 +355,21 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SendMessageDto,
   ) {
-    const session = this.users.get(client.id);
+    let session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) {
-      return {
-        success: false,
-        message: 'Unauthorized connection details',
-      };
+      if (data.passcode) {
+        session = {
+          nickname: data.nickname || 'User',
+          passcode: data.passcode,
+        };
+        this.users.set(client.id, session);
+        client.join(data.passcode);
+      } else {
+        return {
+          success: false,
+          message: 'Unauthorized connection details',
+        };
+      }
     }
 
     const room = await this.roomRepo.findOne({

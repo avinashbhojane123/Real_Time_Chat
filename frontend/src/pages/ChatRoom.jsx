@@ -119,6 +119,10 @@ export default function ChatRoom() {
       socket.emit('joinRoom', { passcode, nickname, avatarUrl });
     });
 
+    if (socket.connected) {
+      socket.emit('joinRoom', { passcode, nickname, avatarUrl });
+    }
+
     socket.on('usersList', (userList) => {
       setUsers(userList || []);
     });
