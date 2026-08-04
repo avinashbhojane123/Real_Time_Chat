@@ -91,7 +91,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
         </button>
       </div>
 
-      {/* Account-Free Video Stream Player */}
+      {/* Account-Free Native HTML5 Video Stream Player (No Instagram Redirection) */}
       {proxyUrl ? (
         <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
           <video
@@ -103,18 +103,27 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
             style={{ width: '100%', maxHeight: '460px', display: 'block', objectFit: 'contain' }}
           />
         </div>
+      ) : loading ? (
+        <div style={{ height: '360px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', backgroundColor: '#121216', color: '#e2e2e6' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#e1306c' }}>sync</span>
+          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Extracting Reel Video (gallery-dl)...</span>
+        </div>
       ) : (
-        <div style={{ position: 'relative', height: '440px', width: '100%' }}>
-          <iframe
-            src={`https://www.instagram.com/reel/${shortcode}/embed/`}
-            width="100%"
-            height="100%"
-            allowFullScreen
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-            title="Instagram Reel Preview"
-            style={{ border: 'none', display: 'block' }}
-          />
+        <div style={{ padding: '24px 16px', textAlign: 'center', backgroundColor: '#121216' }}>
+          {meta?.thumbnailUrl && (
+            <img src={meta.thumbnailUrl} alt="Reel thumbnail" style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '12px', marginBottom: '12px', objectFit: 'cover' }} />
+          )}
+          <p style={{ fontSize: '0.78rem', color: '#c7c5d0', margin: '0 0 12px 0' }}>
+            Reel preview ready. Use clean link to share.
+          </p>
+          <button
+            type="button"
+            className="m3-btn m3-btn-outlined"
+            onClick={handleCopyCleanUrl}
+            style={{ fontSize: '0.72rem' }}
+          >
+            {copied ? '✓ Clean Link Copied' : 'Copy Clean Link'}
+          </button>
         </div>
       )}
 
