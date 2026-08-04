@@ -71,6 +71,7 @@ function InstagramVideoPlayer({ shortcode }) {
             height="100%"
             allowFullScreen
             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            sandbox="allow-scripts allow-same-origin allow-forms"
             title="Instagram Video Stream"
             style={{ border: 'none', display: 'block' }}
           />
@@ -82,6 +83,7 @@ function InstagramVideoPlayer({ shortcode }) {
           height="100%"
           allowFullScreen
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          sandbox="allow-scripts allow-same-origin allow-forms"
           title="Instagram Full Embed Stream"
           style={{ border: 'none', display: 'block' }}
         />
