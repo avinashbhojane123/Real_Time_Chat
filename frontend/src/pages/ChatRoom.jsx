@@ -114,7 +114,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl, onOpenIgshareModal }) {
             type="button"
             style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '10px' }}
             onClick={() => setViewMode('embed')}
-            title="Official Instagram Embed"
+            title="IGShare Web Frame"
           >
             Embed
           </button>
@@ -167,13 +167,13 @@ function InstagramVideoPlayer({ shortcode, baseUrl, onOpenIgshareModal }) {
           }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>info</span>
-          <span>{showFixHelp ? 'Hide Quick Fixes' : 'Video unable to preview? Quick Fixes'}</span>
+          <span>{showFixHelp ? 'Hide IGShare Info' : 'Sharing with family & friends not on Instagram?'}</span>
         </button>
 
         {showFixHelp && (
           <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#c7c5d0', lineHeight: '1.4' }}>
             <p style={{ margin: '0 0 8px 0', opacity: 0.9 }}>
-              <strong>Why this happens:</strong> Instagram frequently restricts external web previews for links that include recipient tracking tags (<code>igsh=...</code>) or when requested through third-party web clients.
+              <strong>Account-Free IGShare:</strong> Anyone can view this content directly in their browser — no Instagram account or app required. Perfect for sharing with family, friends, or colleagues who aren't on Instagram.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -201,7 +201,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl, onOpenIgshareModal }) {
         )}
       </div>
 
-      {/* Caption & Metadata Footer with Open in Instagram Button on Bottom Right */}
+      {/* Caption & Metadata Footer with Watch on IGShare (No Login) Button on Bottom Right */}
       <div
         style={{
           padding: '10px 12px',
@@ -220,16 +220,15 @@ function InstagramVideoPlayer({ shortcode, baseUrl, onOpenIgshareModal }) {
             </p>
           )}
           {!meta?.caption && (
-            <span style={{ fontSize: '0.72rem', color: 'var(--m3-on-surface-variant)' }}>Instagram Reel ({shortcode})</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--m3-on-surface-variant)' }}>IGShare Reel Stream ({shortcode})</span>
           )}
         </div>
 
-        {/* Bottom Right Instagram Action Button */}
-        <a
-          href={cleanUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="m3-btn m3-btn-tonal"
+        {/* Bottom Right IGShare Action Button (No Account Required) */}
+        <button
+          type="button"
+          onClick={handleWatchIgshare}
+          className="m3-btn m3-btn-filled"
           style={{
             padding: '4px 10px',
             fontSize: '0.7rem',
@@ -240,13 +239,12 @@ function InstagramVideoPlayer({ shortcode, baseUrl, onOpenIgshareModal }) {
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            textDecoration: 'none',
           }}
-          title="Open directly in official Instagram app or browser"
+          title="Watch directly inside IGShare without Instagram account or app"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
-          <span>Open in Instagram</span>
-        </a>
+          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>play_circle</span>
+          <span>Watch on IGShare</span>
+        </button>
       </div>
     </div>
   );
@@ -1233,7 +1231,7 @@ export default function ChatRoom() {
                 {/* Quick Fixes & Help Explanation Callout */}
                 <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: '12px', padding: '12px', marginBottom: '16px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#c7c5d0', lineHeight: '1.4' }}>
-                    <strong>Why this happens:</strong> Instagram frequently restricts external web previews for links that include recipient tracking tags (<code>igsh=...</code>) or when requested through third-party web clients. Clicking the IGShare player button or opening directly in the Instagram app bypasses the embedded web frame block.
+                    <strong>Account-Free IGShare:</strong> Anyone can view this content directly in their browser — no Instagram account or app required. Perfect for sharing with family, friends, or colleagues who aren't on Instagram.
                   </p>
 
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1262,7 +1260,7 @@ export default function ChatRoom() {
                   </p>
                 )}
 
-                {/* Action Buttons Row with Open in Instagram on Bottom Right */}
+                {/* Action Buttons Row */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <button
@@ -1295,28 +1293,9 @@ export default function ChatRoom() {
                     )}
                   </div>
 
-                  {/* Bottom Right Instagram Launch Button */}
-                  <a
-                    href={instaResult.shortcode ? `https://www.instagram.com/reel/${instaResult.shortcode}/` : (instaResult.originalUrl || instaInputUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="m3-btn m3-btn-tonal"
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '0.75rem',
-                      borderRadius: '12px',
-                      backgroundColor: '#e1306c',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      textDecoration: 'none',
-                    }}
-                    title="Open directly in official Instagram app or browser"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
-                    <span>Open in Instagram</span>
-                  </a>
+                  <span style={{ fontSize: '0.75rem', color: '#81c784', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>lock_open</span> 100% Account-Free
+                  </span>
                 </div>
               </div>
             )}
