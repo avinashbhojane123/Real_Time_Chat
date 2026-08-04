@@ -123,6 +123,10 @@ export default function ChatRoom() {
       setUsers(userList || []);
     });
 
+    socket.on('chatHistory', (history) => {
+      setMessages(history || []);
+    });
+
     socket.on('messageHistory', (history) => {
       setMessages(history || []);
     });
@@ -272,7 +276,12 @@ export default function ChatRoom() {
 
     try {
       if (nextPip) {
-        if (document.pictureInPictureEnabled && remoteVideoRef.current && document.pictureInPictureElement !== remoteVideoRef.current) {
+        if (
+          document.pictureInPictureEnabled &&
+          remoteVideoRef.current &&
+          remoteVideoRef.current.readyState >= 1 &&
+          document.pictureInPictureElement !== remoteVideoRef.current
+        ) {
           await remoteVideoRef.current.requestPictureInPicture();
         }
       } else {
