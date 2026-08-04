@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { cleanInstagramMessage } from '../utils/instagram';
+import { cleanInstagramMessage, getInstagramShortcode, generateIGShareUrl, generateCleanInstaUrl } from '../utils/instagram';
 
 function InstagramVideoPlayer({ shortcode }) {
   const [videoOnly, setVideoOnly] = useState(true);
@@ -114,11 +114,9 @@ export default function ChatRoom() {
   const [dragTranslateX, setDragTranslateX] = useState(0);
   const touchStartXRef = useRef(0);
 
-  // Instagram Viewer State
-  const [instaInputUrl, setInstaInputUrl] = useState('');
-  const [instaResult, setInstaResult] = useState(null);
-  const [instaLoading, setInstaLoading] = useState(false);
-  const [instaError, setInstaError] = useState('');
+  // IGShare Privacy Generator State
+  const [showIGShareModal, setShowIGShareModal] = useState(false);
+  const [igShareInput, setIgShareInput] = useState('');
 
   // Call States
   const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
@@ -560,6 +558,14 @@ export default function ChatRoom() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
+            className="m3-btn m3-btn-tonal"
+            onClick={() => setShowIGShareModal(true)}
+            title="IGShare - Share Instagram Content Privately (No Account Needed)"
+          >
+            <span className="material-symbols-outlined">share</span>
+            <span className="m3-btn-label">IGShare</span>
+          </button>
+          <button
             className={`m3-btn ${showVideoPanel || callState !== 'idle' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
             onClick={() => setShowVideoPanel((prev) => !prev)}
             title="Toggle Side-by-Side Video Call Panel"
@@ -736,8 +742,67 @@ export default function ChatRoom() {
                           </div>
                         )}
 
-                        {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
-                        {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} />}
+                        {/* IGShare Privacy Video Card */}
+                        {instaShortcode && (
+                          <div style={{ marginTop: '10px', width: '100%', maxWidth: '380px' }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                backgroundColor: 'rgba(208, 188, 255, 0.15)',
+                                padding: '6px 12px',
+                                borderRadius: '12px 12px 0 0',
+                                border: '1px solid var(--m3-outline-variant)',
+                                borderBottom: 'none',
+                              }}
+                            >
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--m3-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>lock</span>
+                                IGShare Protected Stream
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--m3-on-surface-variant)' }}>
+                                No Login Needed
+                              </span>
+                            </div>
+
+                            <InstagramVideoPlayer shortcode={instaShortcode} />
+
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: '8px',
+                                marginTop: '8px',
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="m3-btn m3-btn-outlined"
+                                style={{ padding: '4px 10px', fontSize: '0.72rem', flex: 1 }}
+                                onClick={() => {
+                                  const cleanLink = `https://igshare.me/reel/${instaShortcode}`;
+                                  navigator.clipboard.writeText(cleanLink);
+                                  alert('IGShare clean link copied to clipboard:\n' + cleanLink);
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>content_copy</span>
+                                <span>Copy IGShare Link</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="m3-btn m3-btn-tonal"
+                                style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+                                onClick={() => {
+                                  window.open(`https://igshare.me/reel/${instaShortcode}`, '_blank');
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
+                                <span>Open on IGShare</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -951,6 +1016,138 @@ export default function ChatRoom() {
           )}
         </main>
       </div>
+      {/* IGShare Link Cleaner & Share Modal */}
+      {showIGShareModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 3000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <div
+            className="m3-card"
+            style={{
+              maxWidth: '520px',
+              width: '100%',
+              backgroundColor: 'var(--m3-surface-container-lowest)',
+              borderRadius: 'var(--m3-radius-xl)',
+              padding: '24px',
+              position: 'relative',
+              boxShadow: 'var(--m3-elevation-3)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)', fontSize: '28px' }}>
+                  lock_open
+                </span>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--m3-on-surface)' }}>
+                    IGShare Private Link Generator
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', margin: 0 }}>
+                    Share Instagram content without revealing your profile or requiring login.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="m3-btn m3-btn-icon m3-btn-outlined"
+                style={{ width: '32px', height: '32px' }}
+                onClick={() => setShowIGShareModal(false)}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>close</span>
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const raw = igShareInput.trim();
+                if (!raw) return;
+                const cleanedText = cleanInstagramMessage(raw);
+                const shortcode = getInstagramShortcode(raw);
+                const finalMsg = shortcode ? generateIGShareUrl(raw) || cleanedText : cleanedText;
+
+                socketRef.current?.emit('sendMessage', {
+                  passcode,
+                  nickname,
+                  message: finalMsg,
+                  avatarUrl,
+                  replyTo: null,
+                });
+
+                setIgShareInput('');
+                setShowIGShareModal(false);
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-primary)', marginBottom: '6px' }}>
+                  Paste Instagram Reel or Post Link
+                </label>
+                <input
+                  type="text"
+                  className="m3-text-field"
+                  value={igShareInput}
+                  onChange={(e) => setIgShareInput(e.target.value)}
+                  placeholder="https://www.instagram.com/reel/..."
+                  required
+                />
+              </div>
+
+              {/* IGShare Features List */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '10px',
+                  backgroundColor: 'var(--m3-surface-container-high)',
+                  padding: '12px',
+                  borderRadius: 'var(--m3-radius-m)',
+                  fontSize: '0.75rem',
+                }}
+              >
+                <div>
+                  <strong>⚡ No Account Needed</strong>
+                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>Recipients view without login</div>
+                </div>
+                <div>
+                  <strong>🛡️ Privacy Protected</strong>
+                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>No profile tracking links</div>
+                </div>
+                <div>
+                  <strong>🎬 Instant Playback</strong>
+                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>Clean focus mode player</div>
+                </div>
+                <div>
+                  <strong>💯 100% Free</strong>
+                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>Unlimited clean shares</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button type="button" className="m3-btn m3-btn-outlined" onClick={() => setShowIGShareModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="m3-btn m3-btn-filled" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span className="material-symbols-outlined">send</span>
+                  <span>Share Privately via IGShare</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
