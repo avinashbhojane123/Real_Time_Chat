@@ -76,22 +76,3 @@ export const cleanInstagramMessage = (text) => {
 
   return cleanedText || (instaUrls ? instaUrls[0] : text);
 };
-
-export const getInstagramShortcode = (text) => {
-  if (!text || typeof text !== 'string') return null;
-  const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
-  return match ? match[1] : null;
-};
-
-export const generateIGShareUrl = (textOrUrl) => {
-  const shortcode = getInstagramShortcode(textOrUrl);
-  if (!shortcode) return null;
-  return `https://igshare.me/reel/${shortcode}`;
-};
-
-export const generateCleanInstaUrl = (textOrUrl) => {
-  const shortcode = getInstagramShortcode(textOrUrl);
-  if (!shortcode) return null;
-  return `https://www.instagram.com/reel/${shortcode}/`;
-};
-

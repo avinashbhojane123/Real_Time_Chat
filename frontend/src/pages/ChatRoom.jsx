@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { cleanInstagramMessage, getInstagramShortcode, generateIGShareUrl, generateCleanInstaUrl } from '../utils/instagram';
+import { cleanInstagramMessage } from '../utils/instagram';
 
 function InstagramVideoPlayer({ shortcode }) {
   const [videoOnly, setVideoOnly] = useState(true);
@@ -13,58 +13,84 @@ function InstagramVideoPlayer({ shortcode }) {
     <div
       style={{
         marginTop: '10px',
-        borderRadius: '16px',
+        borderRadius: 'var(--m3-radius-l)',
         overflow: 'hidden',
         border: '1px solid var(--m3-outline-variant)',
         backgroundColor: '#000',
-        maxWidth: '380px',
+        maxWidth: '360px',
         width: '100%',
         position: 'relative',
-        height: videoOnly ? '480px' : '580px',
         boxShadow: 'var(--m3-elevation-2)',
-        transition: 'all 0.3s ease',
       }}
     >
+      {/* IGShare Player Header */}
       <div
         style={{
-          position: 'absolute',
-          top: '10px',
-          right: '10px',
-          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          backgroundColor: 'rgba(33, 31, 38, 0.95)',
+          borderBottom: '1px solid var(--m3-outline-variant)',
         }}
       >
+        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--m3-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>play_circle</span>
+          IGShare In-Chat Reel Stream
+        </span>
         <button
           className="m3-btn m3-btn-outlined"
           type="button"
           style={{
-            padding: '4px 10px',
-            fontSize: '0.7rem',
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            padding: '3px 8px',
+            fontSize: '0.65rem',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
             color: '#fff',
-            borderColor: 'rgba(255, 255, 255, 0.3)',
-            backdropFilter: 'blur(4px)',
-            borderRadius: '12px',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '10px',
           }}
           onClick={(e) => {
             e.stopPropagation();
             setVideoOnly(!videoOnly);
           }}
         >
-          {videoOnly ? 'Show Full Info' : 'Video Only'}
+          {videoOnly ? 'Full View' : 'Focus View'}
         </button>
       </div>
 
-      {videoOnly ? (
-        <div
-          style={{
-            position: 'absolute',
-            top: '-58px',
-            left: 0,
-            width: '100%',
-            height: 'calc(100% + 195px)',
-            overflow: 'hidden',
-          }}
-        >
+      {/* Video Container */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: videoOnly ? '440px' : '540px',
+          overflow: 'hidden',
+          backgroundColor: '#000',
+        }}
+      >
+        {videoOnly ? (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-58px',
+              left: 0,
+              width: '100%',
+              height: 'calc(100% + 195px)',
+              overflow: 'hidden',
+            }}
+          >
+            <iframe
+              src={`https://www.instagram.com/reel/${shortcode}/embed/`}
+              width="100%"
+              height="100%"
+              allowFullScreen
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+              title="IGShare In-Chat Reel Preview"
+              style={{ border: 'none', display: 'block' }}
+            />
+          </div>
+        ) : (
           <iframe
             src={`https://www.instagram.com/reel/${shortcode}/embed/`}
             width="100%"
@@ -72,22 +98,11 @@ function InstagramVideoPlayer({ shortcode }) {
             allowFullScreen
             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-            title="Instagram Video Stream"
+            title="IGShare Full Embed Stream"
             style={{ border: 'none', display: 'block' }}
           />
-        </div>
-      ) : (
-        <iframe
-          src={`https://www.instagram.com/reel/${shortcode}/embed/`}
-          width="100%"
-          height="100%"
-          allowFullScreen
-          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-          title="Instagram Full Embed Stream"
-          style={{ border: 'none', display: 'block' }}
-        />
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -114,9 +129,11 @@ export default function ChatRoom() {
   const [dragTranslateX, setDragTranslateX] = useState(0);
   const touchStartXRef = useRef(0);
 
-  // IGShare Privacy Generator State
-  const [showIGShareModal, setShowIGShareModal] = useState(false);
-  const [igShareInput, setIgShareInput] = useState('');
+  // Instagram Viewer State
+  const [instaInputUrl, setInstaInputUrl] = useState('');
+  const [instaResult, setInstaResult] = useState(null);
+  const [instaLoading, setInstaLoading] = useState(false);
+  const [instaError, setInstaError] = useState('');
 
   // Call States
   const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
@@ -158,7 +175,7 @@ export default function ChatRoom() {
     setIsPipMode(false);
     setRemoteIsPip(false);
     if (typeof document !== 'undefined' && document.pictureInPictureElement) {
-      document.exitPictureInPicture().catch(() => {});
+      document.exitPictureInPicture().catch(() => { });
     }
   }, []);
 
@@ -527,10 +544,10 @@ export default function ChatRoom() {
     }
   };
 
-  // Instagram Shortcode Matcher
+  // Instagram & IGShare Shortcode Matcher
   const getInstagramEmbed = (text) => {
     if (!text) return null;
-    const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
+    const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am|igshare\.me)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
     return match ? match[1] : null;
   };
 
@@ -557,14 +574,6 @@ export default function ChatRoom() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            className="m3-btn m3-btn-tonal"
-            onClick={() => setShowIGShareModal(true)}
-            title="IGShare - Share Instagram Content Privately (No Account Needed)"
-          >
-            <span className="material-symbols-outlined">share</span>
-            <span className="m3-btn-label">IGShare</span>
-          </button>
           <button
             className={`m3-btn ${showVideoPanel || callState !== 'idle' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
             onClick={() => setShowVideoPanel((prev) => !prev)}
@@ -640,229 +649,170 @@ export default function ChatRoom() {
         {/* Main Side-by-Side Workspace */}
         <main className="m3-main-chat" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: '280px' }}>
-              {/* Chat Messages Area */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {messages.length === 0 && (
-                  <div style={{ textAlign: 'center', color: 'var(--m3-on-surface-variant)', padding: '40px 20px' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '48px', opacity: 0.5 }}>forum</span>
-                    <p style={{ marginTop: '8px' }}>No messages in this space yet. Drag a message to reply!</p>
-                  </div>
-                )}
-
-                {messages.map((m, idx) => {
-                  const isSelf = m.nickname === nickname;
-                  const msgId = m.id || idx;
-                  const isDragging = activeDragId === msgId;
-                  const currentTranslate = isDragging ? dragTranslateX : 0;
-                  const instaShortcode = getInstagramEmbed(m.message);
-
-                  return (
-                    <div
-                      key={msgId}
-                      style={{
-                        alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                        maxWidth: '85%',
-                        position: 'relative',
-                        transform: `translateX(${currentTranslate}px)`,
-                        transition: isDragging ? 'none' : 'transform 0.2s ease',
-                        userSelect: 'none',
-                        cursor: 'grab',
-                      }}
-                      onTouchStart={(e) => handleTouchStart(m, e)}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={() => handleTouchEnd(m)}
-                      onMouseDown={(e) => handleMouseDown(m, e)}
-                      onMouseMove={handleMouseMove}
-                      onMouseUp={() => handleMouseUp(m)}
-                    >
-                      {/* Drag to Reply Indicator Icon */}
-                      {currentTranslate > 20 && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            left: '-32px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            color: 'var(--m3-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <span className="material-symbols-outlined">reply</span>
-                        </div>
-                      )}
-
-                      <div style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', marginBottom: '2px', paddingLeft: '4px' }}>
-                        {m.nickname}
-                      </div>
-
-                      <div
-                        style={{
-                          padding: '12px 16px',
-                          borderRadius: isSelf ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                          backgroundColor: isSelf ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
-                          color: isSelf ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)',
-                          boxShadow: 'var(--m3-elevation-1)',
-                        }}
-                      >
-                        {/* Quoted Reply Card */}
-                        {m.replyTo && (
-                          <div
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: 'var(--m3-radius-s)',
-                              backgroundColor: 'rgba(0,0,0,0.25)',
-                              borderLeft: '4px solid var(--m3-primary)',
-                              marginBottom: '8px',
-                              fontSize: '0.8rem',
-                            }}
-                          >
-                            <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
-                              {cleanInstagramMessage(m.replyTo.message)}
-                            </div>
-                          </div>
-                        )}
-
-                        <p style={{ margin: 0, wordBreak: 'break-word' }}>{cleanInstagramMessage(m.message)}</p>
-
-                        {/* File Attachment Preview */}
-                        {m.fileUrl && (
-                          <div style={{ marginTop: '8px' }}>
-                            <a
-                              href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="m3-btn m3-btn-outlined"
-                              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                            >
-                              <span className="material-symbols-outlined">attachment</span>
-                              Attachment
-                            </a>
-                          </div>
-                        )}
-
-                        {/* IGShare Privacy Video Card */}
-                        {instaShortcode && (
-                          <div style={{ marginTop: '10px', width: '100%', maxWidth: '380px' }}>
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                backgroundColor: 'rgba(208, 188, 255, 0.15)',
-                                padding: '6px 12px',
-                                borderRadius: '12px 12px 0 0',
-                                border: '1px solid var(--m3-outline-variant)',
-                                borderBottom: 'none',
-                              }}
-                            >
-                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--m3-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>lock</span>
-                                IGShare Protected Stream
-                              </span>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--m3-on-surface-variant)' }}>
-                                No Login Needed
-                              </span>
-                            </div>
-
-                            <InstagramVideoPlayer shortcode={instaShortcode} />
-
-                            <div
-                              style={{
-                                display: 'flex',
-                                gap: '8px',
-                                marginTop: '8px',
-                                flexWrap: 'wrap',
-                              }}
-                            >
-                              <button
-                                type="button"
-                                className="m3-btn m3-btn-outlined"
-                                style={{ padding: '4px 10px', fontSize: '0.72rem', flex: 1 }}
-                                onClick={() => {
-                                  const cleanLink = `https://igshare.me/reel/${instaShortcode}`;
-                                  navigator.clipboard.writeText(cleanLink);
-                                  alert('IGShare clean link copied to clipboard:\n' + cleanLink);
-                                }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>content_copy</span>
-                                <span>Copy IGShare Link</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="m3-btn m3-btn-tonal"
-                                style={{ padding: '4px 10px', fontSize: '0.72rem' }}
-                                onClick={() => {
-                                  window.open(`https://igshare.me/reel/${instaShortcode}`, '_blank');
-                                }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
-                                <span>Open on IGShare</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={chatBottomRef} />
-              </div>
-
-              {/* Replying-To Active Banner */}
-              {replyingTo && (
-                <div
-                  style={{
-                    padding: '8px 20px',
-                    backgroundColor: 'var(--m3-surface-container-highest)',
-                    borderTop: '1px solid var(--m3-outline-variant)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--m3-primary)' }}>reply</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Replying to <strong>{replyingTo.nickname}</strong>: <em>"{replyingTo.message}"</em>
-                    </span>
-                  </div>
-                  <button
-                    className="m3-btn m3-btn-icon m3-btn-outlined"
-                    style={{ width: '28px', height: '28px', flexShrink: 0 }}
-                    onClick={() => setReplyingTo(null)}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                  </button>
+            {/* Chat Messages Area */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {messages.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--m3-on-surface-variant)', padding: '40px 20px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '48px', opacity: 0.5 }}>forum</span>
+                  <p style={{ marginTop: '8px' }}>No messages in this space yet. Drag a message to reply!</p>
                 </div>
               )}
 
-              {/* Chat Input Bar */}
-              <div style={{ padding: '16px 20px', backgroundColor: 'var(--m3-surface-container)', borderTop: '1px solid var(--m3-outline-variant)' }}>
-                <form onSubmit={sendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <label className="m3-btn m3-btn-icon m3-btn-tonal" style={{ cursor: 'pointer', flexShrink: 0 }}>
-                    <span className="material-symbols-outlined">attach_file</span>
-                    <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
+              {messages.map((m, idx) => {
+                const isSelf = m.nickname === nickname;
+                const msgId = m.id || idx;
+                const isDragging = activeDragId === msgId;
+                const currentTranslate = isDragging ? dragTranslateX : 0;
+                const instaShortcode = getInstagramEmbed(m.message);
 
-                  <input
-                    type="text"
-                    className="m3-text-field"
-                    style={{ borderRadius: 'var(--m3-radius-full)' }}
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onPaste={handleInputPaste}
-                    placeholder={replyingTo ? `Reply to ${replyingTo.nickname}...` : 'Type a message (or drag message to reply)...'}
-                  />
+                return (
+                  <div
+                    key={msgId}
+                    style={{
+                      alignSelf: isSelf ? 'flex-end' : 'flex-start',
+                      maxWidth: '85%',
+                      position: 'relative',
+                      transform: `translateX(${currentTranslate}px)`,
+                      transition: isDragging ? 'none' : 'transform 0.2s ease',
+                      userSelect: 'none',
+                      cursor: 'grab',
+                    }}
+                    onTouchStart={(e) => handleTouchStart(m, e)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(m)}
+                    onMouseDown={(e) => handleMouseDown(m, e)}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={() => handleMouseUp(m)}
+                  >
+                    {/* Drag to Reply Indicator Icon */}
+                    {currentTranslate > 20 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '-32px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'var(--m3-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span className="material-symbols-outlined">reply</span>
+                      </div>
+                    )}
 
-                  <button type="submit" className="m3-btn m3-btn-filled m3-btn-icon" style={{ flexShrink: 0 }}>
-                    <span className="material-symbols-outlined">send</span>
-                  </button>
-                </form>
-              </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', marginBottom: '2px', paddingLeft: '4px' }}>
+                      {m.nickname}
+                    </div>
+
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: isSelf ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                        backgroundColor: isSelf ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
+                        color: isSelf ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)',
+                        boxShadow: 'var(--m3-elevation-1)',
+                      }}
+                    >
+                      {/* Quoted Reply Card */}
+                      {m.replyTo && (
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: 'var(--m3-radius-s)',
+                            backgroundColor: 'rgba(0,0,0,0.25)',
+                            borderLeft: '4px solid var(--m3-primary)',
+                            marginBottom: '8px',
+                            fontSize: '0.8rem',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
+                            {cleanInstagramMessage(m.replyTo.message)}
+                          </div>
+                        </div>
+                      )}
+
+                      <p style={{ margin: 0, wordBreak: 'break-word' }}>{cleanInstagramMessage(m.message)}</p>
+
+                      {/* File Attachment Preview */}
+                      {m.fileUrl && (
+                        <div style={{ marginTop: '8px' }}>
+                          <a
+                            href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="m3-btn m3-btn-outlined"
+                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          >
+                            <span className="material-symbols-outlined">attachment</span>
+                            Attachment
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
+                      {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} />}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={chatBottomRef} />
             </div>
+
+            {/* Replying-To Active Banner */}
+            {replyingTo && (
+              <div
+                style={{
+                  padding: '8px 20px',
+                  backgroundColor: 'var(--m3-surface-container-highest)',
+                  borderTop: '1px solid var(--m3-outline-variant)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '0.85rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--m3-primary)' }}>reply</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Replying to <strong>{replyingTo.nickname}</strong>: <em>"{replyingTo.message}"</em>
+                  </span>
+                </div>
+                <button
+                  className="m3-btn m3-btn-icon m3-btn-outlined"
+                  style={{ width: '28px', height: '28px', flexShrink: 0 }}
+                  onClick={() => setReplyingTo(null)}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                </button>
+              </div>
+            )}
+
+            {/* Chat Input Bar */}
+            <div style={{ padding: '16px 20px', backgroundColor: 'var(--m3-surface-container)', borderTop: '1px solid var(--m3-outline-variant)' }}>
+              <form onSubmit={sendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <label className="m3-btn m3-btn-icon m3-btn-tonal" style={{ cursor: 'pointer', flexShrink: 0 }}>
+                  <span className="material-symbols-outlined">attach_file</span>
+                  <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
+                </label>
+
+                <input
+                  type="text"
+                  className="m3-text-field"
+                  style={{ borderRadius: 'var(--m3-radius-full)' }}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onPaste={handleInputPaste}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.nickname}...` : 'Type a message (or drag message to reply)...'}
+                />
+
+                <button type="submit" className="m3-btn m3-btn-filled m3-btn-icon" style={{ flexShrink: 0 }}>
+                  <span className="material-symbols-outlined">send</span>
+                </button>
+              </form>
+            </div>
+          </div>
 
           {/* Side-by-Side Video Call Panel */}
           {(showVideoPanel || callState !== 'idle') && (
@@ -1016,138 +966,6 @@ export default function ChatRoom() {
           )}
         </main>
       </div>
-      {/* IGShare Link Cleaner & Share Modal */}
-      {showIGShareModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            zIndex: 3000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            backdropFilter: 'blur(6px)',
-          }}
-        >
-          <div
-            className="m3-card"
-            style={{
-              maxWidth: '520px',
-              width: '100%',
-              backgroundColor: 'var(--m3-surface-container-lowest)',
-              borderRadius: 'var(--m3-radius-xl)',
-              padding: '24px',
-              position: 'relative',
-              boxShadow: 'var(--m3-elevation-3)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)', fontSize: '28px' }}>
-                  lock_open
-                </span>
-                <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--m3-on-surface)' }}>
-                    IGShare Private Link Generator
-                  </h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', margin: 0 }}>
-                    Share Instagram content without revealing your profile or requiring login.
-                  </p>
-                </div>
-              </div>
-              <button
-                className="m3-btn m3-btn-icon m3-btn-outlined"
-                style={{ width: '32px', height: '32px' }}
-                onClick={() => setShowIGShareModal(false)}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>close</span>
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const raw = igShareInput.trim();
-                if (!raw) return;
-                const cleanedText = cleanInstagramMessage(raw);
-                const shortcode = getInstagramShortcode(raw);
-                const finalMsg = shortcode ? generateIGShareUrl(raw) || cleanedText : cleanedText;
-
-                socketRef.current?.emit('sendMessage', {
-                  passcode,
-                  nickname,
-                  message: finalMsg,
-                  avatarUrl,
-                  replyTo: null,
-                });
-
-                setIgShareInput('');
-                setShowIGShareModal(false);
-              }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-            >
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-primary)', marginBottom: '6px' }}>
-                  Paste Instagram Reel or Post Link
-                </label>
-                <input
-                  type="text"
-                  className="m3-text-field"
-                  value={igShareInput}
-                  onChange={(e) => setIgShareInput(e.target.value)}
-                  placeholder="https://www.instagram.com/reel/..."
-                  required
-                />
-              </div>
-
-              {/* IGShare Features List */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '10px',
-                  backgroundColor: 'var(--m3-surface-container-high)',
-                  padding: '12px',
-                  borderRadius: 'var(--m3-radius-m)',
-                  fontSize: '0.75rem',
-                }}
-              >
-                <div>
-                  <strong>⚡ No Account Needed</strong>
-                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>Recipients view without login</div>
-                </div>
-                <div>
-                  <strong>🛡️ Privacy Protected</strong>
-                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>No profile tracking links</div>
-                </div>
-                <div>
-                  <strong>🎬 Instant Playback</strong>
-                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>Clean focus mode player</div>
-                </div>
-                <div>
-                  <strong>💯 100% Free</strong>
-                  <div style={{ color: 'var(--m3-on-surface-variant)' }}>Unlimited clean shares</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button type="button" className="m3-btn m3-btn-outlined" onClick={() => setShowIGShareModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="m3-btn m3-btn-filled" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="material-symbols-outlined">send</span>
-                  <span>Share Privately via IGShare</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
