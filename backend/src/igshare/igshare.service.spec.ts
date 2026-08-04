@@ -5,6 +5,8 @@ import { IgshareService } from './igshare.service';
 describe('IgshareService', () => {
   let service: IgshareService;
 
+  jest.setTimeout(15000);
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [IgshareService],

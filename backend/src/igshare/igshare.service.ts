@@ -4,7 +4,6 @@ import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
 
-
 export interface IgMediaResult {
   success: boolean;
   type: string;
@@ -68,7 +67,7 @@ export class IgshareService {
       const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
       const originalUrl = `https://www.instagram.com/reel/${shortcode}/`;
 
-      // Try scraping public embed page for metadata
+      // Try scraping public embed & page metadata
       let fetchedMeta: {
         thumbnailUrl?: string;
         directVideoUrl?: string;
@@ -79,7 +78,7 @@ export class IgshareService {
       try {
         fetchedMeta = await this.scrapePublicEmbedMeta(shortcode);
       } catch (err) {
-        this.logger.warn(`Scraping public metadata for shortcode ${shortcode} failed, using default embed structure: ${err.message}`);
+        this.logger.warn(`Scraping metadata for shortcode ${shortcode} failed: ${err.message}`);
       }
 
       const proxyVideoUrl = fetchedMeta.directVideoUrl
@@ -142,9 +141,9 @@ export class IgshareService {
   }
 
   /**
-   * Scrapes public HTML metadata from Instagram embed endpoint.
+   * Scrapes public HTML metadata from Instagram embed endpoint and main page JSON-LD.
    */
-  private scrapePublicEmbedMeta(
+  private async scrapePublicEmbedMeta(
     shortcode: string,
   ): Promise<{
     thumbnailUrl?: string;
@@ -152,26 +151,55 @@ export class IgshareService {
     caption?: string;
     authorUsername?: string;
   }> {
-    return new Promise((resolve) => {
-      const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+    const urlsToTry = [
+      `https://www.instagram.com/p/${shortcode}/embed/captioned/`,
+      `https://www.instagram.com/reel/${shortcode}/`,
+    ];
 
+    try {
+      const results = await Promise.allSettled(
+        urlsToTry.map((url) => this.fetchAndExtractMeta(url)),
+      );
+
+      for (const res of results) {
+        if (res.status === 'fulfilled') {
+          const meta = res.value;
+          if (meta.directVideoUrl || meta.thumbnailUrl || meta.caption) {
+            return meta;
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    return {};
+  }
+
+  private fetchAndExtractMeta(targetUrl: string): Promise<{
+    thumbnailUrl?: string;
+    directVideoUrl?: string;
+    caption?: string;
+    authorUsername?: string;
+  }> {
+    return new Promise((resolve) => {
       const req = https.get(
-        embedUrl,
+        targetUrl,
         {
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           },
-          timeout: 5000,
+          timeout: 2500,
         },
         (res) => {
           let data = '';
 
           res.on('data', (chunk) => {
             data += chunk;
-            // Cap buffered size at 1MB to prevent excessive memory usage
-            if (data.length > 1024 * 1024) {
+            if (data.length > 2 * 1024 * 1024) {
               req.destroy();
             }
           });
@@ -184,37 +212,74 @@ export class IgshareService {
               authorUsername?: string;
             } = {};
 
-            // Extract video URL if present in embed HTML / script
-            const videoMatch =
-              data.match(/video_url["']:\s*["']([^"']+)["']/i) ||
-              data.match(/<meta property=["']og:video["'] content=["']([^"']+)["']/i);
-            if (videoMatch && videoMatch[1]) {
-              meta.directVideoUrl = videoMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+            // 1. JSON-LD Schema Extraction
+            const jsonLdMatch = data.match(
+              /<script type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+            );
+            if (jsonLdMatch) {
+              for (const scriptTag of jsonLdMatch) {
+                try {
+                  const content = scriptTag.replace(/<[^>]+>/g, '');
+                  const parsed = JSON.parse(content);
+                  const item = Array.isArray(parsed) ? parsed[0] : parsed;
+
+                  if (item) {
+                    if (item.contentUrl) meta.directVideoUrl = item.contentUrl;
+                    if (item.video?.contentUrl) meta.directVideoUrl = item.video.contentUrl;
+                    if (item.thumbnailUrl) meta.thumbnailUrl = item.thumbnailUrl;
+                    if (item.caption) meta.caption = item.caption;
+                    if (item.description && !meta.caption) meta.caption = item.description;
+                    if (item.author?.identifier?.value || item.author?.name) {
+                      meta.authorUsername = item.author.identifier?.value || item.author.name;
+                    }
+                  }
+                } catch {
+                  // Ignore JSON parse failures
+                }
+              }
             }
 
-            // Extract thumbnail image
-            const imageMatch =
-              data.match(/display_url["']:\s*["']([^"']+)["']/i) ||
-              data.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i) ||
-              data.match(/thumbnail_src["']:\s*["']([^"']+)["']/i);
-            if (imageMatch && imageMatch[1]) {
-              meta.thumbnailUrl = imageMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+            // 2. Regex fallbacks for direct video_url and og:video
+            if (!meta.directVideoUrl) {
+              const videoMatch =
+                data.match(/video_url["']:\s*["']([^"']+)["']/i) ||
+                data.match(/<meta property=["']og:video["'] content=["']([^"']+)["']/i) ||
+                data.match(/<meta property=["']og:video:secure_url["'] content=["']([^"']+)["']/i) ||
+                data.match(/["']video_versions["']:\s*\[\s*\{\s*["']url["']:\s*["']([^"']+)["']/i);
+              if (videoMatch && videoMatch[1]) {
+                meta.directVideoUrl = videoMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+              }
             }
 
-            // Extract caption
-            const captionMatch =
-              data.match(/<div class=["']Caption["'][^>]*>([\s\S]*?)<\/div>/i) ||
-              data.match(/<meta property=["']og:description["'] content=["']([^"']+)["']/i);
-            if (captionMatch && captionMatch[1]) {
-              meta.caption = captionMatch[1].replace(/<[^>]+>/g, '').trim();
+            // 3. Regex fallbacks for display_url and og:image
+            if (!meta.thumbnailUrl) {
+              const imageMatch =
+                data.match(/display_url["']:\s*["']([^"']+)["']/i) ||
+                data.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i) ||
+                data.match(/thumbnail_src["']:\s*["']([^"']+)["']/i);
+              if (imageMatch && imageMatch[1]) {
+                meta.thumbnailUrl = imageMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+              }
             }
 
-            // Extract Author username
-            const authorMatch =
-              data.match(/<a class=["']CaptionUsername["'][^>]*>([^<]+)<\/a>/i) ||
-              data.match(/["']username["']:\s*["']([^"']+)["']/i);
-            if (authorMatch && authorMatch[1]) {
-              meta.authorUsername = authorMatch[1].trim();
+            // 4. Regex fallbacks for caption
+            if (!meta.caption) {
+              const captionMatch =
+                data.match(/<div class=["']Caption["'][^>]*>([\s\S]*?)<\/div>/i) ||
+                data.match(/<meta property=["']og:description["'] content=["']([^"']+)["']/i);
+              if (captionMatch && captionMatch[1]) {
+                meta.caption = captionMatch[1].replace(/<[^>]+>/g, '').trim();
+              }
+            }
+
+            // 5. Author fallback
+            if (!meta.authorUsername) {
+              const authorMatch =
+                data.match(/<a class=["']CaptionUsername["'][^>]*>([^<]+)<\/a>/i) ||
+                data.match(/["']username["']:\s*["']([^"']+)["']/i);
+              if (authorMatch && authorMatch[1]) {
+                meta.authorUsername = authorMatch[1].trim();
+              }
             }
 
             resolve(meta);
@@ -222,10 +287,7 @@ export class IgshareService {
         },
       );
 
-      req.on('error', () => {
-        resolve({});
-      });
-
+      req.on('error', () => resolve({}));
       req.on('timeout', () => {
         req.destroy();
         resolve({});
@@ -234,9 +296,18 @@ export class IgshareService {
   }
 
   /**
-   * Proxies binary media streams (video/image) from Instagram CDN to client browser with CORS support.
+   * Proxies binary media streams (video/image) from Instagram CDN to client browser with CORS support and HTTP redirect following.
    */
-  public async proxyMediaStream(mediaUrl: string, req: express.Request, res: express.Response): Promise<void> {
+  public async proxyMediaStream(
+    mediaUrl: string,
+    req: express.Request,
+    res: express.Response,
+    redirectHops = 0,
+  ): Promise<void> {
+    if (redirectHops > 5) {
+      throw new BadRequestException('Too many redirects while fetching Instagram media stream.');
+    }
+
     if (!mediaUrl || typeof mediaUrl !== 'string') {
       throw new BadRequestException('Media URL parameter "url" is required.');
     }
@@ -266,6 +337,17 @@ export class IgshareService {
           headers,
         },
         (proxyRes) => {
+          // Handle HTTP redirects (301, 302, 303, 307, 308) from CDN
+          if (
+            proxyRes.statusCode &&
+            proxyRes.statusCode >= 300 &&
+            proxyRes.statusCode < 400 &&
+            proxyRes.headers.location
+          ) {
+            const redirectUrl = new URL(proxyRes.headers.location, mediaUrl).toString();
+            return this.proxyMediaStream(redirectUrl, req, res, redirectHops + 1);
+          }
+
           res.status(proxyRes.statusCode || 200);
 
           // Forward essential headers for media streaming
