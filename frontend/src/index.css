@@ -269,6 +269,42 @@ input, button, select, textarea {
   }
 
   .m3-bottom-nav {
-    display: flex;
+    display: none; /* Removed for max height chat workspace */
   }
 }
+
+@media (max-width: 768px) {
+  .m3-top-app-bar {
+    padding: 0 12px;
+    height: 56px;
+  }
+
+  .m3-top-app-bar h2 {
+    font-size: 0.95rem !important;
+  }
+
+  .m3-top-app-bar p {
+    font-size: 0.7rem !important;
+  }
+
+  .m3-btn-label {
+    display: none !important;
+  }
+
+  .m3-btn {
+    padding: 8px 12px;
+  }
+
+  .m3-main-chat {
+    flex-direction: column !important;
+  }
+
+  .m3-video-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 280px !important;
+    border-left: none !important;
+    border-bottom: 1px solid var(--m3-outline-variant) !important;
+  }
+}
+
