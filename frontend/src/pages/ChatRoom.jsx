@@ -4,6 +4,92 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { cleanInstagramMessage } from '../utils/instagram';
 
+function InstagramVideoPlayer({ shortcode }) {
+  const [videoOnly, setVideoOnly] = useState(true);
+
+  if (!shortcode) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: '10px',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        border: '1px solid var(--m3-outline-variant)',
+        backgroundColor: '#000',
+        maxWidth: '380px',
+        width: '100%',
+        position: 'relative',
+        height: videoOnly ? '480px' : '580px',
+        boxShadow: 'var(--m3-elevation-2)',
+        transition: 'all 0.3s ease',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 10,
+        }}
+      >
+        <button
+          className="m3-btn m3-btn-outlined"
+          type="button"
+          style={{
+            padding: '4px 10px',
+            fontSize: '0.7rem',
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            color: '#fff',
+            borderColor: 'rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(4px)',
+            borderRadius: '12px',
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setVideoOnly(!videoOnly);
+          }}
+        >
+          {videoOnly ? 'Show Full Info' : 'Video Only'}
+        </button>
+      </div>
+
+      {videoOnly ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: '-58px',
+            left: 0,
+            width: '100%',
+            height: 'calc(100% + 195px)',
+            overflow: 'hidden',
+          }}
+        >
+          <iframe
+            src={`https://www.instagram.com/p/${shortcode}/embed/`}
+            width="100%"
+            height="100%"
+            allowFullScreen
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            title="Instagram Video Stream"
+            style={{ border: 'none', display: 'block' }}
+          />
+        </div>
+      ) : (
+        <iframe
+          src={`https://www.instagram.com/p/${shortcode}/embed/`}
+          width="100%"
+          height="100%"
+          allowFullScreen
+          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          title="Instagram Full Embed Stream"
+          style={{ border: 'none', display: 'block' }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function ChatRoom() {
   const navigate = useNavigate();
 
@@ -706,20 +792,8 @@ export default function ChatRoom() {
                           </div>
                         )}
 
-                        {/* Direct In-Chat Instagram Video Preview Player */}
-                        {instaShortcode && (
-                          <div style={{ marginTop: '10px', borderRadius: 'var(--m3-radius-m)', overflow: 'hidden', border: '1px solid var(--m3-outline-variant)', backgroundColor: '#000' }}>
-                            <iframe
-                              src={`https://www.instagram.com/p/${instaShortcode}/embed/`}
-                              width="100%"
-                              height="460"
-                              allowFullScreen
-                              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                              title="Instagram Reel Direct Stream"
-                              style={{ border: 'none', display: 'block' }}
-                            />
-                          </div>
-                        )}
+                        {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
+                        {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} />}
                       </div>
                     </div>
                   );
@@ -815,19 +889,7 @@ export default function ChatRoom() {
                       <span><strong>Shortcode:</strong> {instaResult.shortcode || 'N/A'}</span>
                     </div>
 
-                    {instaResult.embedUrl && (
-                      <div style={{ borderRadius: 'var(--m3-radius-m)', overflow: 'hidden', border: '1px solid var(--m3-outline)', backgroundColor: '#000' }}>
-                        <iframe
-                          src={instaResult.embedUrl}
-                          width="100%"
-                          height="480"
-                          allowFullScreen
-                          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                          title="Instagram Stream Embed"
-                          style={{ border: 'none', display: 'block' }}
-                        />
-                      </div>
-                    )}
+                    {instaResult.shortcode && <InstagramVideoPlayer shortcode={instaResult.shortcode} />}
                   </div>
                 )}
               </div>
