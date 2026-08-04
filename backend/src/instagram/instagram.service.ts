@@ -34,7 +34,7 @@ export class InstagramService {
   private readonly logger = new Logger(InstagramService.name);
 
   /**
-   * Extracts clean Instagram URL from text.
+   * Extracts clean Instagram URL from input string.
    */
   public extractCleanUrl(text?: string): string {
     if (!text || typeof text !== 'string') {
@@ -54,7 +54,11 @@ export class InstagramService {
   }
 
   /**
-   * Resolves Instagram media view using gallery-dl CLI and public fallback scraper.
+   * Resolves Instagram media view using multi-layer extraction:
+   * 1. yt-dlp (--dump-single-json)
+   * 2. gallery-dl (-j)
+   * 3. Playwright Headless Chromium Scraping (meta tags)
+   * 4. Public embed HTML scraper fallback
    */
   public async resolveMediaView(inputUrl?: string): Promise<InstagramMediaResult> {
     const cleanUrl = this.extractCleanUrl(inputUrl);
@@ -76,14 +80,34 @@ export class InstagramService {
         authorUsername?: string;
       } = {};
 
-      // Attempt 1: Extract via gallery-dl CLI
+      // Attempt 1: Extract via yt-dlp CLI (--dump-single-json)
       try {
-        extracted = await this.extractViaGalleryDl(originalUrl);
+        extracted = await this.extractViaYtDlp(originalUrl);
       } catch (err) {
-        this.logger.warn(`gallery-dl extraction failed for ${shortcode}: ${err.message}`);
+        this.logger.warn(`yt-dlp extraction failed for ${shortcode}: ${err.message}`);
       }
 
-      // Attempt 2: Public scraper fallback if gallery-dl did not find direct video
+      // Attempt 2: Extract via gallery-dl CLI (-j) if direct video URL is missing
+      if (!extracted.directVideoUrl) {
+        try {
+          const gdlMeta = await this.extractViaGalleryDl(originalUrl);
+          extracted = { ...extracted, ...gdlMeta };
+        } catch (err) {
+          this.logger.warn(`gallery-dl extraction failed for ${shortcode}: ${err.message}`);
+        }
+      }
+
+      // Attempt 3: Extract via Playwright Headless Chromium
+      if (!extracted.directVideoUrl || !extracted.thumbnailUrl) {
+        try {
+          const pwMeta = await this.extractViaPlaywright(originalUrl);
+          extracted = { ...extracted, ...pwMeta };
+        } catch (err) {
+          this.logger.warn(`Playwright extraction failed for ${shortcode}: ${err.message}`);
+        }
+      }
+
+      // Attempt 4: Public embed HTML scraper fallback
       if (!extracted.directVideoUrl) {
         try {
           const fallback = await this.scrapePublicMeta(shortcode);
@@ -113,11 +137,11 @@ export class InstagramService {
         embedUrl,
         originalUrl,
         canViewWithoutAccount: true,
-        message: 'Instagram media extracted successfully via gallery-dl for 100% account-free browser viewing.',
+        message: 'Instagram media extracted successfully via yt-dlp/gallery-dl/Playwright for account-free viewing.',
       };
     }
 
-    // 2. Check for Profile link
+    // 2. Check for Profile Link
     const profileMatch = cleanUrl.match(
       /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:@)?([a-zA-Z0-9._]+)/i,
     );
@@ -149,6 +173,46 @@ export class InstagramService {
   }
 
   /**
+   * Invokes yt-dlp --dump-single-json --skip-download to extract Instagram video info.
+   */
+  private async extractViaYtDlp(url: string): Promise<{
+    thumbnailUrl?: string;
+    directVideoUrl?: string;
+    caption?: string;
+    authorUsername?: string;
+  }> {
+    const cmd = `python -m yt_dlp --dump-single-json --skip-download "${url}"`;
+    const { stdout } = await execAsync(cmd, { timeout: 12000 });
+
+    if (!stdout || !stdout.trim()) {
+      return {};
+    }
+
+    const data = JSON.parse(stdout.trim());
+    if (!data || typeof data !== 'object') {
+      return {};
+    }
+
+    let directVideoUrl: string | undefined = data.url;
+    if (!directVideoUrl && Array.isArray(data.formats) && data.formats.length > 0) {
+      const videoFormats = data.formats.filter(
+        (f: any) => f.url && (f.vcodec !== 'none' || f.ext === 'mp4'),
+      );
+      if (videoFormats.length > 0) {
+        directVideoUrl = videoFormats[videoFormats.length - 1].url;
+      } else {
+        directVideoUrl = data.formats[data.formats.length - 1].url;
+      }
+    }
+
+    const thumbnailUrl = data.thumbnail || data.thumbnails?.[0]?.url;
+    const caption = data.description || data.title;
+    const authorUsername = data.uploader_id || data.uploader || data.channel;
+
+    return { directVideoUrl, thumbnailUrl, caption, authorUsername };
+  }
+
+  /**
    * Invokes python -m gallery_dl -j to extract JSON metadata.
    */
   private async extractViaGalleryDl(url: string): Promise<{
@@ -158,7 +222,7 @@ export class InstagramService {
     authorUsername?: string;
   }> {
     const cmd = `python -m gallery_dl -j "${url}"`;
-    const { stdout } = await execAsync(cmd, { timeout: 12000 });
+    const { stdout } = await execAsync(cmd, { timeout: 10000 });
 
     if (!stdout || !stdout.trim()) {
       return {};
@@ -173,8 +237,6 @@ export class InstagramService {
     for (const line of lines) {
       try {
         const parsed = JSON.parse(line);
-
-        // gallery-dl outputs arrays: [category, metadata_object]
         const data = Array.isArray(parsed) ? parsed[1] || parsed[0] : parsed;
 
         if (data && typeof data === 'object') {
@@ -196,11 +258,51 @@ export class InstagramService {
           }
         }
       } catch {
-        // Skip invalid line JSON
+        // Skip invalid JSON lines
       }
     }
 
     return { directVideoUrl, thumbnailUrl, caption, authorUsername };
+  }
+
+  /**
+   * Uses Playwright Headless Chromium to extract metadata (og:image, og:video, etc.)
+   */
+  private async extractViaPlaywright(url: string): Promise<{
+    thumbnailUrl?: string;
+    directVideoUrl?: string;
+    caption?: string;
+    authorUsername?: string;
+  }> {
+    try {
+      const { chromium } = await import('playwright');
+      const browser = await chromium.launch({ headless: true });
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+      const thumbnailUrl =
+        (await page.locator('meta[property="og:image"]').getAttribute('content').catch(() => null)) ||
+        (await page.locator('meta[property="twitter:image"]').getAttribute('content').catch(() => null));
+
+      const directVideoUrl =
+        (await page.locator('meta[property="og:video"]').getAttribute('content').catch(() => null)) ||
+        (await page.locator('meta[property="og:video:secure_url"]').getAttribute('content').catch(() => null));
+
+      const caption =
+        (await page.locator('meta[property="og:description"]').getAttribute('content').catch(() => null)) ||
+        (await page.locator('meta[name="description"]').getAttribute('content').catch(() => null));
+
+      await browser.close();
+
+      return {
+        thumbnailUrl: thumbnailUrl || undefined,
+        directVideoUrl: directVideoUrl || undefined,
+        caption: caption || undefined,
+      };
+    } catch (err) {
+      this.logger.warn(`Playwright browser extraction failed: ${err.message}`);
+      return {};
+    }
   }
 
   /**
