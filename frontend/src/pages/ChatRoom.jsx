@@ -7,8 +7,8 @@ export default function ChatRoom() {
   const navigate = useNavigate();
 
   const baseUrl = localStorage.getItem('baseUrl') || 'https://backend-9i6w.onrender.com/api';
-  const nickname = localStorage.getItem('nickname') || '';
-  const passcode = localStorage.getItem('passcode') || '';
+  const nickname = (localStorage.getItem('nickname') || '').trim();
+  const passcode = (localStorage.getItem('passcode') || '').trim();
   const avatarUrl = localStorage.getItem('avatarUrl') || '';
 
   // Tab State for Mobile/Responsive Views: 'chat' | 'members' | 'instagram'
@@ -136,7 +136,13 @@ export default function ChatRoom() {
     });
 
     socket.on('newMessage', (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      if (!msg) return;
+      setMessages((prev) => {
+        if (msg.id && prev.some((m) => m.id === msg.id)) {
+          return prev;
+        }
+        return [...prev, msg];
+      });
     });
 
     socket.on('userCalling', ({ callerName: cName }) => {

@@ -293,11 +293,14 @@ export class ChatGateway
 
     await this.userRepo.save(user);
 
-    client.join(room.passcode);
+    const roomPasscode = room.passcode.trim();
+    const dataPasscode = data.passcode.trim();
+    client.join(roomPasscode);
+    client.join(dataPasscode);
 
     this.users.set(client.id, {
       nickname: data.nickname,
-      passcode: room.passcode,
+      passcode: roomPasscode,
     });
 
     const messages = await this.messageRepo.find({
@@ -404,7 +407,12 @@ export class ChatGateway
 
     await this.messageRepo.save(savedMessage);
 
-    this.server.to(room.passcode).emit('newMessage', {
+    const roomPasscode = room.passcode.trim();
+    const dataPasscode = data.passcode.trim();
+    client.join(roomPasscode);
+    client.join(dataPasscode);
+
+    const messagePayload = {
       id: savedMessage.id,
       roomId: room.id,
       nickname: savedMessage.nickname,
@@ -419,7 +427,9 @@ export class ChatGateway
       isDeleted: savedMessage.isDeleted,
       reactions: savedMessage.reactions,
       expiresAt: savedMessage.expiresAt,
-    });
+    };
+
+    this.server.to(roomPasscode).to(dataPasscode).emit('newMessage', messagePayload);
 
     return {
       success: true,
