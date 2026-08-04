@@ -145,6 +145,7 @@ export class UploadController {
 
     const trimmed = url.trim();
 
+    // Direct match or search within pasted snippet
     const mediaMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
     if (mediaMatch && mediaMatch[1]) {
       const shortcode = mediaMatch[1];

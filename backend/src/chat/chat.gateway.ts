@@ -45,8 +45,7 @@ import {
   },
 })
 export class ChatGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap, OnModuleDestroy
-{
+  implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap, OnModuleDestroy {
   @WebSocketServer()
   server!: Server;
 
@@ -59,7 +58,7 @@ export class ChatGateway
 
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-  ) {}
+  ) { }
 
   private cleanupTimer?: NodeJS.Timeout;
   private isCleaning = false;
@@ -393,10 +392,12 @@ export class ChatGateway
       expiresAt = new Date(Date.now() + data.expiresIn * 1000);
     }
 
+    const cleanedMessage = cleanInstagramMessage(data.message);
+
     const savedMessage = this.messageRepo.create({
       roomId: room.id,
       nickname: session.nickname,
-      message: data.message,
+      message: cleanedMessage,
       replyTo: data.replyTo,
       fileUrl: data.fileUrl ?? null,
       fileName: data.fileName ?? null,
@@ -790,3 +791,68 @@ export class ChatGateway
     });
   }
 }
+
+function cleanInstagramMessage(text: string): string {
+  if (!text || typeof text !== 'string') return text;
+
+  const instaUrlRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)[^\s]*/gi;
+  const instaUrls = text.match(instaUrlRegex);
+
+  const boilerplateRegex = /^(view profile|view profile on instagram|view more on instagram|view post on instagram|add a comment \.\.\.|add a comment\.\.\.|watch on instagram|watch again|watch reel|open instagram|view profile\.\.\.)$/i;
+
+  const lines = text.split('\n');
+  const cleanedLines: string[] = [];
+
+  const hasBoilerplateOrUrl = /view profile|view more on instagram|add a comment/i.test(text) || instaUrls !== null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (boilerplateRegex.test(line)) continue;
+
+    const lowerLine = line.toLowerCase();
+    if (
+      lowerLine === 'view profile' ||
+      lowerLine === 'view profile on instagram' ||
+      lowerLine === 'view more on instagram' ||
+      lowerLine.startsWith('add a comment')
+    ) {
+      continue;
+    }
+
+    if (hasBoilerplateOrUrl) {
+      if (
+        line.includes('·') ||
+        line.includes(' - Remix') ||
+        lowerLine.includes('original audio')
+      ) {
+        continue;
+      }
+
+      const isAdjacentToBoilerplate = lines.some((l, idx) => Math.abs(idx - i) <= 3 && boilerplateRegex.test(l.trim()));
+      const isUrl = line.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)/i);
+
+      if (isAdjacentToBoilerplate && !isUrl) {
+        if (/^[a-zA-Z0-9_.]+$|^[a-zA-Z0-9_., -]+ \. [a-zA-Z0-9_., -]+$/i.test(line)) {
+          continue;
+        }
+      }
+    }
+
+    cleanedLines.push(line);
+  }
+
+  const cleanedText = cleanedLines.join('\n').trim();
+
+  if (!cleanedText && instaUrls && instaUrls.length > 0) {
+    return instaUrls[0];
+  }
+
+  if (cleanedText && instaUrls && instaUrls.length > 0 && !cleanedText.includes(instaUrls[0])) {
+    return `${cleanedText}\n${instaUrls[0]}`.trim();
+  }
+
+  return cleanedText || (instaUrls ? instaUrls[0] : text);
+}
+

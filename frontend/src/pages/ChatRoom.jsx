@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import { cleanInstagramMessage } from '../utils/instagram';
 
 export default function ChatRoom() {
   const navigate = useNavigate();
@@ -423,17 +424,33 @@ export default function ChatRoom() {
   };
 
   // Messaging & File Upload
+  const handleInputPaste = (e) => {
+    const pastedText = e.clipboardData?.getData('text');
+    if (
+      pastedText &&
+      (/view profile|view more on instagram|add a comment/i.test(pastedText) ||
+        /instagram\.com\/(?:p|reel)/i.test(pastedText))
+    ) {
+      e.preventDefault();
+      const cleaned = cleanInstagramMessage(pastedText);
+      setInputText((prev) => (prev ? `${prev} ${cleaned}` : cleaned));
+    }
+  };
+
   const sendMessage = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    const msgText = inputText.trim();
+    const msgText = cleanInstagramMessage(inputText.trim());
+    if (!msgText) return;
     setInputText('');
 
     socketRef.current?.emit('sendMessage', {
       passcode,
       nickname,
       message: msgText,
-      replyTo: replyingTo ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message } : null,
+      replyTo: replyingTo
+        ? { id: replyingTo.id, nickname: replyingTo.nickname, message: cleanInstagramMessage(replyingTo.message) }
+        : null,
     });
     setReplyingTo(null);
   };
@@ -452,7 +469,7 @@ export default function ChatRoom() {
           nickname,
           message: `[File Attachment] ${res.data.fileName || file.name}`,
           fileUrl: res.data.fileUrl,
-          replyTo: replyingTo ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message } : null,
+          replyTo: replyingTo ? { id: replyingTo.id, nickname: replyingTo.nickname, message: cleanInstagramMessage(replyingTo.message) } : null,
         });
         setReplyingTo(null);
       }
@@ -464,7 +481,9 @@ export default function ChatRoom() {
   // Instagram Viewer API Call
   const handleViewInstagram = async (e) => {
     e.preventDefault();
-    if (!instaInputUrl.trim()) return;
+    const rawUrl = instaInputUrl.trim();
+    if (!rawUrl) return;
+    const cleanedUrl = cleanInstagramMessage(rawUrl);
     setInstaLoading(true);
     setInstaError('');
     setInstaResult(null);
@@ -472,7 +491,7 @@ export default function ChatRoom() {
     try {
       const cleanApiUrl = baseUrl.replace(/\/+$/, '');
       const res = await axios.get(`${cleanApiUrl}/upload/instagram/view`, {
-        params: { url: instaInputUrl.trim() },
+        params: { url: cleanedUrl },
       });
       setInstaResult(res.data);
     } catch (err) {
@@ -664,12 +683,12 @@ export default function ChatRoom() {
                           >
                             <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
-                              {m.replyTo.message}
+                              {cleanInstagramMessage(m.replyTo.message)}
                             </div>
                           </div>
                         )}
 
-                        <p style={{ margin: 0, wordBreak: 'break-word' }}>{m.message}</p>
+                        <p style={{ margin: 0, wordBreak: 'break-word' }}>{cleanInstagramMessage(m.message)}</p>
 
                         {/* File Attachment Preview */}
                         {m.fileUrl && (
@@ -751,6 +770,7 @@ export default function ChatRoom() {
                     style={{ borderRadius: 'var(--m3-radius-full)' }}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
+                    onPaste={handleInputPaste}
                     placeholder={replyingTo ? `Reply to ${replyingTo.nickname}...` : 'Type a message (or drag message to reply)...'}
                   />
 
