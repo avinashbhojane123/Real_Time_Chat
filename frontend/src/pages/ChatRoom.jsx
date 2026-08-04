@@ -25,6 +25,26 @@ function InstagramVideoPlayer({ shortcode }) {
         transition: 'all 0.3s ease',
       }}
     >
+      {/* Transparent Click Shield - Blocks all click/touch navigation to Instagram */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 5,
+          cursor: 'default',
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+        }}
+      />
+
       <div
         style={{
           position: 'absolute',
@@ -73,7 +93,7 @@ function InstagramVideoPlayer({ shortcode }) {
             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
             sandbox="allow-scripts allow-same-origin allow-forms"
             title="Instagram Video Stream"
-            style={{ border: 'none', display: 'block' }}
+            style={{ border: 'none', display: 'block', pointerEvents: 'none' }}
           />
         </div>
       ) : (
@@ -85,7 +105,7 @@ function InstagramVideoPlayer({ shortcode }) {
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
           sandbox="allow-scripts allow-same-origin allow-forms"
           title="Instagram Full Embed Stream"
-          style={{ border: 'none', display: 'block' }}
+          style={{ border: 'none', display: 'block', pointerEvents: 'none' }}
         />
       )}
     </div>
