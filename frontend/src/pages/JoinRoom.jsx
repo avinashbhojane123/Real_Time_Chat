@@ -49,56 +49,149 @@ export default function JoinRoom() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Join Chat Space</h1>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleJoin}>
-        <div>
-          <label>Backend API Render / Local Server URL:</label><br />
-          <input
-            type="text"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            style={{ width: '100%', maxWidth: '400px' }}
-            required
-          />
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        background: 'radial-gradient(circle at 50% 20%, #2b1f47 0%, var(--m3-background) 80%)',
+      }}
+    >
+      <div
+        className="m3-card"
+        style={{
+          width: '100%',
+          maxWidth: '480px',
+          padding: '36px 32px',
+          borderRadius: 'var(--m3-radius-xl)',
+          backgroundColor: 'var(--m3-surface-container)',
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: 'var(--m3-radius-xl)',
+              backgroundColor: 'var(--m3-primary-container)',
+              color: 'var(--m3-on-primary-container)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>forum</span>
+          </div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>
+            Real-Time Space
+          </h1>
+          <p style={{ color: 'var(--m3-on-surface-variant)', fontSize: '0.9rem', marginTop: '6px' }}>
+            Material Design 3 Interactive Chat & Video Hub
+          </p>
         </div>
-        <br />
-        <div>
-          <label>Nickname:</label><br />
-          <input
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="Enter nickname"
-            required
-          />
-        </div>
-        <br />
-        <div>
-          <label>Room Passcode:</label><br />
-          <input
-            type="text"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
-            placeholder="Enter room passcode"
-            required
-          />
-        </div>
-        <br />
-        <div>
-          <label>Avatar Upload (Optional):</label><br />
-          <input type="file" onChange={handleAvatarUpload} accept="image/*" />
-          {uploading && <span> Uploading...</span>}
-          {avatarUrl && (
-            <div>
-              <p>Uploaded Avatar: {avatarUrl}</p>
-            </div>
-          )}
-        </div>
-        <br />
-        <button type="submit">Join Room</button>
-      </form>
+
+        {error && (
+          <div
+            style={{
+              backgroundColor: 'var(--m3-error-container)',
+              color: 'var(--m3-on-error)',
+              padding: '12px 16px',
+              borderRadius: 'var(--m3-radius-m)',
+              marginBottom: '20px',
+              fontSize: '0.875rem',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleJoin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-primary)', marginBottom: '6px' }}>
+              Backend Server URL (Render / Local)
+            </label>
+            <input
+              type="text"
+              className="m3-text-field"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://backend-9i6w.onrender.com/api"
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
+              Your Nickname
+            </label>
+            <input
+              type="text"
+              className="m3-text-field"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="e.g. Alex"
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
+              Room Passcode
+            </label>
+            <input
+              type="text"
+              className="m3-text-field"
+              value={passcode}
+              onChange={(e) => setPasscode(e.target.value)}
+              placeholder="e.g. 1234"
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
+              Profile Avatar (Optional)
+            </label>
+            <input
+              type="file"
+              onChange={handleAvatarUpload}
+              accept="image/*"
+              style={{ display: 'none' }}
+              id="m3-avatar-input"
+            />
+            <label
+              htmlFor="m3-avatar-input"
+              className="m3-btn m3-btn-outlined"
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+              {uploading ? 'Uploading Avatar...' : avatarUrl ? 'Change Avatar' : 'Upload Avatar'}
+            </label>
+            {avatarUrl && (
+              <p style={{ fontSize: '0.75rem', color: 'var(--m3-primary)', marginTop: '6px', textAlign: 'center' }}>
+                ✓ Avatar Attached
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="m3-btn m3-btn-filled"
+            style={{
+              padding: '14px 24px',
+              fontSize: '1rem',
+              marginTop: '10px',
+              boxShadow: 'var(--m3-elevation-2)',
+            }}
+          >
+            <span className="material-symbols-outlined">login</span>
+            Join Room Space
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

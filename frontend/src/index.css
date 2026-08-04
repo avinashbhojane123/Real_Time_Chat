@@ -1,0 +1,273 @@
+/* ==========================================================================
+   Google Material Design 3 (M3 / Material You) Design System
+   ========================================================================== */
+
+:root {
+  /* M3 Color Roles (Dark / Dynamic Tonal Palettes) */
+  --m3-primary: #D0BCFF;
+  --m3-on-primary: #381E72;
+  --m3-primary-container: #4F378B;
+  --m3-on-primary-container: #EADDFF;
+
+  --m3-secondary: #CCC2DC;
+  --m3-on-secondary: #332D41;
+  --m3-secondary-container: #4A4458;
+  --m3-on-secondary-container: #E8DEF8;
+
+  --m3-tertiary: #EFB8C8;
+  --m3-on-tertiary: #492532;
+  --m3-tertiary-container: #633B48;
+  --m3-on-tertiary-container: #FFD8E4;
+
+  --m3-error: #F2B8B5;
+  --m3-on-error: #601410;
+  --m3-error-container: #8C1D18;
+
+  --m3-background: #141218;
+  --m3-on-background: #E6E0E9;
+
+  --m3-surface: #141218;
+  --m3-on-surface: #E6E0E9;
+  --m3-surface-variant: #49454F;
+  --m3-on-surface-variant: #CAC4D0;
+
+  --m3-surface-container-lowest: #0F0D13;
+  --m3-surface-container-low: #1D1B20;
+  --m3-surface-container: #211F26;
+  --m3-surface-container-high: #2B2930;
+  --m3-surface-container-highest: #36343B;
+
+  --m3-outline: #938F99;
+  --m3-outline-variant: #44474E;
+
+  /* Shape Tokens */
+  --m3-radius-xs: 4px;
+  --m3-radius-s: 8px;
+  --m3-radius-m: 12px;
+  --m3-radius-l: 16px;
+  --m3-radius-xl: 28px;
+  --m3-radius-full: 9999px;
+
+  /* Elevation Shadows */
+  --m3-elevation-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
+  --m3-elevation-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
+  --m3-elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.30);
+
+  /* Typography */
+  --m3-font: 'Plus Jakarta Sans', 'Roboto', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--m3-font);
+  background-color: var(--m3-background);
+  color: var(--m3-on-background);
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* Material Icons Helper */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Base Form & Input Tokens */
+input, button, select, textarea {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.m3-text-field {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--m3-radius-xs);
+  border: 1px solid var(--m3-outline);
+  background-color: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  transition: all 0.2s ease;
+}
+
+.m3-text-field:focus {
+  outline: none;
+  border-color: var(--m3-primary);
+  box-shadow: 0 0 0 2px var(--m3-primary-container);
+}
+
+/* M3 Button System */
+.m3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: var(--m3-radius-full);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  text-decoration: none;
+}
+
+.m3-btn-filled {
+  background-color: var(--m3-primary);
+  color: var(--m3-on-primary);
+}
+
+.m3-btn-filled:hover {
+  box-shadow: var(--m3-elevation-1);
+  opacity: 0.92;
+}
+
+.m3-btn-tonal {
+  background-color: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+}
+
+.m3-btn-tonal:hover {
+  background-color: var(--m3-surface-variant);
+}
+
+.m3-btn-outlined {
+  background-color: transparent;
+  border: 1px solid var(--m3-outline);
+  color: var(--m3-primary);
+}
+
+.m3-btn-outlined:hover {
+  background-color: var(--m3-surface-container-highest);
+}
+
+.m3-btn-danger {
+  background-color: var(--m3-error-container);
+  color: var(--m3-on-error);
+}
+
+.m3-btn-icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--m3-radius-full);
+}
+
+/* M3 Card Container */
+.m3-card {
+  background-color: var(--m3-surface-container);
+  border-radius: var(--m3-radius-m);
+  padding: 24px;
+  border: 1px solid var(--m3-outline-variant);
+  box-shadow: var(--m3-elevation-1);
+}
+
+/* Responsive Main Layout Container */
+.m3-app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* M3 Top App Bar */
+.m3-top-app-bar {
+  height: 64px;
+  background-color: var(--m3-surface-container-low);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--m3-outline-variant);
+  z-index: 100;
+}
+
+/* M3 Main Content Grid */
+.m3-content-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Side Sheet / Drawer Navigation */
+.m3-side-sheet {
+  width: 320px;
+  background-color: var(--m3-surface-container-lowest);
+  border-right: 1px solid var(--m3-outline-variant);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
+/* Main Chat Section */
+.m3-main-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--m3-surface-container-low);
+}
+
+/* M3 Navigation Bar (Mobile Bottom Nav) */
+.m3-bottom-nav {
+  display: none;
+  height: 68px;
+  background-color: var(--m3-surface-container);
+  border-top: 1px solid var(--m3-outline-variant);
+  justify-content: space-around;
+  align-items: center;
+}
+
+.m3-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--m3-on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: var(--m3-radius-xl);
+}
+
+.m3-nav-item.active {
+  color: var(--m3-primary);
+  background-color: var(--m3-primary-container);
+}
+
+/* Responsive Media Queries */
+@media (max-width: 840px) {
+  .m3-side-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 200;
+    width: 280px;
+    transform: translateX(-100%);
+  }
+
+  .m3-side-sheet.open {
+    transform: translateX(0);
+    box-shadow: var(--m3-elevation-3);
+  }
+
+  .m3-bottom-nav {
+    display: flex;
+  }
+}
