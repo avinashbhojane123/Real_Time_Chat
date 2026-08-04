@@ -154,7 +154,7 @@ export class UploadController {
         type: 'instagram',
         mediaType: 'post_or_reel',
         shortcode,
-        embedUrl: `https://www.instagram.com/p/${shortcode}/embed`,
+        videoUrl: `https://www.instagram.com/p/${shortcode}/embed`,
         originalUrl: `https://www.instagram.com/reel/${shortcode}/`,
         canView: true,
         message: 'Instagram media stream view URL parsed successfully without downloading file.',
@@ -170,7 +170,7 @@ export class UploadController {
         mediaType: 'profile',
         username,
         profileUrl: `https://www.instagram.com/${username}/`,
-        embedUrl: `https://www.instagram.com/${username}/`,
+        videoUrl: `https://www.instagram.com/${username}/`,
         canView: true,
         message: 'Instagram profile viewer URL parsed successfully.',
       };
