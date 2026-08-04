@@ -2,8 +2,8 @@ import {
   Controller,
   Post,
   Get,
-  Body,
   Query,
+  Body,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -16,8 +16,6 @@ import { extname, join } from 'path';
 
 import * as fs from 'fs';
 import { readdirSync } from 'fs';
-
-import { IgshareService } from '../igshare/igshare.service';
 
 const uploadDir = join(
   process.cwd(),
@@ -32,8 +30,6 @@ if (!fs.existsSync(uploadDir)) {
 
 @Controller('upload')
 export class UploadController {
-  constructor(private readonly igshareService: IgshareService) {}
-
   @Get('files')
   files() {
     return {
@@ -131,16 +127,6 @@ export class UploadController {
       fileUrl,
     };
   }
-
-
-  @Get('instagram/view')
-  async viewInstagramGet(@Query('url') urlParam?: string) {
-    return this.igshareService.resolveMediaView(urlParam);
-  }
-
-  @Post('instagram/view')
-  async viewInstagramPost(@Body('url') urlBody?: string) {
-    return this.igshareService.resolveMediaView(urlBody);
-  }
 }
+
 
