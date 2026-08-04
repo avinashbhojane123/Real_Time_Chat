@@ -4,104 +4,89 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { cleanInstagramMessage } from '../utils/instagram';
 
-function InstagramVideoPlayer({ shortcode }) {
-  const [videoOnly, setVideoOnly] = useState(true);
-
+function IGShareReelCard({ shortcode }) {
   if (!shortcode) return null;
+
+  const igShareUrl = `https://igshare.me/reel/${shortcode}`;
+  const cleanInstaUrl = `https://www.instagram.com/reel/${shortcode}/`;
 
   return (
     <div
       style={{
         marginTop: '10px',
-        borderRadius: 'var(--m3-radius-l)',
+        borderRadius: 'var(--m3-radius-m)',
         overflow: 'hidden',
         border: '1px solid var(--m3-outline-variant)',
-        backgroundColor: '#000',
+        backgroundColor: 'var(--m3-surface-container-high)',
         maxWidth: '360px',
         width: '100%',
-        position: 'relative',
-        boxShadow: 'var(--m3-elevation-2)',
+        padding: '14px',
+        boxShadow: 'var(--m3-elevation-1)',
       }}
     >
-      {/* IGShare Player Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '8px 12px',
-          backgroundColor: 'rgba(33, 31, 38, 0.95)',
-          borderBottom: '1px solid var(--m3-outline-variant)',
-        }}
-      >
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--m3-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>play_circle</span>
-          IGShare In-Chat Reel Stream
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)', fontSize: '20px' }}>
+          verified
         </span>
-        <button
-          className="m3-btn m3-btn-outlined"
-          type="button"
+        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--m3-primary)' }}>
+          IGShare Clean Link
+        </span>
+        <span
           style={{
-            padding: '3px 8px',
-            fontSize: '0.65rem',
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            color: '#fff',
-            borderColor: 'rgba(255, 255, 255, 0.2)',
-            borderRadius: '10px',
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            setVideoOnly(!videoOnly);
+            fontSize: '0.7rem',
+            color: '#81c784',
+            backgroundColor: 'rgba(129, 199, 132, 0.15)',
+            padding: '2px 8px',
+            borderRadius: 'var(--m3-radius-full)',
+            marginLeft: 'auto',
+            fontWeight: 600,
           }}
         >
-          {videoOnly ? 'Full View' : 'Focus View'}
-        </button>
+          No Account Needed
+        </span>
       </div>
 
-      {/* Video Container */}
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: videoOnly ? '440px' : '540px',
-          overflow: 'hidden',
-          backgroundColor: '#000',
-        }}
-      >
-        {videoOnly ? (
-          <div
-            style={{
-              position: 'absolute',
-              top: '-58px',
-              left: 0,
-              width: '100%',
-              height: 'calc(100% + 195px)',
-              overflow: 'hidden',
+      <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '14px', lineHeight: 1.4 }}>
+        Share & watch Instagram Reel without revealing your profile or requiring an Instagram account.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <a
+          href={igShareUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="m3-btn m3-btn-filled"
+          style={{ width: '100%', textDecoration: 'none', padding: '10px 16px', fontSize: '0.85rem', justifyContent: 'center' }}
+        >
+          <span className="material-symbols-outlined">play_circle</span>
+          <span>Watch on IGShare (No Login)</span>
+        </a>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="m3-btn m3-btn-outlined"
+            style={{ flex: 1, padding: '6px 10px', fontSize: '0.75rem', justifyContent: 'center' }}
+            onClick={() => {
+              navigator.clipboard.writeText(igShareUrl);
+              alert('IGShare clean URL copied to clipboard:\n' + igShareUrl);
             }}
           >
-            <iframe
-              src={`https://www.instagram.com/reel/${shortcode}/embed/`}
-              width="100%"
-              height="100%"
-              allowFullScreen
-              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-              title="IGShare In-Chat Reel Preview"
-              style={{ border: 'none', display: 'block' }}
-            />
-          </div>
-        ) : (
-          <iframe
-            src={`https://www.instagram.com/reel/${shortcode}/embed/`}
-            width="100%"
-            height="100%"
-            allowFullScreen
-            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-            title="IGShare Full Embed Stream"
-            style={{ border: 'none', display: 'block' }}
-          />
-        )}
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>content_copy</span>
+            <span>Copy Clean URL</span>
+          </button>
+
+          <a
+            href={cleanInstaUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="m3-btn m3-btn-tonal"
+            style={{ padding: '6px 10px', fontSize: '0.75rem', textDecoration: 'none', justifyContent: 'center' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>open_in_new</span>
+            <span>Instagram</span>
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -751,8 +736,8 @@ export default function ChatRoom() {
                         </div>
                       )}
 
-                      {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
-                      {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} />}
+                      {/* IGShare Clean Reel Card (No Iframe Block / ERR_BLOCKED_BY_RESPONSE) */}
+                      {instaShortcode && <IGShareReelCard shortcode={instaShortcode} />}
                     </div>
                   </div>
                 );
