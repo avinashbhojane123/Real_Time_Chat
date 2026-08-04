@@ -1,8 +1,10 @@
-import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CallUserDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsString()
@@ -13,6 +15,7 @@ export class CallUserDto {
 export class AcceptCallDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsString()
@@ -23,6 +26,7 @@ export class AcceptCallDto {
 export class DeclineCallDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsString()
@@ -33,6 +37,7 @@ export class DeclineCallDto {
 export class WebrtcOfferDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsNotEmpty()
@@ -42,6 +47,7 @@ export class WebrtcOfferDto {
 export class WebrtcAnswerDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsNotEmpty()
@@ -51,6 +57,7 @@ export class WebrtcAnswerDto {
 export class WebrtcCandidateDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsNotEmpty()
@@ -60,5 +67,16 @@ export class WebrtcCandidateDto {
 export class EndCallDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
+}
+
+export class TogglePipDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  passcode!: string;
+
+  @IsBoolean()
+  isPip!: boolean;
 }

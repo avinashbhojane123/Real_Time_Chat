@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 
 import { Room } from '../rooms/room.entity';
@@ -34,6 +35,7 @@ export class Message {
   })
   room!: Room;
 
+  @Index()
   @Column()
   roomId!: number;
 
@@ -97,6 +99,7 @@ export class Message {
   })
   reactions!: Record<string, string[]> | null;
 
+  @Index()
   @Column({
     type: 'timestamptz',
     nullable: true,

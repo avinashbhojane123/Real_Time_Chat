@@ -11,17 +11,31 @@ export class RoomsService {
     private roomRepo: Repository<Room>,
   ) {}
 
-  async findOrCreate(passcode: string) {
+  async findOrCreate(passcode: string): Promise<Room> {
     let room = await this.roomRepo.findOne({
       where: { passcode },
     });
 
     if (!room) {
-      room = this.roomRepo.create({
-        passcode,
-      });
+      try {
+        room = this.roomRepo.create({
+          passcode,
+        });
 
-      await this.roomRepo.save(room);
+        await this.roomRepo.save(room);
+      } catch (err: any) {
+        if (err.code === '23505') {
+          room = await this.roomRepo.findOne({
+            where: { passcode },
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (!room) {
+      throw new Error(`Failed to create or find room with passcode ${passcode}`);
     }
 
     return room;

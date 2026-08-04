@@ -12,7 +12,7 @@ import { Server, Socket } from 'socket.io';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UsePipes, ValidationPipe, OnApplicationBootstrap } from '@nestjs/common';
+import { UsePipes, ValidationPipe, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 
 import { Room } from '../rooms/room.entity';
 import { Message } from '../messages/message.entity';
@@ -35,6 +35,7 @@ import {
   WebrtcAnswerDto,
   WebrtcCandidateDto,
   EndCallDto,
+  TogglePipDto,
 } from './dto/call-signal.dto';
 
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -44,7 +45,7 @@ import {
   },
 })
 export class ChatGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap
+  implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap, OnModuleDestroy
 {
   @WebSocketServer()
   server!: Server;
@@ -60,6 +61,9 @@ export class ChatGateway
     private readonly userRepo: Repository<User>,
   ) {}
 
+  private cleanupTimer?: NodeJS.Timeout;
+  private isCleaning = false;
+
   async onApplicationBootstrap() {
     console.log('Resetting all users online status to offline on startup...');
     await this.userRepo
@@ -68,38 +72,56 @@ export class ChatGateway
       .set({ isOnline: false })
       .execute();
 
-    // Start ephemeral message cleanup loop (runs every 5 seconds)
-    setInterval(async () => {
-      try {
-        const now = new Date();
-        const expiredMessages = await this.messageRepo
-          .createQueryBuilder('message')
-          .leftJoinAndSelect('message.room', 'room')
-          .where('message.expiresAt IS NOT NULL AND message.expiresAt <= :now', { now })
-          .getMany();
+    this.cleanupTimer = setInterval(() => this.cleanupExpiredMessages(), 5000);
+  }
 
-        if (expiredMessages.length > 0) {
-          const ids = expiredMessages.map(m => m.id);
-          const roomPasscodes = Array.from(new Set(expiredMessages.map(m => m.room.passcode)));
+  onModuleDestroy() {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
+  }
 
-          await this.messageRepo
-            .createQueryBuilder()
-            .delete()
-            .from(Message)
-            .where('id IN (:...ids)', { ids })
-            .execute();
+  private async cleanupExpiredMessages() {
+    if (this.isCleaning) return;
+    this.isCleaning = true;
+    try {
+      const now = new Date();
+      const expiredMessages = await this.messageRepo
+        .createQueryBuilder('message')
+        .innerJoinAndSelect('message.room', 'room')
+        .where('message.expiresAt IS NOT NULL AND message.expiresAt <= :now', { now })
+        .getMany();
 
-          console.log(`[Self-Destruct] Cleaned up ${ids.length} expired messages.`);
+      if (expiredMessages.length > 0) {
+        const ids = expiredMessages.map(m => m.id);
 
-          for (const passcode of roomPasscodes) {
-            const roomIds = expiredMessages.filter(m => m.room.passcode === passcode).map(m => m.id);
-            this.server.to(passcode).emit('messagesExpired', { ids: roomIds });
+        await this.messageRepo
+          .createQueryBuilder()
+          .delete()
+          .from(Message)
+          .where('id IN (:...ids)', { ids })
+          .execute();
+
+        console.log(`[Self-Destruct] Cleaned up ${ids.length} expired messages.`);
+
+        const roomGroups = new Map<string, number[]>();
+        for (const msg of expiredMessages) {
+          if (msg.room?.passcode) {
+            const list = roomGroups.get(msg.room.passcode) || [];
+            list.push(msg.id);
+            roomGroups.set(msg.room.passcode, list);
           }
         }
-      } catch (e) {
-        console.error('Error during self-destruct messages cleanup', e);
+
+        for (const [passcode, msgIds] of roomGroups.entries()) {
+          this.server.to(passcode).emit('messagesExpired', { ids: msgIds });
+        }
       }
-    }, 5000);
+    } catch (e) {
+      console.error('Error during self-destruct messages cleanup', e);
+    } finally {
+      this.isCleaning = false;
+    }
   }
 
   private users = new Map<
@@ -107,6 +129,7 @@ export class ChatGateway
     {
       nickname: string;
       passcode: string;
+      isPip?: boolean;
     }
   >();
 
@@ -120,6 +143,9 @@ export class ChatGateway
     if (!userInfo) return;
 
     this.users.delete(client.id);
+
+    // Yield microtask execution to handle fast socket reconnection
+    await Promise.resolve();
 
     // Check if there's another active socket connected for the same user
     const isStillConnected = Array.from(this.users.values()).some(
@@ -213,12 +239,26 @@ export class ChatGateway
     });
 
     if (!room) {
-      room = this.roomRepo.create({
-        passcode: data.passcode,
-        roomName: `Room-${data.passcode}`,
-      });
+      try {
+        room = this.roomRepo.create({
+          passcode: data.passcode,
+          roomName: `Room-${data.passcode}`,
+        });
 
-      room = await this.roomRepo.save(room);
+        room = await this.roomRepo.save(room);
+      } catch (err: any) {
+        if (err.code === '23505') {
+          room = await this.roomRepo.findOne({
+            where: { passcode: data.passcode },
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (!room) {
+      return { success: false, message: 'Could not create or find room' };
     }
 
     let user = await this.userRepo.findOne({
@@ -379,9 +419,15 @@ export class ChatGateway
 
   @SubscribeMessage('getMessages')
   async getMessages(
+    @ConnectedSocket() client: Socket,
     @MessageBody()
     data: GetRoomDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) {
+      return [];
+    }
+
     const room = await this.roomRepo.findOne({
       where: {
         passcode: data.passcode,
@@ -408,8 +454,11 @@ export class ChatGateway
     @MessageBody()
     data: TypingDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     client.to(data.passcode).emit('userTyping', {
-      nickname: data.nickname,
+      nickname: session.nickname,
     });
   }
 
@@ -419,18 +468,26 @@ export class ChatGateway
     @MessageBody()
     data: TypingDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     client.to(data.passcode).emit('userStoppedTyping', {
-      nickname: data.nickname,
+      nickname: session.nickname,
     });
   }
 
   @SubscribeMessage('getUsers')
   async getUsers(
+    @ConnectedSocket() client: Socket,
     @MessageBody()
     data: GetRoomDto,
-    @ConnectedSocket()
-    client: Socket,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) {
+      client.emit('usersList', []);
+      return;
+    }
+
     const room = await this.roomRepo.findOne({
       where: {
         passcode: data.passcode,
@@ -472,9 +529,12 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: CallUserDto,
   ) {
-    console.log(`[CallUser] ${data.callerName} is calling in room: ${data.passcode}`);
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    console.log(`[CallUser] ${session.nickname} is calling in room: ${data.passcode}`);
     client.to(data.passcode).emit('userCalling', {
-      callerName: data.callerName,
+      callerName: session.nickname,
     });
   }
 
@@ -483,9 +543,12 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: AcceptCallDto,
   ) {
-    console.log(`[AcceptCall] ${data.receiverName} accepted the call in room: ${data.passcode}`);
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    console.log(`[AcceptCall] ${session.nickname} accepted the call in room: ${data.passcode}`);
     client.to(data.passcode).emit('callAccepted', {
-      receiverName: data.receiverName,
+      receiverName: session.nickname,
     });
   }
 
@@ -494,9 +557,12 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: DeclineCallDto,
   ) {
-    console.log(`[DeclineCall] ${data.receiverName} declined the call in room: ${data.passcode}`);
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    console.log(`[DeclineCall] ${session.nickname} declined the call in room: ${data.passcode}`);
     client.to(data.passcode).emit('callDeclined', {
-      receiverName: data.receiverName,
+      receiverName: session.nickname,
     });
   }
 
@@ -505,6 +571,9 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WebrtcOfferDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     console.log(`[WebRTCOffer] Relaying WebRTC offer in room: ${data.passcode}`);
     client.to(data.passcode).emit('webrtcOfferRelay', {
       offer: data.offer,
@@ -516,6 +585,9 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WebrtcAnswerDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     console.log(`[WebRTCAnswer] Relaying WebRTC answer in room: ${data.passcode}`);
     client.to(data.passcode).emit('webrtcAnswerRelay', {
       answer: data.answer,
@@ -527,6 +599,9 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WebrtcCandidateDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     console.log(`[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${data.passcode}`);
     client.to(data.passcode).emit('webrtcCandidateRelay', {
       candidate: data.candidate,
@@ -538,8 +613,28 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: EndCallDto,
   ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
     console.log(`[EndCall] Relaying endCall in room: ${data.passcode}`);
     client.to(data.passcode).emit('callEnded');
+  }
+
+  @SubscribeMessage('togglePip')
+  togglePip(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: TogglePipDto,
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    session.isPip = data.isPip;
+
+    console.log(`[TogglePip] ${session.nickname} set PIP mode to ${data.isPip} in room: ${data.passcode}`);
+    client.to(data.passcode).emit('pipStateChanged', {
+      nickname: session.nickname,
+      isPip: data.isPip,
+    });
   }
 
   @SubscribeMessage('editMessage')
@@ -550,8 +645,13 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
+    const room = await this.roomRepo.findOne({
+      where: { passcode: session.passcode },
+    });
+    if (!room) return;
+
     const msg = await this.messageRepo.findOne({
-      where: { id: data.messageId },
+      where: { id: data.messageId, roomId: room.id },
     });
     if (!msg) return;
 
@@ -583,8 +683,13 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
+    const room = await this.roomRepo.findOne({
+      where: { passcode: session.passcode },
+    });
+    if (!room) return;
+
     const msg = await this.messageRepo.findOne({
-      where: { id: data.messageId },
+      where: { id: data.messageId, roomId: room.id },
     });
     if (!msg) return;
 
@@ -631,8 +736,13 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
+    const room = await this.roomRepo.findOne({
+      where: { passcode: session.passcode },
+    });
+    if (!room) return;
+
     const msg = await this.messageRepo.findOne({
-      where: { id: data.messageId },
+      where: { id: data.messageId, roomId: room.id },
     });
     if (!msg) return;
 

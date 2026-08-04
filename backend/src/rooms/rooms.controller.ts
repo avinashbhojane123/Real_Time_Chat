@@ -15,13 +15,14 @@ export class RoomsController {
   ) {
     const room =
       await this.roomService.findOrCreate(
-        body.passcode,
+        body.passcode.trim(),
       );
 
     return {
       success: true,
-      room,
-      nickname: body.nickname,
+      roomId: room.id,
+      passcode: room.passcode,
+      nickname: body.nickname.trim(),
     };
   }
 }

@@ -17,5 +17,5 @@ export default new DataSource({
 
   migrations: ['dist/migrations/*.js'],
 
-  synchronize: true,
+  synchronize: process.env.NODE_ENV !== 'production',
 });

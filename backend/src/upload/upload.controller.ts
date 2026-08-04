@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Body,
+  Query,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -31,16 +33,7 @@ export class UploadController {
   @Get('files')
   files() {
     return {
-      uploadDir,
       files: readdirSync(uploadDir),
-    };
-  }
-
-  @Post('test')
-  test() {
-    return {
-      success: true,
-      uploadDir,
     };
   }
 
@@ -117,13 +110,7 @@ export class UploadController {
       file.path,
     );
 
-    let fileUrl = `/uploads/${file.filename}`;
-    try {
-      const fileBuffer = fs.readFileSync(file.path);
-      fileUrl = `data:${file.mimetype || 'application/octet-stream'};base64,${fileBuffer.toString('base64')}`;
-    } catch (e) {
-      console.error('Base64 file conversion error:', e);
-    }
+    const fileUrl = `/uploads/${file.filename}`;
 
     return {
       success: true,
@@ -139,5 +126,55 @@ export class UploadController {
 
       fileUrl,
     };
+  }
+
+  @Get('instagram/view')
+  viewInstagramGet(@Query('url') urlParam?: string) {
+    return this.parseAndReturnInstagramView(urlParam);
+  }
+
+  @Post('instagram/view')
+  viewInstagramPost(@Body('url') urlBody?: string) {
+    return this.parseAndReturnInstagramView(urlBody);
+  }
+
+  private parseAndReturnInstagramView(url?: string) {
+    if (!url || typeof url !== 'string') {
+      throw new BadRequestException('Instagram URL parameter "url" is required.');
+    }
+
+    const trimmed = url.trim();
+
+    const mediaMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
+    if (mediaMatch && mediaMatch[1]) {
+      const shortcode = mediaMatch[1];
+      return {
+        success: true,
+        type: 'instagram',
+        mediaType: 'post_or_reel',
+        shortcode,
+        embedUrl: `https://www.instagram.com/p/${shortcode}/embed`,
+        originalUrl: `https://www.instagram.com/reel/${shortcode}/`,
+        canView: true,
+        message: 'Instagram media stream view URL parsed successfully without downloading file.',
+      };
+    }
+
+    const profileMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:@)?([a-zA-Z0-9._]+)/i);
+    if (profileMatch && profileMatch[1] && !['p', 'reel', 'reels', 'tv', 'explore', 'stories'].includes(profileMatch[1].toLowerCase())) {
+      const username = profileMatch[1].replace(/^@/, '');
+      return {
+        success: true,
+        type: 'instagram',
+        mediaType: 'profile',
+        username,
+        profileUrl: `https://www.instagram.com/${username}/`,
+        embedUrl: `https://www.instagram.com/${username}/`,
+        canView: true,
+        message: 'Instagram profile viewer URL parsed successfully.',
+      };
+    }
+
+    throw new BadRequestException('Invalid Instagram URL. Supported formats include Reels, Posts, IGTV, and Profile links.');
   }
 }

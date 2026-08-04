@@ -1,14 +1,17 @@
 import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class JoinRoomDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   nickname!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   passcode!: string;
 
   @IsString()
