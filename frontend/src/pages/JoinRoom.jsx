@@ -344,19 +344,6 @@ export default function JoinRoom() {
 
             <form onSubmit={handleSecretJoin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-primary)', marginBottom: '4px' }}>
-                  Backend Server API URL
-                </label>
-                <input
-                  type="text"
-                  className="m3-text-field"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
                   User Nickname
                 </label>

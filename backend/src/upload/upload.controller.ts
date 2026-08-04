@@ -128,6 +128,7 @@ export class UploadController {
     };
   }
 
+
   @Get('instagram/view')
   viewInstagramGet(@Query('url') urlParam?: string) {
     return this.parseAndReturnInstagramView(urlParam);
