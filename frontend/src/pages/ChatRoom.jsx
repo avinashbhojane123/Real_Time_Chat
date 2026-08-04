@@ -219,6 +219,68 @@ export default function ChatRoom() {
     };
   }, [baseUrl, nickname, passcode, avatarUrl, navigate, cleanUpCall, createPeerConnection]);
 
+  // 15-Second Inactivity & Tab Close Auto-Logout Setup
+  const inactivityTimerRef = useRef(null);
+
+  const performAutoLogout = useCallback(() => {
+    localStorage.clear();
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    cleanUpCall();
+    navigate('/');
+  }, [navigate, cleanUpCall]);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    inactivityTimerRef.current = setTimeout(() => {
+      alert('Logged out automatically due to 15 seconds of inactivity.');
+      performAutoLogout();
+    }, 15000);
+  }, [performAutoLogout]);
+
+  useEffect(() => {
+    const activityEvents = ['mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+
+    const handleUserActivity = () => {
+      resetInactivityTimer();
+    };
+
+    activityEvents.forEach((event) => {
+      window.addEventListener(event, handleUserActivity);
+    });
+
+    // Initial timer launch
+    resetInactivityTimer();
+
+    // Tab close / window exit cleanup
+    const handleBeforeUnload = () => {
+      performAutoLogout();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        performAutoLogout();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      activityEvents.forEach((event) => {
+        window.removeEventListener(event, handleUserActivity);
+      });
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [resetInactivityTimer, performAutoLogout]);
+
   // Video refs
   const localVideoCallback = useCallback((el) => {
     if (el && localStream) el.srcObject = localStream;
