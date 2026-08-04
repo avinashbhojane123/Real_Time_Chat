@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoomsModule } from './rooms/rooms.module';
 import { ChatModule } from './chat/chat.module';
 import { UploadModule } from './upload/upload.module';
+import { IgshareModule } from './igshare/igshare.module';
 
 @Module({
   imports: [
@@ -40,6 +41,8 @@ synchronize: true,
     RoomsModule,
     ChatModule,
     UploadModule,
+    IgshareModule,
   ],
 })
 export class AppModule {}
+

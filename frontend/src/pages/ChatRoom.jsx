@@ -4,89 +4,249 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { cleanInstagramMessage } from '../utils/instagram';
 
-function IGShareReelCard({ shortcode }) {
+function InstagramVideoPlayer({ shortcode, baseUrl, onOpenIgshareModal }) {
+  const [viewMode, setViewMode] = useState('native'); // 'native' | 'embed'
+  const [meta, setMeta] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [showFixHelp, setShowFixHelp] = useState(false);
+
+  useEffect(() => {
+    if (!shortcode) return;
+    let isMounted = true;
+    const fetchMeta = async () => {
+      try {
+        const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+        const res = await axios.get(`${cleanApiUrl}/igshare/view`, {
+          params: { url: `https://www.instagram.com/reel/${shortcode}/` },
+        });
+        if (isMounted && res.data) {
+          setMeta(res.data);
+        }
+      } catch (err) {
+        console.log('Failed to fetch IGShare metadata', err);
+      }
+    };
+    fetchMeta();
+    return () => {
+      isMounted = false;
+    };
+  }, [shortcode, baseUrl]);
+
   if (!shortcode) return null;
 
-  const igShareUrl = `https://igshare.me/reel/${shortcode}`;
-  const cleanInstaUrl = `https://www.instagram.com/reel/${shortcode}/`;
+  const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+  const proxyUrl = meta?.proxyVideoUrl
+    ? (meta.proxyVideoUrl.startsWith('http') ? meta.proxyVideoUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyVideoUrl}`)
+    : null;
+  const cleanUrl = `https://www.instagram.com/reel/${shortcode}/`;
+
+  const handleCopyCleanUrl = (e) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(cleanUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleWatchIgshare = (e) => {
+    if (e) e.stopPropagation();
+    if (proxyUrl) {
+      setViewMode('native');
+    }
+    if (onOpenIgshareModal) {
+      onOpenIgshareModal(cleanUrl);
+    }
+  };
 
   return (
     <div
       style={{
         marginTop: '10px',
-        borderRadius: 'var(--m3-radius-m)',
+        borderRadius: '16px',
         overflow: 'hidden',
         border: '1px solid var(--m3-outline-variant)',
-        backgroundColor: 'var(--m3-surface-container-high)',
-        maxWidth: '360px',
+        backgroundColor: '#0a0a0c',
+        maxWidth: '400px',
         width: '100%',
-        padding: '14px',
-        boxShadow: 'var(--m3-elevation-1)',
+        position: 'relative',
+        boxShadow: 'var(--m3-elevation-2)',
+        transition: 'all 0.3s ease',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)', fontSize: '20px' }}>
-          verified
-        </span>
-        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--m3-primary)' }}>
-          IGShare Clean Link
-        </span>
-        <span
+      {/* Header bar */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 12px',
+          backgroundColor: 'rgba(18, 18, 22, 0.95)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#e2e2e6', fontWeight: 600 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#e1306c' }}>movie</span>
+          <span>{meta?.author?.username ? `@${meta.author.username}` : 'Instagram Reel'}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            className="m3-btn m3-btn-outlined"
+            type="button"
+            style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '10px', color: copied ? '#81c784' : '#fff', borderColor: copied ? '#81c784' : 'rgba(255,255,255,0.2)' }}
+            onClick={handleCopyCleanUrl}
+            title="Copy Clean URL without tracking tags (?igsh=...)"
+          >
+            {copied ? '✓ Clean URL Copied' : 'Copy Clean URL'}
+          </button>
+
+          {proxyUrl && (
+            <button
+              className={`m3-btn ${viewMode === 'native' ? 'm3-btn-filled' : 'm3-btn-outlined'}`}
+              type="button"
+              style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '10px' }}
+              onClick={() => setViewMode('native')}
+              title="Watch on IGShare (No Login)"
+            >
+              IGShare Player
+            </button>
+          )}
+          <button
+            className={`m3-btn ${viewMode === 'embed' || !proxyUrl ? 'm3-btn-filled' : 'm3-btn-outlined'}`}
+            type="button"
+            style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '10px' }}
+            onClick={() => setViewMode('embed')}
+            title="Official Instagram Embed"
+          >
+            Embed
+          </button>
+        </div>
+      </div>
+
+      {/* Main Stream Content */}
+      {viewMode === 'native' && proxyUrl ? (
+        <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
+          <video
+            src={proxyUrl}
+            controls
+            loop
+            playsInline
+            poster={meta?.thumbnailUrl}
+            style={{ width: '100%', maxHeight: '480px', display: 'block', objectFit: 'contain' }}
+          />
+        </div>
+      ) : (
+        <div style={{ position: 'relative', height: '460px', width: '100%' }}>
+          <iframe
+            src={`https://www.instagram.com/reel/${shortcode}/embed/`}
+            width="100%"
+            height="100%"
+            allowFullScreen
+            allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+            title="Instagram Video Stream"
+            style={{ border: 'none', display: 'block' }}
+          />
+        </div>
+      )}
+
+      {/* Quick Fixes Banner / Warning Callout Toggle */}
+      <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)', borderTop: '1px solid rgba(255, 255, 255, 0.08)', padding: '8px 12px' }}>
+        <button
+          type="button"
+          onClick={() => setShowFixHelp(!showFixHelp)}
           style={{
-            fontSize: '0.7rem',
-            color: '#81c784',
-            backgroundColor: 'rgba(129, 199, 132, 0.15)',
-            padding: '2px 8px',
-            borderRadius: 'var(--m3-radius-full)',
-            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            color: 'var(--m3-primary, #a8c7fa)',
+            fontSize: '0.73rem',
+            cursor: 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
             fontWeight: 600,
           }}
         >
-          No Account Needed
-        </span>
+          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>info</span>
+          <span>{showFixHelp ? 'Hide Quick Fixes' : 'Video unable to preview? Quick Fixes'}</span>
+        </button>
+
+        {showFixHelp && (
+          <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#c7c5d0', lineHeight: '1.4' }}>
+            <p style={{ margin: '0 0 8px 0', opacity: 0.9 }}>
+              <strong>Why this happens:</strong> Instagram frequently restricts external web previews for links that include recipient tracking tags (<code>igsh=...</code>) or when requested through third-party web clients.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <button
+                type="button"
+                className="m3-btn m3-btn-filled"
+                style={{ padding: '4px 10px', fontSize: '0.7rem', justifyContent: 'flex-start' }}
+                onClick={handleWatchIgshare}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>play_circle</span>
+                <span>Watch on IGShare (No Login)</span>
+              </button>
+
+              <button
+                type="button"
+                className="m3-btn m3-btn-tonal"
+                style={{ padding: '4px 10px', fontSize: '0.7rem', justifyContent: 'flex-start' }}
+                onClick={handleCopyCleanUrl}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>content_copy</span>
+                <span>{copied ? '✓ Clean URL Copied!' : 'Copy Clean URL (Strips ?igsh=...)'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '14px', lineHeight: 1.4 }}>
-        Share & watch Instagram Reel without revealing your profile or requiring an Instagram account.
-      </p>
+      {/* Caption & Metadata Footer with Open in Instagram Button on Bottom Right */}
+      <div
+        style={{
+          padding: '10px 12px',
+          backgroundColor: 'rgba(20,20,26,0.95)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: '12px',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {meta?.caption && (
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#c7c5d0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              {meta.caption}
+            </p>
+          )}
+          {!meta?.caption && (
+            <span style={{ fontSize: '0.72rem', color: 'var(--m3-on-surface-variant)' }}>Instagram Reel ({shortcode})</span>
+          )}
+        </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Bottom Right Instagram Action Button */}
         <a
-          href={igShareUrl}
+          href={cleanUrl}
           target="_blank"
           rel="noreferrer"
-          className="m3-btn m3-btn-filled"
-          style={{ width: '100%', textDecoration: 'none', padding: '10px 16px', fontSize: '0.85rem', justifyContent: 'center' }}
+          className="m3-btn m3-btn-tonal"
+          style={{
+            padding: '4px 10px',
+            fontSize: '0.7rem',
+            flexShrink: 0,
+            borderRadius: '12px',
+            backgroundColor: '#e1306c',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            textDecoration: 'none',
+          }}
+          title="Open directly in official Instagram app or browser"
         >
-          <span className="material-symbols-outlined">play_circle</span>
-          <span>Watch on IGShare (No Login)</span>
+          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
+          <span>Open in Instagram</span>
         </a>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            className="m3-btn m3-btn-outlined"
-            style={{ flex: 1, padding: '6px 10px', fontSize: '0.75rem', justifyContent: 'center' }}
-            onClick={() => {
-              navigator.clipboard.writeText(igShareUrl);
-              alert('IGShare clean URL copied to clipboard:\n' + igShareUrl);
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>content_copy</span>
-            <span>Copy Clean URL</span>
-          </button>
-
-          <a
-            href={cleanInstaUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="m3-btn m3-btn-tonal"
-            style={{ padding: '6px 10px', fontSize: '0.75rem', textDecoration: 'none', justifyContent: 'center' }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>open_in_new</span>
-            <span>Instagram</span>
-          </a>
-        </div>
       </div>
     </div>
   );
@@ -119,6 +279,10 @@ export default function ChatRoom() {
   const [instaResult, setInstaResult] = useState(null);
   const [instaLoading, setInstaLoading] = useState(false);
   const [instaError, setInstaError] = useState('');
+  const [showIgshareModal, setShowIgshareModal] = useState(false);
+  const [modalCopied, setModalCopied] = useState(false);
+
+
 
   // Call States
   const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
@@ -529,10 +693,10 @@ export default function ChatRoom() {
     }
   };
 
-  // Instagram & IGShare Shortcode Matcher
+  // Instagram Shortcode Matcher
   const getInstagramEmbed = (text) => {
     if (!text) return null;
-    const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am|igshare\.me)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
+    const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
     return match ? match[1] : null;
   };
 
@@ -559,6 +723,14 @@ export default function ChatRoom() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            className={`m3-btn ${showIgshareModal ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
+            onClick={() => setShowIgshareModal((prev) => !prev)}
+            title="Open IGShare Account-Free Instagram Viewer"
+          >
+            <span className="material-symbols-outlined" style={{ color: '#e1306c' }}>share</span>
+            <span className="m3-btn-label">IGShare</span>
+          </button>
           <button
             className={`m3-btn ${showVideoPanel || callState !== 'idle' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
             onClick={() => setShowVideoPanel((prev) => !prev)}
@@ -736,8 +908,8 @@ export default function ChatRoom() {
                         </div>
                       )}
 
-                      {/* IGShare Clean Reel Card (No Iframe Block / ERR_BLOCKED_BY_RESPONSE) */}
-                      {instaShortcode && <IGShareReelCard shortcode={instaShortcode} />}
+                      {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
+                      {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} baseUrl={baseUrl} />}
                     </div>
                   </div>
                 );
@@ -951,6 +1123,206 @@ export default function ChatRoom() {
           )}
         </main>
       </div>
+
+      {/* IGShare Account-Free Instagram Media Viewer Modal */}
+      {showIgshareModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setShowIgshareModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--m3-surface-container-high, #1e1e24)',
+              borderRadius: '24px',
+              border: '1px solid var(--m3-outline-variant, #333)',
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '28px', color: '#e1306c' }}>share</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>IGShare Viewer</h3>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)' }}>
+                    View & share Instagram Reels, Posts & Videos without an account
+                  </p>
+                </div>
+              </div>
+              <button
+                className="m3-btn m3-btn-icon m3-btn-outlined"
+                onClick={() => setShowIgshareModal(false)}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleViewInstagram} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <input
+                type="text"
+                className="m3-text-field"
+                style={{ flex: 1, borderRadius: '12px' }}
+                placeholder="Paste Instagram Reel, Post, Video or Profile link..."
+                value={instaInputUrl}
+                onChange={(e) => setInstaInputUrl(e.target.value)}
+              />
+              <button type="submit" className="m3-btn m3-btn-filled" disabled={instaLoading}>
+                {instaLoading ? 'Resolving...' : 'View Media'}
+              </button>
+            </form>
+
+            {instaError && (
+              <div style={{ padding: '12px', borderRadius: '12px', backgroundColor: 'rgba(239, 83, 80, 0.15)', color: '#ef5350', fontSize: '0.85rem', marginBottom: '16px' }}>
+                {instaError}
+              </div>
+            )}
+
+            {instaResult && (
+              <div style={{ borderRadius: '16px', backgroundColor: 'var(--m3-surface-container-lowest, #121216)', padding: '16px', border: '1px solid var(--m3-outline-variant)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: '#e1306c', letterSpacing: '0.5px' }}>
+                    {instaResult.mediaType}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#81c784', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>check_circle</span> No Account Required
+                  </span>
+                </div>
+
+                {instaResult.proxyVideoUrl ? (
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', backgroundColor: '#000', marginBottom: '12px' }}>
+                    <video
+                      src={instaResult.proxyVideoUrl.startsWith('http') ? instaResult.proxyVideoUrl : `${baseUrl.replace(/\/api\/?$/, '')}${instaResult.proxyVideoUrl}`}
+                      controls
+                      autoPlay
+                      loop
+                      playsInline
+                      poster={instaResult.thumbnailUrl}
+                      style={{ width: '100%', maxHeight: '360px', display: 'block', objectFit: 'contain' }}
+                    />
+                  </div>
+                ) : instaResult.shortcode ? (
+                  <div style={{ height: '380px', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px' }}>
+                    <iframe
+                      src={`https://www.instagram.com/reel/${instaResult.shortcode}/embed/`}
+                      width="100%"
+                      height="100%"
+                      style={{ border: 'none' }}
+                      title="Instagram Embed Preview"
+                    />
+                  </div>
+                ) : null}
+
+                {/* Quick Fixes & Help Explanation Callout */}
+                <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: '12px', padding: '12px', marginBottom: '16px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#c7c5d0', lineHeight: '1.4' }}>
+                    <strong>Why this happens:</strong> Instagram frequently restricts external web previews for links that include recipient tracking tags (<code>igsh=...</code>) or when requested through third-party web clients. Clicking the IGShare player button or opening directly in the Instagram app bypasses the embedded web frame block.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="m3-btn m3-btn-outlined"
+                      style={{ padding: '4px 10px', fontSize: '0.72rem', color: modalCopied ? '#81c784' : '#fff', borderColor: modalCopied ? '#81c784' : 'rgba(255,255,255,0.2)' }}
+                      onClick={() => {
+                        const targetUrl = instaResult.shortcode
+                          ? `https://www.instagram.com/reel/${instaResult.shortcode}/`
+                          : (instaResult.originalUrl || instaInputUrl).split('?')[0];
+                        navigator.clipboard.writeText(targetUrl);
+                        setModalCopied(true);
+                        setTimeout(() => setModalCopied(false), 2000);
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>content_copy</span>
+                      {modalCopied ? '✓ Clean URL Copied' : 'Copy Clean URL (Strips ?igsh=...)'}
+                    </button>
+                  </div>
+                </div>
+
+                {instaResult.caption && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--m3-on-surface)', marginBottom: '16px', whiteSpace: 'pre-wrap' }}>
+                    {instaResult.caption}
+                  </p>
+                )}
+
+                {/* Action Buttons Row with Open in Instagram on Bottom Right */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      className="m3-btn m3-btn-filled"
+                      onClick={() => {
+                        const linkToShare = instaResult.shortcode
+                          ? `https://www.instagram.com/reel/${instaResult.shortcode}/`
+                          : (instaResult.originalUrl || instaInputUrl);
+                        socketRef.current?.emit('sendMessage', {
+                          passcode,
+                          nickname,
+                          message: linkToShare,
+                        });
+                        setShowIgshareModal(false);
+                      }}
+                    >
+                      <span className="material-symbols-outlined">send</span> Send to Space Chat
+                    </button>
+
+                    {instaResult.proxyVideoUrl && (
+                      <a
+                        href={instaResult.proxyVideoUrl.startsWith('http') ? instaResult.proxyVideoUrl : `${baseUrl.replace(/\/api\/?$/, '')}${instaResult.proxyVideoUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="m3-btn m3-btn-outlined"
+                        download={`instagram_${instaResult.shortcode || 'media'}.mp4`}
+                      >
+                        <span className="material-symbols-outlined">download</span> Download Video
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Bottom Right Instagram Launch Button */}
+                  <a
+                    href={instaResult.shortcode ? `https://www.instagram.com/reel/${instaResult.shortcode}/` : (instaResult.originalUrl || instaInputUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="m3-btn m3-btn-tonal"
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      borderRadius: '12px',
+                      backgroundColor: '#e1306c',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      textDecoration: 'none',
+                    }}
+                    title="Open directly in official Instagram app or browser"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
+                    <span>Open in Instagram</span>
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

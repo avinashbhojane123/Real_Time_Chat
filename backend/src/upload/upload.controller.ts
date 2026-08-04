@@ -17,6 +17,8 @@ import { extname, join } from 'path';
 import * as fs from 'fs';
 import { readdirSync } from 'fs';
 
+import { IgshareService } from '../igshare/igshare.service';
+
 const uploadDir = join(
   process.cwd(),
   'uploads',
@@ -30,6 +32,8 @@ if (!fs.existsSync(uploadDir)) {
 
 @Controller('upload')
 export class UploadController {
+  constructor(private readonly igshareService: IgshareService) {}
+
   @Get('files')
   files() {
     return {
@@ -130,53 +134,13 @@ export class UploadController {
 
 
   @Get('instagram/view')
-  viewInstagramGet(@Query('url') urlParam?: string) {
-    return this.parseAndReturnInstagramView(urlParam);
+  async viewInstagramGet(@Query('url') urlParam?: string) {
+    return this.igshareService.resolveMediaView(urlParam);
   }
 
   @Post('instagram/view')
-  viewInstagramPost(@Body('url') urlBody?: string) {
-    return this.parseAndReturnInstagramView(urlBody);
-  }
-
-  private parseAndReturnInstagramView(url?: string) {
-    if (!url || typeof url !== 'string') {
-      throw new BadRequestException('Instagram URL parameter "url" is required.');
-    }
-
-    const trimmed = url.trim();
-
-    // Direct match or search within pasted snippet
-    const mediaMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
-    if (mediaMatch && mediaMatch[1]) {
-      const shortcode = mediaMatch[1];
-      return {
-        success: true,
-        type: 'instagram',
-        mediaType: 'post_or_reel',
-        shortcode,
-        videoUrl: `https://www.instagram.com/p/${shortcode}/embed`,
-        originalUrl: `https://www.instagram.com/reel/${shortcode}/`,
-        canView: true,
-        message: 'Instagram media stream view URL parsed successfully without downloading file.',
-      };
-    }
-
-    const profileMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:@)?([a-zA-Z0-9._]+)/i);
-    if (profileMatch && profileMatch[1] && !['p', 'reel', 'reels', 'tv', 'explore', 'stories'].includes(profileMatch[1].toLowerCase())) {
-      const username = profileMatch[1].replace(/^@/, '');
-      return {
-        success: true,
-        type: 'instagram',
-        mediaType: 'profile',
-        username,
-        profileUrl: `https://www.instagram.com/${username}/`,
-        videoUrl: `https://www.instagram.com/${username}/`,
-        canView: true,
-        message: 'Instagram profile viewer URL parsed successfully.',
-      };
-    }
-
-    throw new BadRequestException('Invalid Instagram URL. Supported formats include Reels, Posts, IGTV, and Profile links.');
+  async viewInstagramPost(@Body('url') urlBody?: string) {
+    return this.igshareService.resolveMediaView(urlBody);
   }
 }
+
