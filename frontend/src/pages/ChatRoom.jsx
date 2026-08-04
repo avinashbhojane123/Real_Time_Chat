@@ -25,26 +25,6 @@ function InstagramVideoPlayer({ shortcode }) {
         transition: 'all 0.3s ease',
       }}
     >
-      {/* Transparent Click Shield - Blocks all click/touch navigation to Instagram */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          zIndex: 5,
-          cursor: 'default',
-        }}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onTouchStart={(e) => {
-          e.stopPropagation();
-        }}
-      />
-
       <div
         style={{
           position: 'absolute',
@@ -86,26 +66,26 @@ function InstagramVideoPlayer({ shortcode }) {
           }}
         >
           <iframe
-            src={`https://www.instagram.com/p/${shortcode}/embed/`}
+            src={`https://www.instagram.com/reel/${shortcode}/embed/`}
             width="100%"
             height="100%"
             allowFullScreen
             allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-            sandbox="allow-scripts allow-same-origin allow-forms"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
             title="Instagram Video Stream"
-            style={{ border: 'none', display: 'block', pointerEvents: 'none' }}
+            style={{ border: 'none', display: 'block' }}
           />
         </div>
       ) : (
         <iframe
-          src={`https://www.instagram.com/p/${shortcode}/embed/`}
+          src={`https://www.instagram.com/reel/${shortcode}/embed/`}
           width="100%"
           height="100%"
           allowFullScreen
           allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-          sandbox="allow-scripts allow-same-origin allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
           title="Instagram Full Embed Stream"
-          style={{ border: 'none', display: 'block', pointerEvents: 'none' }}
+          style={{ border: 'none', display: 'block' }}
         />
       )}
     </div>
