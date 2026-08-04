@@ -192,6 +192,11 @@ export default function ChatRoom() {
       }
     });
 
+    socket.on('exception', (err) => {
+      console.error('Socket validation error:', err);
+      if (err?.message) alert('Socket error: ' + err.message);
+    });
+
     return () => {
       socket.disconnect();
       cleanUpCall();
@@ -298,7 +303,7 @@ export default function ChatRoom() {
   const sendMessage = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    socketRef.current?.emit('sendMessage', { passcode, message: inputText });
+    socketRef.current?.emit('sendMessage', { passcode, nickname, message: inputText });
     setInputText('');
   };
 
@@ -313,6 +318,7 @@ export default function ChatRoom() {
       if (res.data && res.data.fileUrl) {
         socketRef.current?.emit('sendMessage', {
           passcode,
+          nickname,
           message: `[File Attachment] ${res.data.fileName || file.name}`,
           fileUrl: res.data.fileUrl,
         });

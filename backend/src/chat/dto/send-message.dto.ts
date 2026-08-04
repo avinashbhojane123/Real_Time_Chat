@@ -9,10 +9,10 @@ export class SendMessageDto {
   passcode!: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(50)
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
-  nickname!: string;
+  nickname?: string;
 
   @IsString()
   @IsOptional()

@@ -36,6 +36,6 @@ export class JoinRoomDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(255)
+  @MaxLength(2000)
   avatarUrl?: string;
 }
