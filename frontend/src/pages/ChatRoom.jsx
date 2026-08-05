@@ -159,6 +159,35 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
   );
 }
 
+function formatLastSeen(lastSeenDate) {
+  if (!lastSeenDate) return 'Offline';
+  const date = new Date(lastSeenDate);
+  if (isNaN(date.getTime())) return 'Offline';
+
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffSec < 60) {
+    return 'Last seen just now';
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return `Last seen ${diffMin}m ago`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) {
+    return `Last seen ${diffHours}h ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) {
+    return `Last seen yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  if (diffDays < 7) {
+    return `Last seen ${diffDays}d ago`;
+  }
+  return `Last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+}
+
 export default function ChatRoom() {
   const navigate = useNavigate();
 
@@ -181,11 +210,54 @@ export default function ChatRoom() {
   const [dragTranslateX, setDragTranslateX] = useState(0);
   const touchStartXRef = useRef(0);
 
+  // Message Edit State
+  const [editingMsgId, setEditingMsgId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+
+  // Clear Confirmation Modal State
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   // Instagram Viewer State
   const [instaInputUrl, setInstaInputUrl] = useState('');
   const [instaResult, setInstaResult] = useState(null);
   const [instaLoading, setInstaLoading] = useState(false);
   const [instaError, setInstaError] = useState('');
+
+  const startEditing = (msg) => {
+    setEditingMsgId(msg.id);
+    setEditingText(msg.message || '');
+  };
+
+  const cancelEditing = () => {
+    setEditingMsgId(null);
+    setEditingText('');
+  };
+
+  const handleSaveEdit = (msgId, e) => {
+    if (e) e.preventDefault();
+    if (!editingText.trim()) return;
+    socketRef.current?.emit('editMessage', {
+      passcode,
+      messageId: msgId,
+      newMessage: editingText.trim(),
+    });
+    setEditingMsgId(null);
+    setEditingText('');
+  };
+
+  const handleDeleteMessage = (msgId) => {
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      socketRef.current?.emit('deleteMessage', {
+        passcode,
+        messageId: msgId,
+      });
+    }
+  };
+
+  const handleClearHistory = () => {
+    socketRef.current?.emit('clearHistory', { passcode });
+    setShowClearConfirm(false);
+  };
 
 
 
@@ -366,6 +438,63 @@ export default function ChatRoom() {
       if (n !== nickname) {
         setRemoteIsPip(isPip);
       }
+    });
+
+    socket.on('messageEdited', ({ messageId, newMessage, fileUrl }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                message: newMessage ?? msg.message,
+                fileUrl: fileUrl !== undefined ? fileUrl : msg.fileUrl,
+                isEdited: true,
+              }
+            : msg
+        )
+      );
+    });
+
+    socket.on('messageDeleted', ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                isDeleted: true,
+                message: 'This message was deleted',
+                fileUrl: null,
+                fileName: null,
+                fileType: null,
+                fileSize: null,
+              }
+            : msg
+        )
+      );
+    });
+
+    socket.on('historyCleared', () => {
+      setMessages([]);
+    });
+
+    socket.on('userOffline', ({ nickname: offlineNick, lastSeen }) => {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.nickname === offlineNick
+            ? { ...u, isOnline: false, lastSeen: lastSeen || new Date() }
+            : u
+        )
+      );
+    });
+
+    socket.on('userOnline', ({ nickname: onlineNick }) => {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.nickname === onlineNick
+            ? { ...u, isOnline: true, lastSeen: null }
+            : u
+        )
+      );
     });
 
     socket.on('exception', (err) => {
@@ -630,6 +759,14 @@ export default function ChatRoom() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
+            className="m3-btn m3-btn-tonal"
+            onClick={() => setShowClearConfirm(true)}
+            title="Clear All Messages in Space"
+          >
+            <span className="material-symbols-outlined" style={{ color: 'var(--m3-error)' }}>delete_sweep</span>
+            <span className="m3-btn-label" style={{ color: 'var(--m3-error)' }}>Clear Chat</span>
+          </button>
+          <button
             className={`m3-btn ${showVideoPanel || callState !== 'idle' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
             onClick={() => setShowVideoPanel((prev) => !prev)}
             title="Toggle Side-by-Side Video Call Panel"
@@ -692,7 +829,7 @@ export default function ChatRoom() {
                     {u.nickname} {u.nickname === nickname ? '(You)' : ''}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: u.isOnline ? '#81c784' : 'var(--m3-outline)' }}>
-                    {u.isOnline ? 'Active Now' : 'Offline'}
+                    {u.isOnline ? 'Active Now' : formatLastSeen(u.lastSeen)}
                   </div>
                 </div>
               </div>
@@ -756,8 +893,43 @@ export default function ChatRoom() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', marginBottom: '2px', paddingLeft: '4px' }}>
-                      {m.nickname}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px', paddingLeft: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)' }}>
+                        {m.nickname}
+                      </span>
+
+                      {!m.isDeleted && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <button
+                            type="button"
+                            className="m3-action-btn"
+                            onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, message: m.message })}
+                            title="Reply"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>reply</span>
+                          </button>
+                          {isSelf && m.id && (
+                            <>
+                              <button
+                                type="button"
+                                className="m3-action-btn"
+                                onClick={() => startEditing(m)}
+                                title="Edit message"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="m3-action-btn m3-action-btn-danger"
+                                onClick={() => handleDeleteMessage(m.id)}
+                                title="Delete message"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>delete</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div
@@ -769,45 +941,89 @@ export default function ChatRoom() {
                         boxShadow: 'var(--m3-elevation-1)',
                       }}
                     >
-                      {/* Quoted Reply Card */}
-                      {m.replyTo && (
-                        <div
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: 'var(--m3-radius-s)',
-                            backgroundColor: 'rgba(0,0,0,0.25)',
-                            borderLeft: '4px solid var(--m3-primary)',
-                            marginBottom: '8px',
-                            fontSize: '0.8rem',
-                          }}
-                        >
-                          <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
-                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
-                            {cleanInstagramMessage(m.replyTo.message)}
+                      {m.isDeleted ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', opacity: 0.8 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>block</span>
+                          <span>This message was deleted</span>
+                        </div>
+                      ) : editingMsgId === m.id ? (
+                        <form onSubmit={(e) => handleSaveEdit(m.id, e)} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <input
+                            type="text"
+                            className="m3-text-field"
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            autoFocus
+                            style={{ fontSize: '0.875rem', padding: '6px 10px', borderRadius: 'var(--m3-radius-s)', color: '#fff', backgroundColor: 'rgba(0,0,0,0.3)' }}
+                          />
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="m3-btn m3-btn-tonal"
+                              style={{ padding: '2px 10px', fontSize: '0.72rem' }}
+                              onClick={cancelEditing}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="m3-btn m3-btn-filled"
+                              style={{ padding: '2px 10px', fontSize: '0.72rem' }}
+                            >
+                              Save
+                            </button>
                           </div>
-                        </div>
+                        </form>
+                      ) : (
+                        <>
+                          {/* Quoted Reply Card */}
+                          {m.replyTo && (
+                            <div
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: 'var(--m3-radius-s)',
+                                backgroundColor: 'rgba(0,0,0,0.25)',
+                                borderLeft: '4px solid var(--m3-primary)',
+                                marginBottom: '8px',
+                                fontSize: '0.8rem',
+                              }}
+                            >
+                              <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
+                                {cleanInstagramMessage(m.replyTo.message)}
+                              </div>
+                            </div>
+                          )}
+
+                          <p style={{ margin: 0, wordBreak: 'break-word' }}>
+                            {cleanInstagramMessage(m.message)}
+                            {m.isEdited && (
+                              <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
+                                (edited)
+                              </span>
+                            )}
+                          </p>
+
+                          {/* File Attachment Preview */}
+                          {m.fileUrl && (
+                            <div style={{ marginTop: '8px' }}>
+                              <a
+                                href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="m3-btn m3-btn-outlined"
+                                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                              >
+                                <span className="material-symbols-outlined">attachment</span>
+                                Attachment
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
+                          {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} baseUrl={baseUrl} />}
+                        </>
                       )}
-
-                      <p style={{ margin: 0, wordBreak: 'break-word' }}>{cleanInstagramMessage(m.message)}</p>
-
-                      {/* File Attachment Preview */}
-                      {m.fileUrl && (
-                        <div style={{ marginTop: '8px' }}>
-                          <a
-                            href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="m3-btn m3-btn-outlined"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                          >
-                            <span className="material-symbols-outlined">attachment</span>
-                            Attachment
-                          </a>
-                        </div>
-                      )}
-
-                      {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
-                      {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} baseUrl={baseUrl} />}
                     </div>
                   </div>
                 );
@@ -1021,6 +1237,61 @@ export default function ChatRoom() {
           )}
         </main>
       </div>
+
+      {/* Clear Chat Confirmation Modal */}
+      {showClearConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            className="m3-card"
+            style={{
+              maxWidth: '420px',
+              width: '90%',
+              backgroundColor: 'var(--m3-surface-container-high)',
+              borderRadius: 'var(--m3-radius-l)',
+              padding: '24px',
+              boxShadow: 'var(--m3-elevation-3)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '32px', color: 'var(--m3-error)' }}>delete_sweep</span>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>Clear All Messages?</h3>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px', lineHeight: 1.5 }}>
+              Are you sure you want to clear all messages in Space #{passcode} for everyone? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="m3-btn m3-btn-tonal"
+                onClick={() => setShowClearConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="m3-btn m3-btn-danger"
+                onClick={handleClearHistory}
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
