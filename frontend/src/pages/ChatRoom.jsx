@@ -3,6 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { cleanInstagramMessage } from '../utils/instagram';
+import YouTubePreview, { parseYouTubeUrl } from '../components/YouTubePreview';
+import StatusViewerModal from '../components/StatusViewerModal';
+import StatusCreatorModal from '../components/StatusCreatorModal';
+
+function formatMessageTime(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateHeader(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (msgDate.getTime() === today.getTime()) {
+    return 'Today';
+  } else if (msgDate.getTime() === yesterday.getTime()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+}
 
 function InstagramVideoPlayer({ shortcode, baseUrl }) {
   const [meta, setMeta] = useState(null);
@@ -216,6 +245,50 @@ export default function ChatRoom() {
 
   // Clear Confirmation Modal State
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Status Feature State
+  const [statuses, setStatuses] = useState([]);
+  const [showStatusCreator, setShowStatusCreator] = useState(false);
+  const [activeStatusUser, setActiveStatusUser] = useState(null);
+
+  // Reaction Picker & Toast State
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+  const [toastText, setToastText] = useState(null);
+
+  const showToast = (msg) => {
+    setToastText(msg);
+    setTimeout(() => setToastText(null), 2500);
+  };
+
+  const handleReactToMessage = (msgId, emoji) => {
+    socketRef.current?.emit('reactToMessage', {
+      passcode,
+      messageId: msgId,
+      emoji,
+    });
+    setActiveReactionMsgId(null);
+  };
+
+  const handleCreateStatus = (statusData) => {
+    socketRef.current?.emit('createStatus', {
+      passcode,
+      ...statusData,
+    });
+  };
+
+  const handleViewStatus = (statusId) => {
+    socketRef.current?.emit('viewStatus', {
+      passcode,
+      statusId,
+    });
+  };
+
+  const handleDeleteStatus = (statusId) => {
+    socketRef.current?.emit('deleteStatus', {
+      passcode,
+      statusId,
+    });
+  };
 
   // Instagram Viewer State
   const [instaInputUrl, setInstaInputUrl] = useState('');
@@ -495,6 +568,34 @@ export default function ChatRoom() {
             : u
         )
       );
+    });
+
+    socket.on('messageReactionsUpdated', ({ messageId, reactions }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? { ...msg, reactions } : msg))
+      );
+    });
+
+    // Request initial statuses
+    socket.emit('getStatuses', { passcode }, (statusList) => {
+      if (Array.isArray(statusList)) {
+        setStatuses(statusList);
+      }
+    });
+
+    socket.on('statusCreated', (newStatus) => {
+      if (!newStatus) return;
+      setStatuses((prev) => [...prev.filter((s) => s.id !== newStatus.id), newStatus]);
+    });
+
+    socket.on('statusViewed', ({ statusId, viewers }) => {
+      setStatuses((prev) =>
+        prev.map((s) => (s.id === statusId ? { ...s, viewers } : s))
+      );
+    });
+
+    socket.on('statusDeleted', ({ statusId }) => {
+      setStatuses((prev) => prev.filter((s) => s.id !== statusId));
     });
 
     socket.on('exception', (err) => {
@@ -788,9 +889,125 @@ export default function ChatRoom() {
 
       {/* Main Content Area */}
       <div className="m3-content-layout">
-        {/* M3 Side Sheet Drawer (Members List) */}
+        {/* M3 Side Sheet Drawer (Members List & Status Updates) */}
         <aside className={`m3-side-sheet ${sideDrawerOpen ? 'open' : ''}`}>
-          <div style={{ padding: '20px', borderBottom: '1px solid var(--m3-outline-variant)' }}>
+          {/* Status Updates Bar (WhatsApp Style) */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--m3-outline-variant)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--m3-primary)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#25d366' }}>auto_awesome</span>
+                Status Updates
+              </h3>
+              <button
+                type="button"
+                className="m3-btn m3-btn-icon"
+                onClick={() => setShowStatusCreator(true)}
+                title="Create Status"
+                style={{ width: '32px', height: '32px', minWidth: 0, padding: 0 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#25d366' }}>add_circle</span>
+              </button>
+            </div>
+
+            {/* Status Avatar Strip */}
+            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+              {/* My Status */}
+              <div
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+                onClick={() => {
+                  const mySts = statuses.filter((s) => s.nickname === nickname);
+                  if (mySts.length > 0) {
+                    setActiveStatusUser({ nickname, statuses: mySts });
+                  } else {
+                    setShowStatusCreator(true);
+                  }
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--m3-secondary-container)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '1rem',
+                      border: statuses.some((s) => s.nickname === nickname) ? '2.5px solid #25d366' : '2px solid rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    {nickname.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-2px',
+                      right: '-2px',
+                      backgroundColor: '#25d366',
+                      color: '#000',
+                      borderRadius: '50%',
+                      width: '18px',
+                      height: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid #16161e',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    +
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.7rem', color: '#c7c5d0', marginTop: '4px', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  My Status
+                </span>
+              </div>
+
+              {/* Other Members Statuses */}
+              {users
+                .filter((u) => u.nickname !== nickname)
+                .map((u) => {
+                  const userStatuses = statuses.filter((s) => s.nickname === u.nickname);
+                  if (userStatuses.length === 0) return null;
+                  const hasUnviewed = userStatuses.some(
+                    (s) => !s.viewers || !s.viewers.includes(nickname)
+                  );
+                  return (
+                    <div
+                      key={u.id || u.nickname}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => setActiveStatusUser({ nickname: u.nickname, statuses: userStatuses })}
+                    >
+                      <div
+                        style={{
+                          width: '44px',
+                          height: '44px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--m3-secondary-container)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '1rem',
+                          border: hasUnviewed ? '3px solid #25d366' : '2px solid rgba(255,255,255,0.2)',
+                          boxShadow: hasUnviewed ? '0 0 8px rgba(37, 211, 102, 0.5)' : 'none',
+                        }}
+                      >
+                        {u.nickname.slice(0, 2).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#c7c5d0', marginTop: '4px', maxWidth: '54px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {u.nickname}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--m3-outline-variant)' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--m3-primary)' }}>
               Active Space Members ({users.length})
             </h3>
@@ -850,184 +1067,306 @@ export default function ChatRoom() {
                 </div>
               )}
 
-              {messages.map((m, idx) => {
-                const isSelf = m.nickname === nickname;
-                const msgId = m.id || idx;
-                const isDragging = activeDragId === msgId;
-                const currentTranslate = isDragging ? dragTranslateX : 0;
-                const instaShortcode = getInstagramEmbed(m.message);
+              {(() => {
+                let lastDateHeader = '';
+                return messages.map((m, idx) => {
+                  const isSelf = m.nickname === nickname;
+                  const msgId = m.id || idx;
+                  const isDragging = activeDragId === msgId;
+                  const currentTranslate = isDragging ? dragTranslateX : 0;
+                  const instaShortcode = getInstagramEmbed(m.message);
+                  const ytData = parseYouTubeUrl(m.message);
+                  const currentDateHeader = formatDateHeader(m.createdAt);
+                  let renderDateHeader = false;
+                  if (currentDateHeader && currentDateHeader !== lastDateHeader) {
+                    renderDateHeader = true;
+                    lastDateHeader = currentDateHeader;
+                  }
 
-                return (
-                  <div
-                    key={msgId}
-                    style={{
-                      alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                      maxWidth: '85%',
-                      position: 'relative',
-                      transform: `translateX(${currentTranslate}px)`,
-                      transition: isDragging ? 'none' : 'transform 0.2s ease',
-                      userSelect: 'none',
-                      cursor: 'grab',
-                    }}
-                    onTouchStart={(e) => handleTouchStart(m, e)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={() => handleTouchEnd(m)}
-                    onMouseDown={(e) => handleMouseDown(m, e)}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={() => handleMouseUp(m)}
-                  >
-                    {/* Drag to Reply Indicator Icon */}
-                    {currentTranslate > 20 && (
+                  return (
+                    <div key={msgId} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                      {/* Date Separator Badge */}
+                      {renderDateHeader && (
+                        <div
+                          style={{
+                            alignSelf: 'center',
+                            margin: '16px 0 8px 0',
+                            padding: '4px 14px',
+                            borderRadius: '16px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            color: 'var(--m3-on-surface-variant)',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            letterSpacing: '0.5px',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                          }}
+                        >
+                          {currentDateHeader}
+                        </div>
+                      )}
+
                       <div
                         style={{
-                          position: 'absolute',
-                          left: '-32px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: 'var(--m3-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
+                          alignSelf: isSelf ? 'flex-end' : 'flex-start',
+                          maxWidth: '85%',
+                          position: 'relative',
+                          transform: `translateX(${currentTranslate}px)`,
+                          transition: isDragging ? 'none' : 'transform 0.2s ease',
+                          userSelect: 'none',
+                          cursor: 'grab',
                         }}
+                        onTouchStart={(e) => handleTouchStart(m, e)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={() => handleTouchEnd(m)}
+                        onMouseDown={(e) => handleMouseDown(m, e)}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={() => handleMouseUp(m)}
                       >
-                        <span className="material-symbols-outlined">reply</span>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px', paddingLeft: '4px' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)' }}>
-                        {m.nickname}
-                      </span>
-
-                      {!m.isDeleted && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <button
-                            type="button"
-                            className="m3-action-btn"
-                            onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, message: m.message })}
-                            title="Reply"
+                        {/* Drag to Reply Indicator Icon */}
+                        {currentTranslate > 20 && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '-32px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              color: 'var(--m3-primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>reply</span>
-                          </button>
-                          {isSelf && m.id && (
-                            <>
+                            <span className="material-symbols-outlined">reply</span>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px', paddingLeft: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', fontWeight: 600 }}>
+                            {m.nickname}
+                          </span>
+
+                          {!m.isDeleted && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                              {/* Emoji Reaction Action Button */}
                               <button
                                 type="button"
                                 className="m3-action-btn"
-                                onClick={() => startEditing(m)}
-                                title="Edit message"
+                                onClick={() => setActiveReactionMsgId(activeReactionMsgId === msgId ? null : msgId)}
+                                title="React with Emoji"
                               >
-                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>edit</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>add_reaction</span>
                               </button>
+
                               <button
                                 type="button"
-                                className="m3-action-btn m3-action-btn-danger"
-                                onClick={() => handleDeleteMessage(m.id)}
-                                title="Delete message"
+                                className="m3-action-btn"
+                                onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, message: m.message })}
+                                title="Reply"
                               >
-                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>delete</span>
+                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>reply</span>
                               </button>
+                              {isSelf && m.id && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="m3-action-btn"
+                                    onClick={() => startEditing(m)}
+                                    title="Edit message"
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>edit</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="m3-action-btn m3-action-btn-danger"
+                                    onClick={() => handleDeleteMessage(m.id)}
+                                    title="Delete message"
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>delete</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Floating Emoji Picker Popover */}
+                        {activeReactionMsgId === msgId && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '-38px',
+                              right: isSelf ? '0' : 'auto',
+                              left: isSelf ? 'auto' : '0',
+                              zIndex: 100,
+                              backgroundColor: 'rgba(20, 20, 26, 0.95)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '20px',
+                              padding: '4px 8px',
+                              display: 'flex',
+                              gap: '6px',
+                              boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
+                              backdropFilter: 'blur(8px)',
+                            }}
+                          >
+                            {['👍', '❤️', '😂', '😮', '😢', '🔥', '🙏'].map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  fontSize: '1.1rem',
+                                  cursor: 'pointer',
+                                  padding: '2px',
+                                  transition: 'transform 0.15s ease',
+                                }}
+                                onClick={() => handleReactToMessage(m.id, emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: isSelf ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                            backgroundColor: isSelf ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
+                            color: isSelf ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)',
+                            boxShadow: 'var(--m3-elevation-1)',
+                          }}
+                        >
+                          {m.isDeleted ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', opacity: 0.8 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>block</span>
+                              <span>This message was deleted</span>
+                            </div>
+                          ) : editingMsgId === m.id ? (
+                            <form onSubmit={(e) => handleSaveEdit(m.id, e)} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <input
+                                type="text"
+                                className="m3-text-field"
+                                value={editingText}
+                                onChange={(e) => setEditingText(e.target.value)}
+                                autoFocus
+                                style={{ fontSize: '0.875rem', padding: '6px 10px', borderRadius: 'var(--m3-radius-s)', color: '#fff', backgroundColor: 'rgba(0,0,0,0.3)' }}
+                              />
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button
+                                  type="button"
+                                  className="m3-btn m3-btn-tonal"
+                                  style={{ padding: '2px 10px', fontSize: '0.72rem' }}
+                                  onClick={cancelEditing}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="m3-btn m3-btn-filled"
+                                  style={{ padding: '2px 10px', fontSize: '0.72rem' }}
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </form>
+                          ) : (
+                            <>
+                              {/* Quoted Reply Card */}
+                              {m.replyTo && (
+                                <div
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: 'var(--m3-radius-s)',
+                                    backgroundColor: 'rgba(0,0,0,0.25)',
+                                    borderLeft: '4px solid var(--m3-primary)',
+                                    marginBottom: '8px',
+                                    fontSize: '0.8rem',
+                                  }}
+                                >
+                                  <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
+                                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
+                                    {cleanInstagramMessage(m.replyTo.message)}
+                                  </div>
+                                </div>
+                              )}
+
+                              <p style={{ margin: 0, wordBreak: 'break-word', lineHeight: '1.45' }}>
+                                {cleanInstagramMessage(m.message)}
+                                {m.isEdited && (
+                                  <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
+                                    (edited)
+                                  </span>
+                                )}
+                              </p>
+
+                              {/* YouTube Interactive Video Preview Card */}
+                              {ytData && <YouTubePreview messageText={m.message} onCopySuccess={showToast} />}
+
+                              {/* File Attachment Preview */}
+                              {m.fileUrl && (
+                                <div style={{ marginTop: '8px' }}>
+                                  <a
+                                    href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="m3-btn m3-btn-outlined"
+                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                  >
+                                    <span className="material-symbols-outlined">attachment</span>
+                                    Attachment
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Direct In-Chat Instagram Video Preview Player */}
+                              {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} baseUrl={baseUrl} />}
+
+                              {/* Emoji Reactions Display Pills */}
+                              {m.reactions && Object.keys(m.reactions).length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
+                                  {Object.entries(m.reactions).map(([emoji, userList]) => {
+                                    const hasMyReaction = Array.isArray(userList) && userList.includes(nickname);
+                                    return (
+                                      <button
+                                        key={emoji}
+                                        type="button"
+                                        onClick={() => handleReactToMessage(m.id, emoji)}
+                                        title={`Reacted by: ${Array.isArray(userList) ? userList.join(', ') : ''}`}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          padding: '2px 8px',
+                                          borderRadius: '12px',
+                                          backgroundColor: hasMyReaction ? 'rgba(37, 211, 102, 0.25)' : 'rgba(0, 0, 0, 0.3)',
+                                          border: hasMyReaction ? '1px solid #25d366' : '1px solid rgba(255, 255, 255, 0.1)',
+                                          fontSize: '0.78rem',
+                                          color: '#fff',
+                                          cursor: 'pointer',
+                                        }}
+                                      >
+                                        <span>{emoji}</span>
+                                        <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{userList.length}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Visible Chat Message Timestamp */}
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                                <span style={{ fontSize: '0.68rem', color: isSelf ? 'rgba(255,255,255,0.7)' : 'var(--m3-outline)', fontWeight: 500 }}>
+                                  {formatMessageTime(m.createdAt)}
+                                </span>
+                              </div>
                             </>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
-
-                    <div
-                      style={{
-                        padding: '12px 16px',
-                        borderRadius: isSelf ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                        backgroundColor: isSelf ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
-                        color: isSelf ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)',
-                        boxShadow: 'var(--m3-elevation-1)',
-                      }}
-                    >
-                      {m.isDeleted ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', opacity: 0.8 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>block</span>
-                          <span>This message was deleted</span>
-                        </div>
-                      ) : editingMsgId === m.id ? (
-                        <form onSubmit={(e) => handleSaveEdit(m.id, e)} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <input
-                            type="text"
-                            className="m3-text-field"
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            autoFocus
-                            style={{ fontSize: '0.875rem', padding: '6px 10px', borderRadius: 'var(--m3-radius-s)', color: '#fff', backgroundColor: 'rgba(0,0,0,0.3)' }}
-                          />
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="m3-btn m3-btn-tonal"
-                              style={{ padding: '2px 10px', fontSize: '0.72rem' }}
-                              onClick={cancelEditing}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="m3-btn m3-btn-filled"
-                              style={{ padding: '2px 10px', fontSize: '0.72rem' }}
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <>
-                          {/* Quoted Reply Card */}
-                          {m.replyTo && (
-                            <div
-                              style={{
-                                padding: '8px 12px',
-                                borderRadius: 'var(--m3-radius-s)',
-                                backgroundColor: 'rgba(0,0,0,0.25)',
-                                borderLeft: '4px solid var(--m3-primary)',
-                                marginBottom: '8px',
-                                fontSize: '0.8rem',
-                              }}
-                            >
-                              <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
-                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
-                                {cleanInstagramMessage(m.replyTo.message)}
-                              </div>
-                            </div>
-                          )}
-
-                          <p style={{ margin: 0, wordBreak: 'break-word' }}>
-                            {cleanInstagramMessage(m.message)}
-                            {m.isEdited && (
-                              <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
-                                (edited)
-                              </span>
-                            )}
-                          </p>
-
-                          {/* File Attachment Preview */}
-                          {m.fileUrl && (
-                            <div style={{ marginTop: '8px' }}>
-                              <a
-                                href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="m3-btn m3-btn-outlined"
-                                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                              >
-                                <span className="material-symbols-outlined">attachment</span>
-                                Attachment
-                              </a>
-                            </div>
-                          )}
-
-                          {/* Direct In-Chat Instagram Video Preview Player (Cropped Video Only by Default) */}
-                          {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} baseUrl={baseUrl} />}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
               <div ref={chatBottomRef} />
             </div>
 
@@ -1290,6 +1629,56 @@ export default function ChatRoom() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Status Creator Modal */}
+      {showStatusCreator && (
+        <StatusCreatorModal
+          baseUrl={baseUrl}
+          onClose={() => setShowStatusCreator(false)}
+          onSubmitStatus={handleCreateStatus}
+        />
+      )}
+
+      {/* Status Story Viewer Modal */}
+      {activeStatusUser && (
+        <StatusViewerModal
+          statuses={activeStatusUser.statuses}
+          initialIndex={0}
+          currentNickname={nickname}
+          onClose={() => setActiveStatusUser(null)}
+          onViewStatus={handleViewStatus}
+          onDeleteStatus={handleDeleteStatus}
+        />
+      )}
+
+      {/* Copy Toast Feedback Popup */}
+      {toastText && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(20, 20, 26, 0.95)',
+            border: '1px solid #25d366',
+            color: '#ffffff',
+            padding: '10px 20px',
+            borderRadius: '24px',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ color: '#25d366', fontSize: '18px' }}>
+            check_circle
+          </span>
+          <span>{toastText}</span>
         </div>
       )}
     </div>

@@ -6,6 +6,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { ChatModule } from './chat/chat.module';
 import { UploadModule } from './upload/upload.module';
 import { InstagramModule } from './instagram/instagram.module';
+import { StatusModule } from './status/status.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ synchronize: true,
     ChatModule,
     UploadModule,
     InstagramModule,
+    StatusModule,
   ],
 })
 export class AppModule {}

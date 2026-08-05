@@ -17,6 +17,7 @@ import { UsePipes, ValidationPipe, OnApplicationBootstrap, OnModuleDestroy } fro
 import { Room } from '../rooms/room.entity';
 import { Message } from '../messages/message.entity';
 import { User } from '../users/user.entity';
+import { Status } from '../status/status.entity';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { TypingDto } from './dto/typing.dto';
@@ -58,6 +59,9 @@ export class ChatGateway
 
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+
+    @InjectRepository(Status)
+    private readonly statusRepo: Repository<Status>,
   ) { }
 
   private cleanupTimer?: NodeJS.Timeout;
@@ -788,6 +792,133 @@ export class ChatGateway
     this.server.to(data.passcode).emit('messageReactionsUpdated', {
       messageId: msg.id,
       reactions: msg.reactions,
+    });
+  }
+
+  @SubscribeMessage('createStatus')
+  async createStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: {
+      passcode: string;
+      type: 'text' | 'image' | 'video';
+      content?: string;
+      mediaUrl?: string;
+      bgColor?: string;
+      fontStyle?: string;
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return { success: false };
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode },
+    });
+    if (!room) return { success: false };
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
+
+    const status = this.statusRepo.create({
+      nickname: session.nickname,
+      roomId: room.id,
+      type: data.type || 'text',
+      content: data.content || null,
+      mediaUrl: data.mediaUrl || null,
+      bgColor: data.bgColor || null,
+      fontStyle: data.fontStyle || null,
+      viewers: [],
+      expiresAt,
+    });
+
+    const savedStatus = await this.statusRepo.save(status);
+
+    this.server.to(data.passcode).emit('statusCreated', {
+      id: savedStatus.id,
+      nickname: savedStatus.nickname,
+      roomId: savedStatus.roomId,
+      type: savedStatus.type,
+      content: savedStatus.content,
+      mediaUrl: savedStatus.mediaUrl,
+      bgColor: savedStatus.bgColor,
+      fontStyle: savedStatus.fontStyle,
+      viewers: savedStatus.viewers || [],
+      createdAt: savedStatus.createdAt,
+      expiresAt: savedStatus.expiresAt,
+    });
+
+    return { success: true, status: savedStatus };
+  }
+
+  @SubscribeMessage('getStatuses')
+  async getStatuses(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { passcode: string },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return [];
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode },
+    });
+    if (!room) return [];
+
+    const now = new Date();
+    const statuses = await this.statusRepo
+      .createQueryBuilder('status')
+      .where('status.roomId = :roomId', { roomId: room.id })
+      .andWhere('(status.expiresAt IS NULL OR status.expiresAt > :now)', { now })
+      .orderBy('status.createdAt', 'ASC')
+      .getMany();
+
+    return statuses;
+  }
+
+  @SubscribeMessage('viewStatus')
+  async viewStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { statusId: number; passcode: string },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    const status = await this.statusRepo.findOne({
+      where: { id: data.statusId },
+    });
+    if (!status) return;
+
+    let viewers = status.viewers || [];
+    if (!viewers.includes(session.nickname)) {
+      viewers = [...viewers, session.nickname];
+      status.viewers = viewers;
+      await this.statusRepo.save(status);
+    }
+
+    this.server.to(data.passcode).emit('statusViewed', {
+      statusId: status.id,
+      viewers: status.viewers,
+    });
+  }
+
+  @SubscribeMessage('deleteStatus')
+  async deleteStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { statusId: number; passcode: string },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    const status = await this.statusRepo.findOne({
+      where: { id: data.statusId },
+    });
+    if (!status) return;
+
+    if (status.nickname !== session.nickname) {
+      return; // Unauthorized delete attempt
+    }
+
+    await this.statusRepo.remove(status);
+
+    this.server.to(data.passcode).emit('statusDeleted', {
+      statusId: data.statusId,
     });
   }
 }

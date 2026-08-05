@@ -6,6 +6,7 @@ import { ChatGateway } from './chat.gateway';
 import { Room } from '../rooms/room.entity';
 import { Message } from '../messages/message.entity';
 import { User } from '../users/user.entity';
+import { Status } from '../status/status.entity';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { User } from '../users/user.entity';
       Room,
       Message,
       User,
+      Status,
     ]),
   ],
   providers: [ChatGateway],
