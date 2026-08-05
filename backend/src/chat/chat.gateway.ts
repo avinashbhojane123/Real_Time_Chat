@@ -38,6 +38,12 @@ import {
   EndCallDto,
   TogglePipDto,
 } from './dto/call-signal.dto';
+import {
+  CreateStatusDto,
+  GetStatusesDto,
+  ViewStatusDto,
+  DeleteStatusDto,
+} from './dto/status.dto';
 
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 @WebSocketGateway({
@@ -800,20 +806,13 @@ export class ChatGateway
   @SubscribeMessage('createStatus')
   async createStatus(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: {
-      passcode: string;
-      type: 'text' | 'image' | 'video';
-      content?: string;
-      mediaUrl?: string;
-      bgColor?: string;
-      fontStyle?: string;
-    },
+    @MessageBody() data: CreateStatusDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return { success: false };
+    if (!session || session.passcode !== data.passcode.trim()) return { success: false };
 
     const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode },
+      where: { passcode: data.passcode.trim() },
     });
     if (!room) return { success: false };
 
@@ -857,7 +856,7 @@ export class ChatGateway
   @SubscribeMessage('getStatuses')
   async getStatuses(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { passcode: string },
+    @MessageBody() data: GetStatusesDto,
   ) {
     const session = this.users.get(client.id);
     const targetPasscode = (data?.passcode || session?.passcode || '').trim();
@@ -882,7 +881,7 @@ export class ChatGateway
   @SubscribeMessage('viewStatus')
   async viewStatus(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { statusId: number; passcode: string },
+    @MessageBody() data: ViewStatusDto,
   ) {
     const session = this.users.get(client.id);
     if (!session) return;
@@ -909,7 +908,7 @@ export class ChatGateway
   @SubscribeMessage('deleteStatus')
   async deleteStatus(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { statusId: number; passcode: string },
+    @MessageBody() data: DeleteStatusDto,
   ) {
     const session = this.users.get(client.id);
     if (!session) return;

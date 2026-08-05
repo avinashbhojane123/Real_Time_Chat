@@ -632,8 +632,7 @@ export default function ChatRoom() {
     });
 
     socket.on('exception', (err) => {
-      console.error('Socket validation error:', err);
-      if (err?.message) alert('Socket error: ' + err.message);
+      console.warn('Socket exception:', err);
     });
 
     return () => {
