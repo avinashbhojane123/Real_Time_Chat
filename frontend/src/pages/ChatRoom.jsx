@@ -255,6 +255,22 @@ export default function ChatRoom() {
   const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
   const [toastText, setToastText] = useState(null);
 
+  // Typing Feature State
+  const [typingUsers, setTypingUsers] = useState([]);
+  const typingTimeoutRef = useRef(null);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInputText(val);
+    if (socketRef.current) {
+      socketRef.current.emit('typing', { passcode });
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current?.emit('stopTyping', { passcode });
+      }, 2000);
+    }
+  };
+
   const showToast = (msg) => {
     setToastText(msg);
     setTimeout(() => setToastText(null), 2500);
@@ -576,8 +592,25 @@ export default function ChatRoom() {
       );
     });
 
+    // Typing status listeners
+    socket.on('userTyping', ({ nickname: typingNick }) => {
+      if (typingNick && typingNick !== nickname) {
+        setTypingUsers((prev) => Array.from(new Set([...prev, typingNick])));
+      }
+    });
+
+    socket.on('userStoppedTyping', ({ nickname: typingNick }) => {
+      setTypingUsers((prev) => prev.filter((n) => n !== typingNick));
+    });
+
     // Request initial statuses
     socket.emit('getStatuses', { passcode }, (statusList) => {
+      if (Array.isArray(statusList)) {
+        setStatuses(statusList);
+      }
+    });
+
+    socket.on('statusesList', (statusList) => {
       if (Array.isArray(statusList)) {
         setStatuses(statusList);
       }
@@ -771,6 +804,9 @@ export default function ChatRoom() {
     const msgText = cleanInstagramMessage(inputText.trim());
     if (!msgText) return;
     setInputText('');
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    socketRef.current?.emit('stopTyping', { passcode });
 
     socketRef.current?.emit('sendMessage', {
       passcode,
@@ -1058,6 +1094,123 @@ export default function ChatRoom() {
         {/* Main Side-by-Side Workspace */}
         <main className="m3-main-chat" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: '280px' }}>
+            {/* Always Visible Top WhatsApp Status Header Bar */}
+            <div
+              style={{
+                padding: '10px 16px',
+                backgroundColor: 'var(--m3-surface-container-lowest)',
+                borderBottom: '1px solid var(--m3-outline-variant)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                overflowX: 'auto',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#25d366', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span>
+                Status:
+              </div>
+
+              {/* My Status Item */}
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0, padding: '2px 8px', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.05)' }}
+                onClick={() => {
+                  const mySts = statuses.filter((s) => s.nickname === nickname);
+                  if (mySts.length > 0) {
+                    setActiveStatusUser({ nickname, statuses: mySts });
+                  } else {
+                    setShowStatusCreator(true);
+                  }
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--m3-secondary-container)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      border: statuses.some((s) => s.nickname === nickname) ? '2.5px solid #25d366' : '1.5px solid rgba(255,255,255,0.2)',
+                    }}
+                  >
+                    {nickname.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-2px',
+                      right: '-2px',
+                      backgroundColor: '#25d366',
+                      color: '#000',
+                      borderRadius: '50%',
+                      width: '14px',
+                      height: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    +
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 600 }}>My Status</span>
+              </div>
+
+              {/* Other Members Status Items */}
+              {Array.from(new Set(statuses.map((s) => s.nickname)))
+                .filter((n) => n !== nickname)
+                .map((userNick) => {
+                  const userStatuses = statuses.filter((s) => s.nickname === userNick);
+                  if (userStatuses.length === 0) return null;
+                  const hasUnviewed = userStatuses.some((s) => !s.viewers || !s.viewers.includes(nickname));
+
+                  return (
+                    <div
+                      key={userNick}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0, padding: '2px 8px', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.05)' }}
+                      onClick={() => setActiveStatusUser({ nickname: userNick, statuses: userStatuses })}
+                    >
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--m3-secondary-container)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          border: hasUnviewed ? '2.5px solid #25d366' : '1.5px solid rgba(255,255,255,0.2)',
+                          boxShadow: hasUnviewed ? '0 0 6px rgba(37, 211, 102, 0.5)' : 'none',
+                        }}
+                      >
+                        {userNick.slice(0, 2).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: hasUnviewed ? '#25d366' : '#c7c5d0', fontWeight: hasUnviewed ? 700 : 500 }}>
+                        {userNick}
+                      </span>
+                    </div>
+                  );
+                })}
+
+              <button
+                type="button"
+                className="m3-btn m3-btn-outlined"
+                style={{ padding: '2px 10px', fontSize: '0.72rem', borderRadius: '14px', marginLeft: 'auto', flexShrink: 0, borderColor: '#25d366', color: '#25d366' }}
+                onClick={() => setShowStatusCreator(true)}
+              >
+                + Add Status
+              </button>
+            </div>
+
             {/* Chat Messages Area */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {messages.length === 0 && (
@@ -1399,6 +1552,30 @@ export default function ChatRoom() {
               </div>
             )}
 
+            {/* Active Typing Indicator Bar */}
+            {typingUsers.length > 0 && (
+              <div
+                style={{
+                  padding: '6px 20px',
+                  backgroundColor: 'rgba(37, 211, 102, 0.08)',
+                  borderTop: '1px solid rgba(37, 211, 102, 0.2)',
+                  color: '#25d366',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#25d366' }}>
+                  edit
+                </span>
+                <span>
+                  <strong>{typingUsers.join(', ')}</strong> {typingUsers.length === 1 ? 'is' : 'are'} typing...
+                </span>
+              </div>
+            )}
+
             {/* Chat Input Bar */}
             <div style={{ padding: '16px 20px', backgroundColor: 'var(--m3-surface-container)', borderTop: '1px solid var(--m3-outline-variant)' }}>
               <form onSubmit={sendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -1412,7 +1589,7 @@ export default function ChatRoom() {
                   className="m3-text-field"
                   style={{ borderRadius: 'var(--m3-radius-full)' }}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={handleInputChange}
                   onPaste={handleInputPaste}
                   placeholder={replyingTo ? `Reply to ${replyingTo.nickname}...` : 'Type a message (or drag message to reply)...'}
                 />

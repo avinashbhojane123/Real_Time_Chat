@@ -479,9 +479,10 @@ export class ChatGateway
     data: TypingDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session) return;
 
-    client.to(data.passcode).emit('userTyping', {
+    const trimmedPasscode = (data.passcode || session.passcode).trim();
+    client.to(trimmedPasscode).emit('userTyping', {
       nickname: session.nickname,
     });
   }
@@ -493,9 +494,10 @@ export class ChatGateway
     data: TypingDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session) return;
 
-    client.to(data.passcode).emit('userStoppedTyping', {
+    const trimmedPasscode = (data.passcode || session.passcode).trim();
+    client.to(trimmedPasscode).emit('userStoppedTyping', {
       nickname: session.nickname,
     });
   }
@@ -830,8 +832,10 @@ export class ChatGateway
     });
 
     const savedStatus = await this.statusRepo.save(status);
+    const roomPasscode = room.passcode.trim();
+    const dataPasscode = data.passcode.trim();
 
-    this.server.to(data.passcode).emit('statusCreated', {
+    const statusPayload = {
       id: savedStatus.id,
       nickname: savedStatus.nickname,
       roomId: savedStatus.roomId,
@@ -843,7 +847,9 @@ export class ChatGateway
       viewers: savedStatus.viewers || [],
       createdAt: savedStatus.createdAt,
       expiresAt: savedStatus.expiresAt,
-    });
+    };
+
+    this.server.to(roomPasscode).to(dataPasscode).emit('statusCreated', statusPayload);
 
     return { success: true, status: savedStatus };
   }
@@ -854,10 +860,10 @@ export class ChatGateway
     @MessageBody() data: { passcode: string },
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return [];
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
 
     const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode },
+      where: { passcode: targetPasscode },
     });
     if (!room) return [];
 
@@ -869,6 +875,7 @@ export class ChatGateway
       .orderBy('status.createdAt', 'ASC')
       .getMany();
 
+    client.emit('statusesList', statuses);
     return statuses;
   }
 
@@ -878,7 +885,7 @@ export class ChatGateway
     @MessageBody() data: { statusId: number; passcode: string },
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session) return;
 
     const status = await this.statusRepo.findOne({
       where: { id: data.statusId },
@@ -892,7 +899,8 @@ export class ChatGateway
       await this.statusRepo.save(status);
     }
 
-    this.server.to(data.passcode).emit('statusViewed', {
+    const trimmedPasscode = (data.passcode || session.passcode).trim();
+    this.server.to(trimmedPasscode).emit('statusViewed', {
       statusId: status.id,
       viewers: status.viewers,
     });
@@ -904,7 +912,7 @@ export class ChatGateway
     @MessageBody() data: { statusId: number; passcode: string },
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session) return;
 
     const status = await this.statusRepo.findOne({
       where: { id: data.statusId },
@@ -917,7 +925,8 @@ export class ChatGateway
 
     await this.statusRepo.remove(status);
 
-    this.server.to(data.passcode).emit('statusDeleted', {
+    const trimmedPasscode = (data.passcode || session.passcode).trim();
+    this.server.to(trimmedPasscode).emit('statusDeleted', {
       statusId: data.statusId,
     });
   }
