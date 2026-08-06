@@ -23,13 +23,9 @@ export class Message {
   })
   message!: string;
 
-  @ManyToOne(
-    () => Room,
-    (room) => room.messages,
-    {
-      onDelete: 'CASCADE',
-    },
-  )
+  @ManyToOne(() => Room, (room) => room.messages, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({
     name: 'roomId',
   })
@@ -47,13 +43,11 @@ export class Message {
     type: 'jsonb',
     nullable: true,
   })
-  replyTo!:
-    | {
-      id?: number;
-      nickname: string;
-      message: string;
-    }
-    | null;
+  replyTo!: {
+    id?: number;
+    nickname: string;
+    message: string;
+  } | null;
 
   // File support
   @Column({

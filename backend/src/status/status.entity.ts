@@ -21,12 +21,9 @@ export class Status {
   })
   nickname!: string;
 
-  @ManyToOne(
-    () => Room,
-    {
-      onDelete: 'CASCADE',
-    },
-  )
+  @ManyToOne(() => Room, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({
     name: 'roomId',
   })

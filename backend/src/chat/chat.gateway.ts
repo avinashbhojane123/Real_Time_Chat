@@ -12,7 +12,12 @@ import { Server, Socket } from 'socket.io';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UsePipes, ValidationPipe, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
+import {
+  UsePipes,
+  ValidationPipe,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+} from '@nestjs/common';
 
 import { Room } from '../rooms/room.entity';
 import { Message } from '../messages/message.entity';
@@ -56,7 +61,12 @@ import {
   pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 5000),
 })
 export class ChatGateway
-  implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap, OnModuleDestroy {
+  implements
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnApplicationBootstrap,
+    OnModuleDestroy
+{
   @WebSocketServer()
   server!: Server;
 
@@ -72,7 +82,7 @@ export class ChatGateway
 
     @InjectRepository(Status)
     private readonly statusRepo: Repository<Status>,
-  ) { }
+  ) {}
 
   private cleanupTimer?: NodeJS.Timeout;
   private isCleaning = false;
@@ -85,8 +95,13 @@ export class ChatGateway
       .set({ isOnline: false })
       .execute();
 
-    const cleanupInterval = Number(process.env.MESSAGE_CLEANUP_INTERVAL || 5000);
-    this.cleanupTimer = setInterval(() => this.cleanupExpiredMessages(), cleanupInterval);
+    const cleanupInterval = Number(
+      process.env.MESSAGE_CLEANUP_INTERVAL || 5000,
+    );
+    this.cleanupTimer = setInterval(
+      () => this.cleanupExpiredMessages(),
+      cleanupInterval,
+    );
   }
 
   onModuleDestroy() {
@@ -103,11 +118,13 @@ export class ChatGateway
       const expiredMessages = await this.messageRepo
         .createQueryBuilder('message')
         .innerJoinAndSelect('message.room', 'room')
-        .where('message.expiresAt IS NOT NULL AND message.expiresAt <= :now', { now })
+        .where('message.expiresAt IS NOT NULL AND message.expiresAt <= :now', {
+          now,
+        })
         .getMany();
 
       if (expiredMessages.length > 0) {
-        const ids = expiredMessages.map(m => m.id);
+        const ids = expiredMessages.map((m) => m.id);
 
         await this.messageRepo
           .createQueryBuilder()
@@ -116,7 +133,9 @@ export class ChatGateway
           .where('id IN (:...ids)', { ids })
           .execute();
 
-        console.log(`[Self-Destruct] Cleaned up ${ids.length} expired messages.`);
+        console.log(
+          `[Self-Destruct] Cleaned up ${ids.length} expired messages.`,
+        );
 
         const roomGroups = new Map<string, number[]>();
         for (const msg of expiredMessages) {
@@ -163,7 +182,9 @@ export class ChatGateway
 
     // Check if there's another active socket connected for the same user
     const isStillConnected = Array.from(this.users.values()).some(
-      (info) => info.nickname === userInfo.nickname && info.passcode === userInfo.passcode
+      (info) =>
+        info.nickname === userInfo.nickname &&
+        info.passcode === userInfo.passcode,
     );
 
     if (isStillConnected) {
@@ -216,18 +237,14 @@ export class ChatGateway
       );
     }
 
-    this.server
-      .to(userInfo.passcode)
-      .emit('userOffline', {
-        nickname: userInfo.nickname,
-        lastSeen: new Date(),
-      });
+    this.server.to(userInfo.passcode).emit('userOffline', {
+      nickname: userInfo.nickname,
+      lastSeen: new Date(),
+    });
 
-    this.server
-      .to(userInfo.passcode)
-      .emit('userLeft', {
-        nickname: userInfo.nickname,
-      });
+    this.server.to(userInfo.passcode).emit('userLeft', {
+      nickname: userInfo.nickname,
+    });
   }
 
   @SubscribeMessage('joinRoom')
@@ -417,7 +434,10 @@ export class ChatGateway
       fileUrl: data.fileUrl ?? null,
       fileName: data.fileName ?? null,
       fileType: data.fileType ?? null,
-      fileSize: typeof data.fileSize === 'string' ? parseInt(data.fileSize, 10) : (data.fileSize ?? null),
+      fileSize:
+        typeof data.fileSize === 'string'
+          ? parseInt(data.fileSize, 10)
+          : (data.fileSize ?? null),
       expiresAt,
     });
 
@@ -445,7 +465,10 @@ export class ChatGateway
       expiresAt: savedMessage.expiresAt,
     };
 
-    this.server.to(roomPasscode).to(dataPasscode).emit('newMessage', messagePayload);
+    this.server
+      .to(roomPasscode)
+      .to(dataPasscode)
+      .emit('newMessage', messagePayload);
 
     return {
       success: true,
@@ -569,7 +592,9 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
-    console.log(`[CallUser] ${session.nickname} is calling in room: ${data.passcode}`);
+    console.log(
+      `[CallUser] ${session.nickname} is calling in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('userCalling', {
       callerName: session.nickname,
     });
@@ -583,7 +608,9 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
-    console.log(`[AcceptCall] ${session.nickname} accepted the call in room: ${data.passcode}`);
+    console.log(
+      `[AcceptCall] ${session.nickname} accepted the call in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('callAccepted', {
       receiverName: session.nickname,
     });
@@ -597,7 +624,9 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
-    console.log(`[DeclineCall] ${session.nickname} declined the call in room: ${data.passcode}`);
+    console.log(
+      `[DeclineCall] ${session.nickname} declined the call in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('callDeclined', {
       receiverName: session.nickname,
     });
@@ -611,7 +640,9 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
-    console.log(`[WebRTCOffer] Relaying WebRTC offer in room: ${data.passcode}`);
+    console.log(
+      `[WebRTCOffer] Relaying WebRTC offer in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('webrtcOfferRelay', {
       offer: data.offer,
     });
@@ -625,7 +656,9 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
-    console.log(`[WebRTCAnswer] Relaying WebRTC answer in room: ${data.passcode}`);
+    console.log(
+      `[WebRTCAnswer] Relaying WebRTC answer in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('webrtcAnswerRelay', {
       answer: data.answer,
     });
@@ -639,17 +672,16 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
-    console.log(`[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${data.passcode}`);
+    console.log(
+      `[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('webrtcCandidateRelay', {
       candidate: data.candidate,
     });
   }
 
   @SubscribeMessage('endCall')
-  endCall(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: EndCallDto,
-  ) {
+  endCall(@ConnectedSocket() client: Socket, @MessageBody() data: EndCallDto) {
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
 
@@ -667,7 +699,9 @@ export class ChatGateway
 
     session.isPip = data.isPip;
 
-    console.log(`[TogglePip] ${session.nickname} set PIP mode to ${data.isPip} in room: ${data.passcode}`);
+    console.log(
+      `[TogglePip] ${session.nickname} set PIP mode to ${data.isPip} in room: ${data.passcode}`,
+    );
     client.to(data.passcode).emit('pipStateChanged', {
       nickname: session.nickname,
       isPip: data.isPip,
@@ -788,7 +822,7 @@ export class ChatGateway
     let reactionUsers = reactions[data.emoji] || [];
 
     if (reactionUsers.includes(activeNickname)) {
-      reactionUsers = reactionUsers.filter(u => u !== activeNickname);
+      reactionUsers = reactionUsers.filter((u) => u !== activeNickname);
     } else {
       reactionUsers.push(activeNickname);
     }
@@ -814,7 +848,8 @@ export class ChatGateway
     @MessageBody() data: CreateStatusDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode.trim()) return { success: false };
+    if (!session || session.passcode !== data.passcode.trim())
+      return { success: false };
 
     const room = await this.roomRepo.findOne({
       where: { passcode: data.passcode.trim() },
@@ -853,7 +888,10 @@ export class ChatGateway
       expiresAt: savedStatus.expiresAt,
     };
 
-    this.server.to(roomPasscode).to(dataPasscode).emit('statusCreated', statusPayload);
+    this.server
+      .to(roomPasscode)
+      .to(dataPasscode)
+      .emit('statusCreated', statusPayload);
 
     return { success: true, status: savedStatus };
   }
@@ -875,7 +913,9 @@ export class ChatGateway
     const statuses = await this.statusRepo
       .createQueryBuilder('status')
       .where('status.roomId = :roomId', { roomId: room.id })
-      .andWhere('(status.expiresAt IS NULL OR status.expiresAt > :now)', { now })
+      .andWhere('(status.expiresAt IS NULL OR status.expiresAt > :now)', {
+        now,
+      })
       .orderBy('status.createdAt', 'ASC')
       .getMany();
 
@@ -939,15 +979,19 @@ export class ChatGateway
 function cleanInstagramMessage(text: string): string {
   if (!text || typeof text !== 'string') return text;
 
-  const instaUrlRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)[^\s]*/gi;
+  const instaUrlRegex =
+    /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)[^\s]*/gi;
   const instaUrls = text.match(instaUrlRegex);
 
-  const boilerplateRegex = /^(view profile|view profile on instagram|view more on instagram|view post on instagram|add a comment \.\.\.|add a comment\.\.\.|watch on instagram|watch again|watch reel|open instagram|view profile\.\.\.)$/i;
+  const boilerplateRegex =
+    /^(view profile|view profile on instagram|view more on instagram|view post on instagram|add a comment \.\.\.|add a comment\.\.\.|watch on instagram|watch again|watch reel|open instagram|view profile\.\.\.)$/i;
 
   const lines = text.split('\n');
   const cleanedLines: string[] = [];
 
-  const hasBoilerplateOrUrl = /view profile|view more on instagram|add a comment/i.test(text) || instaUrls !== null;
+  const hasBoilerplateOrUrl =
+    /view profile|view more on instagram|add a comment/i.test(text) ||
+    instaUrls !== null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -974,11 +1018,19 @@ function cleanInstagramMessage(text: string): string {
         continue;
       }
 
-      const isAdjacentToBoilerplate = lines.some((l, idx) => Math.abs(idx - i) <= 3 && boilerplateRegex.test(l.trim()));
-      const isUrl = line.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)/i);
+      const isAdjacentToBoilerplate = lines.some(
+        (l, idx) => Math.abs(idx - i) <= 3 && boilerplateRegex.test(l.trim()),
+      );
+      const isUrl = line.match(
+        /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)/i,
+      );
 
       if (isAdjacentToBoilerplate && !isUrl) {
-        if (/^[a-zA-Z0-9_.]+$|^[a-zA-Z0-9_., -]+ \. [a-zA-Z0-9_., -]+$/i.test(line)) {
+        if (
+          /^[a-zA-Z0-9_.]+$|^[a-zA-Z0-9_., -]+ \. [a-zA-Z0-9_., -]+$/i.test(
+            line,
+          )
+        ) {
           continue;
         }
       }
@@ -993,10 +1045,14 @@ function cleanInstagramMessage(text: string): string {
     return instaUrls[0];
   }
 
-  if (cleanedText && instaUrls && instaUrls.length > 0 && !cleanedText.includes(instaUrls[0])) {
+  if (
+    cleanedText &&
+    instaUrls &&
+    instaUrls.length > 0 &&
+    !cleanedText.includes(instaUrls[0])
+  ) {
     return `${cleanedText}\n${instaUrls[0]}`.trim();
   }
 
   return cleanedText || (instaUrls ? instaUrls[0] : text);
 }
-

@@ -34,13 +34,9 @@ export class User {
   })
   lastSeen!: Date | null;
 
-  @ManyToOne(
-    () => Room,
-    (room) => room.users,
-    {
-      onDelete: 'CASCADE',
-    },
-  )
+  @ManyToOne(() => Room, (room) => room.users, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({
     name: 'roomId',
   })

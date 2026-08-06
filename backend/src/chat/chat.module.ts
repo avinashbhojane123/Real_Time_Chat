@@ -9,14 +9,7 @@ import { User } from '../users/user.entity';
 import { Status } from '../status/status.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Room,
-      Message,
-      User,
-      Status,
-    ]),
-  ],
+  imports: [TypeOrmModule.forFeature([Room, Message, User, Status])],
   providers: [ChatGateway],
 })
 export class ChatModule {}

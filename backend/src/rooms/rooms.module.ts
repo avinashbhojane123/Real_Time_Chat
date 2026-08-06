@@ -7,9 +7,7 @@ import { RoomsService } from './rooms.service';
 import { RoomsController } from './rooms.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Room]),
-  ],
+  imports: [TypeOrmModule.forFeature([Room])],
 
   controllers: [RoomsController],
 

@@ -39,7 +39,9 @@ export class InstagramService {
    */
   public extractCleanUrl(text?: string): string {
     if (!text || typeof text !== 'string') {
-      throw new BadRequestException('Instagram URL or text parameter is required.');
+      throw new BadRequestException(
+        'Instagram URL or text parameter is required.',
+      );
     }
 
     const trimmed = text.trim();
@@ -61,7 +63,9 @@ export class InstagramService {
    * 3. Playwright Headless Chromium Scraping (meta tags)
    * 4. Public embed HTML scraper fallback
    */
-  public async resolveMediaView(inputUrl?: string): Promise<InstagramMediaResult> {
+  public async resolveMediaView(
+    inputUrl?: string,
+  ): Promise<InstagramMediaResult> {
     const cleanUrl = this.extractCleanUrl(inputUrl);
 
     // 1. Check for Shortcode (Reel, Post, IGTV)
@@ -86,7 +90,9 @@ export class InstagramService {
         const rapidMeta = await this.extractViaRapidApi(originalUrl);
         extracted = { ...rapidMeta };
       } catch (err) {
-        this.logger.warn(`RapidAPI extraction failed for ${shortcode}: ${err.message}`);
+        this.logger.warn(
+          `RapidAPI extraction failed for ${shortcode}: ${err.message}`,
+        );
       }
 
       // Attempt 2: Extract via yt-dlp CLI (--dump-single-json) if direct video URL is missing
@@ -95,7 +101,9 @@ export class InstagramService {
           const ytMeta = await this.extractViaYtDlp(originalUrl);
           extracted = { ...extracted, ...ytMeta };
         } catch (err) {
-          this.logger.warn(`yt-dlp extraction failed for ${shortcode}: ${err.message}`);
+          this.logger.warn(
+            `yt-dlp extraction failed for ${shortcode}: ${err.message}`,
+          );
         }
       }
 
@@ -105,7 +113,9 @@ export class InstagramService {
           const gdlMeta = await this.extractViaGalleryDl(originalUrl);
           extracted = { ...extracted, ...gdlMeta };
         } catch (err) {
-          this.logger.warn(`gallery-dl extraction failed for ${shortcode}: ${err.message}`);
+          this.logger.warn(
+            `gallery-dl extraction failed for ${shortcode}: ${err.message}`,
+          );
         }
       }
 
@@ -115,7 +125,9 @@ export class InstagramService {
           const pwMeta = await this.extractViaPlaywright(originalUrl);
           extracted = { ...extracted, ...pwMeta };
         } catch (err) {
-          this.logger.warn(`Playwright extraction failed for ${shortcode}: ${err.message}`);
+          this.logger.warn(
+            `Playwright extraction failed for ${shortcode}: ${err.message}`,
+          );
         }
       }
 
@@ -125,7 +137,9 @@ export class InstagramService {
           const fallback = await this.scrapePublicMeta(shortcode);
           extracted = { ...fallback, ...extracted };
         } catch (err) {
-          this.logger.warn(`Public metadata fallback failed for ${shortcode}: ${err.message}`);
+          this.logger.warn(
+            `Public metadata fallback failed for ${shortcode}: ${err.message}`,
+          );
         }
       }
 
@@ -143,10 +157,13 @@ export class InstagramService {
         mediaType: cleanUrl.toLowerCase().includes('/p/') ? 'post' : 'reel',
         shortcode,
         title: extracted.caption
-          ? extracted.caption.slice(0, 100) + (extracted.caption.length > 100 ? '...' : '')
+          ? extracted.caption.slice(0, 100) +
+            (extracted.caption.length > 100 ? '...' : '')
           : `Instagram Reel (${shortcode})`,
         caption: extracted.caption,
-        author: extracted.authorUsername ? { username: extracted.authorUsername } : undefined,
+        author: extracted.authorUsername
+          ? { username: extracted.authorUsername }
+          : undefined,
         thumbnailUrl: extracted.thumbnailUrl,
         directVideoUrl: extracted.directVideoUrl,
         proxyVideoUrl,
@@ -154,7 +171,8 @@ export class InstagramService {
         embedUrl,
         originalUrl,
         canViewWithoutAccount: true,
-        message: 'Instagram media extracted successfully via RapidAPI for direct in-browser account-free viewing.',
+        message:
+          'Instagram media extracted successfully via RapidAPI for direct in-browser account-free viewing.',
       };
     }
 
@@ -166,7 +184,9 @@ export class InstagramService {
     if (
       profileMatch &&
       profileMatch[1] &&
-      !['p', 'reel', 'reels', 'tv', 'explore', 'stories'].includes(profileMatch[1].toLowerCase())
+      !['p', 'reel', 'reels', 'tv', 'explore', 'stories'].includes(
+        profileMatch[1].toLowerCase(),
+      )
     ) {
       const username = profileMatch[1].replace(/^@/, '');
       const profileUrl = `https://www.instagram.com/${username}/`;
@@ -186,7 +206,9 @@ export class InstagramService {
       };
     }
 
-    throw new BadRequestException('Invalid Instagram URL. Formats supported: Reels, Posts, IGTV, Profiles.');
+    throw new BadRequestException(
+      'Invalid Instagram URL. Formats supported: Reels, Posts, IGTV, Profiles.',
+    );
   }
 
   /**
@@ -211,7 +233,11 @@ export class InstagramService {
     }
 
     let directVideoUrl: string | undefined = data.url;
-    if (!directVideoUrl && Array.isArray(data.formats) && data.formats.length > 0) {
+    if (
+      !directVideoUrl &&
+      Array.isArray(data.formats) &&
+      data.formats.length > 0
+    ) {
       const videoFormats = data.formats.filter(
         (f: any) => f.url && (f.vcodec !== 'none' || f.ext === 'mp4'),
       );
@@ -257,21 +283,41 @@ export class InstagramService {
         const data = Array.isArray(parsed) ? parsed[1] || parsed[0] : parsed;
 
         if (data && typeof data === 'object') {
-          if (!directVideoUrl && (data.video_versions?.[0]?.url || data.url || data.video_url)) {
-            directVideoUrl = data.video_versions?.[0]?.url || data.url || data.video_url;
+          if (
+            !directVideoUrl &&
+            (data.video_versions?.[0]?.url || data.url || data.video_url)
+          ) {
+            directVideoUrl =
+              data.video_versions?.[0]?.url || data.url || data.video_url;
           }
 
-          if (!thumbnailUrl && (data.display_url || data.thumbnail || data.image_versions2?.candidates?.[0]?.url)) {
-            thumbnailUrl = data.display_url || data.thumbnail || data.image_versions2?.candidates?.[0]?.url;
+          if (
+            !thumbnailUrl &&
+            (data.display_url ||
+              data.thumbnail ||
+              data.image_versions2?.candidates?.[0]?.url)
+          ) {
+            thumbnailUrl =
+              data.display_url ||
+              data.thumbnail ||
+              data.image_versions2?.candidates?.[0]?.url;
           }
 
-          if (!caption && (data.description || data.caption?.text || data.caption)) {
-            const rawCap = data.description || data.caption?.text || data.caption;
+          if (
+            !caption &&
+            (data.description || data.caption?.text || data.caption)
+          ) {
+            const rawCap =
+              data.description || data.caption?.text || data.caption;
             caption = typeof rawCap === 'string' ? rawCap : undefined;
           }
 
-          if (!authorUsername && (data.user?.username || data.username || data.author)) {
-            authorUsername = data.user?.username || data.username || data.author;
+          if (
+            !authorUsername &&
+            (data.user?.username || data.username || data.author)
+          ) {
+            authorUsername =
+              data.user?.username || data.username || data.author;
           }
         }
       } catch {
@@ -298,16 +344,34 @@ export class InstagramService {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
 
       const thumbnailUrl =
-        (await page.locator('meta[property="og:image"]').getAttribute('content').catch(() => null)) ||
-        (await page.locator('meta[property="twitter:image"]').getAttribute('content').catch(() => null));
+        (await page
+          .locator('meta[property="og:image"]')
+          .getAttribute('content')
+          .catch(() => null)) ||
+        (await page
+          .locator('meta[property="twitter:image"]')
+          .getAttribute('content')
+          .catch(() => null));
 
       const directVideoUrl =
-        (await page.locator('meta[property="og:video"]').getAttribute('content').catch(() => null)) ||
-        (await page.locator('meta[property="og:video:secure_url"]').getAttribute('content').catch(() => null));
+        (await page
+          .locator('meta[property="og:video"]')
+          .getAttribute('content')
+          .catch(() => null)) ||
+        (await page
+          .locator('meta[property="og:video:secure_url"]')
+          .getAttribute('content')
+          .catch(() => null));
 
       const caption =
-        (await page.locator('meta[property="og:description"]').getAttribute('content').catch(() => null)) ||
-        (await page.locator('meta[name="description"]').getAttribute('content').catch(() => null));
+        (await page
+          .locator('meta[property="og:description"]')
+          .getAttribute('content')
+          .catch(() => null)) ||
+        (await page
+          .locator('meta[name="description"]')
+          .getAttribute('content')
+          .catch(() => null));
 
       await browser.close();
 
@@ -325,9 +389,7 @@ export class InstagramService {
   /**
    * Fallback scraper parsing public embed metadata.
    */
-  private scrapePublicMeta(
-    shortcode: string,
-  ): Promise<{
+  private scrapePublicMeta(shortcode: string): Promise<{
     thumbnailUrl?: string;
     directVideoUrl?: string;
     caption?: string;
@@ -362,28 +424,41 @@ export class InstagramService {
 
             const videoMatch =
               data.match(/video_url["']:\s*["']([^"']+)["']/i) ||
-              data.match(/<meta property=["']og:video["'] content=["']([^"']+)["']/i);
+              data.match(
+                /<meta property=["']og:video["'] content=["']([^"']+)["']/i,
+              );
             if (videoMatch && videoMatch[1]) {
-              meta.directVideoUrl = videoMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+              meta.directVideoUrl = videoMatch[1]
+                .replace(/\\u0026/g, '&')
+                .replace(/\\/g, '');
             }
 
             const imageMatch =
               data.match(/display_url["']:\s*["']([^"']+)["']/i) ||
-              data.match(/<meta property=["']og:image["'] content=["']([^"']+)["']/i);
+              data.match(
+                /<meta property=["']og:image["'] content=["']([^"']+)["']/i,
+              );
             if (imageMatch && imageMatch[1]) {
-              meta.thumbnailUrl = imageMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '');
+              meta.thumbnailUrl = imageMatch[1]
+                .replace(/\\u0026/g, '&')
+                .replace(/\\/g, '');
             }
 
             const captionMatch =
-              data.match(/<div class=["']Caption["'][^>]*>([\s\S]*?)<\/div>/i) ||
-              data.match(/<meta property=["']og:description["'] content=["']([^"']+)["']/i);
+              data.match(
+                /<div class=["']Caption["'][^>]*>([\s\S]*?)<\/div>/i,
+              ) ||
+              data.match(
+                /<meta property=["']og:description["'] content=["']([^"']+)["']/i,
+              );
             if (captionMatch && captionMatch[1]) {
               meta.caption = captionMatch[1].replace(/<[^>]+>/g, '').trim();
             }
 
             const authorMatch =
-              data.match(/<a class=["']CaptionUsername["'][^>]*>([^<]+)<\/a>/i) ||
-              data.match(/["']username["']:\s*["']([^"']+)["']/i);
+              data.match(
+                /<a class=["']CaptionUsername["'][^>]*>([^<]+)<\/a>/i,
+              ) || data.match(/["']username["']:\s*["']([^"']+)["']/i);
             if (authorMatch && authorMatch[1]) {
               meta.authorUsername = authorMatch[1].trim();
             }
@@ -411,7 +486,9 @@ export class InstagramService {
     redirectHops = 0,
   ): Promise<void> {
     if (redirectHops > 5) {
-      throw new BadRequestException('Too many redirects while fetching media stream.');
+      throw new BadRequestException(
+        'Too many redirects while fetching media stream.',
+      );
     }
 
     if (!mediaUrl || typeof mediaUrl !== 'string') {
@@ -421,7 +498,9 @@ export class InstagramService {
     try {
       const parsedUrl = new URL(mediaUrl);
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-        throw new BadRequestException('Invalid protocol. Only HTTP and HTTPS media URLs are supported.');
+        throw new BadRequestException(
+          'Invalid protocol. Only HTTP and HTTPS media URLs are supported.',
+        );
       }
 
       const client = parsedUrl.protocol === 'https:' ? https : http;
@@ -449,8 +528,16 @@ export class InstagramService {
             proxyRes.statusCode < 400 &&
             proxyRes.headers.location
           ) {
-            const redirectUrl = new URL(proxyRes.headers.location, mediaUrl).toString();
-            return this.proxyMediaStream(redirectUrl, req, res, redirectHops + 1);
+            const redirectUrl = new URL(
+              proxyRes.headers.location,
+              mediaUrl,
+            ).toString();
+            return this.proxyMediaStream(
+              redirectUrl,
+              req,
+              res,
+              redirectHops + 1,
+            );
           }
 
           res.status(proxyRes.statusCode || 200);
@@ -467,7 +554,7 @@ export class InstagramService {
 
           headersToForward.forEach((h) => {
             if (proxyRes.headers[h]) {
-              res.setHeader(h, proxyRes.headers[h] as string);
+              res.setHeader(h, proxyRes.headers[h]);
             }
           });
 
@@ -482,13 +569,17 @@ export class InstagramService {
       proxyReq.on('error', (err) => {
         this.logger.error(`Proxy stream error: ${err.message}`);
         if (!res.headersSent) {
-          res.status(502).json({ error: 'Failed to proxy Instagram media stream.' });
+          res
+            .status(502)
+            .json({ error: 'Failed to proxy Instagram media stream.' });
         }
       });
 
       proxyReq.end();
     } catch (err) {
-      throw new BadRequestException(`Failed to parse target media URL: ${err.message}`);
+      throw new BadRequestException(
+        `Failed to parse target media URL: ${err.message}`,
+      );
     }
   }
 
@@ -523,9 +614,13 @@ export class InstagramService {
 
         res.on('end', () => {
           try {
-            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            if (
+              res.statusCode &&
+              res.statusCode >= 200 &&
+              res.statusCode < 300
+            ) {
               const data = JSON.parse(body);
-              const item = Array.isArray(data) ? data[0] : (data.result || data);
+              const item = Array.isArray(data) ? data[0] : data.result || data;
 
               let directVideoUrl: string | undefined =
                 (Array.isArray(item?.urls) && item.urls[0]?.url) ||
@@ -536,7 +631,11 @@ export class InstagramService {
               if (!directVideoUrl && Array.isArray(data)) {
                 for (const sub of data) {
                   if (Array.isArray(sub?.urls)) {
-                    const found = sub.urls.find((u: any) => u.url && (u.extension === 'mp4' || u.url.includes('.mp4')));
+                    const found = sub.urls.find(
+                      (u: any) =>
+                        u.url &&
+                        (u.extension === 'mp4' || u.url.includes('.mp4')),
+                    );
                     if (found) {
                       directVideoUrl = found.url;
                       break;
@@ -552,11 +651,24 @@ export class InstagramService {
                 item?.thumbnail ||
                 (Array.isArray(item?.urls) && item.urls[0]?.cover);
 
-              const caption = item?.meta?.title || item?.title || item?.caption || item?.description;
-              const authorUsername = item?.meta?.username || item?.author?.username || item?.username || item?.uploader;
+              const caption =
+                item?.meta?.title ||
+                item?.title ||
+                item?.caption ||
+                item?.description;
+              const authorUsername =
+                item?.meta?.username ||
+                item?.author?.username ||
+                item?.username ||
+                item?.uploader;
 
               if (directVideoUrl) {
-                return resolve({ directVideoUrl, thumbnailUrl, caption, authorUsername });
+                return resolve({
+                  directVideoUrl,
+                  thumbnailUrl,
+                  caption,
+                  authorUsername,
+                });
               }
             }
           } catch (e) {

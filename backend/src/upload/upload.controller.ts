@@ -2,8 +2,6 @@ import {
   Controller,
   Post,
   Get,
-  Query,
-  Body,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -18,10 +16,7 @@ import * as fs from 'fs';
 import { readdirSync } from 'fs';
 
 const uploadFolder = process.env.UPLOAD_DIR || 'uploads';
-const uploadDir = join(
-  process.cwd(),
-  uploadFolder,
-);
+const uploadDir = join(process.cwd(), uploadFolder);
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, {
@@ -31,7 +26,9 @@ if (!fs.existsSync(uploadDir)) {
 
 const maxFileSizeMB = Number(process.env.MAX_FILE_SIZE_MB || 100);
 const blockedExtList = process.env.BLOCKED_FILE_EXTENSIONS
-  ? process.env.BLOCKED_FILE_EXTENSIONS.split(',').map((e) => e.trim().toLowerCase())
+  ? process.env.BLOCKED_FILE_EXTENSIONS.split(',').map((e) =>
+      e.trim().toLowerCase(),
+    )
   : ['.exe', '.bat', '.cmd', '.vbs', '.com', '.scr', '.pif', '.msi'];
 
 @Controller('upload')
@@ -49,20 +46,12 @@ export class UploadController {
       storage: diskStorage({
         destination: uploadDir,
 
-        filename: (
-          req,
-          file,
-          cb,
-        ) => {
+        filename: (req, file, cb) => {
           const uniqueName =
             Date.now() +
             '-' +
-            Math.round(
-              Math.random() * 1e9,
-            ) +
-            extname(
-              file.originalname,
-            );
+            Math.round(Math.random() * 1e9) +
+            extname(file.originalname);
 
           cb(null, uniqueName);
         },
@@ -71,7 +60,12 @@ export class UploadController {
       fileFilter: (req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase();
         if (blockedExtList.includes(ext)) {
-          return cb(new Error(`Executable or blocked file type (${ext}) is not allowed`), false);
+          return cb(
+            new Error(
+              `Executable or blocked file type (${ext}) is not allowed`,
+            ),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -86,40 +80,29 @@ export class UploadController {
     file: any,
   ) {
     if (!file) {
-      throw new BadRequestException(
-        'No file uploaded',
-      );
+      throw new BadRequestException('No file uploaded');
     }
 
-    console.log(
-      'Uploaded file:',
-      file.filename,
-    );
+    console.log('Uploaded file:', file.filename);
 
-    console.log(
-      'Saved path:',
-      file.path,
-    );
+    console.log('Saved path:', file.path);
 
     const uploadPrefix = process.env.UPLOAD_PREFIX || '/uploads/';
-    const cleanPrefix = uploadPrefix.endsWith('/') ? uploadPrefix : `${uploadPrefix}/`;
+    const cleanPrefix = uploadPrefix.endsWith('/')
+      ? uploadPrefix
+      : `${uploadPrefix}/`;
     const fileUrl = `${cleanPrefix}${file.filename}`;
 
     return {
       success: true,
 
-      fileName:
-        file.originalname,
+      fileName: file.originalname,
 
-      fileType:
-        file.mimetype,
+      fileType: file.mimetype,
 
-      fileSize:
-        file.size,
+      fileSize: file.size,
 
       fileUrl,
     };
   }
 }
-
-

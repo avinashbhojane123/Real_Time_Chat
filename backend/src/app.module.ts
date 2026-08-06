@@ -28,9 +28,9 @@ import { KeepAliveModule } from './keep-alive/keep-alive.module';
       ssl:
         process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production'
           ? {
-            rejectUnauthorized:
-              process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
-          }
+              rejectUnauthorized:
+                process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
+            }
           : false,
 
       autoLoadEntities: true,
@@ -48,6 +48,4 @@ import { KeepAliveModule } from './keep-alive/keep-alive.module';
     KeepAliveModule,
   ],
 })
-export class AppModule { }
-
-
+export class AppModule {}

@@ -6,10 +6,7 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app =
-    await NestFactory.create<NestExpressApplication>(
-      AppModule,
-    );
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
@@ -30,15 +27,9 @@ async function bootstrap() {
   );
 
   const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
-  const uploadPath = join(
-    process.cwd(),
-    uploadDirName,
-  );
+  const uploadPath = join(process.cwd(), uploadDirName);
 
-  console.log(
-    'Uploads folder:',
-    uploadPath,
-  );
+  console.log('Uploads folder:', uploadPath);
 
   const uploadPrefix = process.env.UPLOAD_PREFIX || '/uploads/';
 
@@ -58,14 +49,11 @@ async function bootstrap() {
     exclude: [excludePath, uploadDirName],
   });
 
-  const port =
-    Number(process.env.PORT || 10000);
+  const port = Number(process.env.PORT || 10000);
 
   await app.listen(port);
 
-  console.log(
-    `Application running on port ${port}`,
-  );
+  console.log(`Application running on port ${port}`);
 }
 
 bootstrap();

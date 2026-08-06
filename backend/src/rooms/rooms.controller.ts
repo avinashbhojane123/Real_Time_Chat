@@ -4,19 +4,14 @@ import { JoinRoomHttpDto } from './dto/join-room-http.dto';
 
 @Controller('rooms')
 export class RoomsController {
-  constructor(
-    private readonly roomService: RoomsService,
-  ) {}
+  constructor(private readonly roomService: RoomsService) {}
 
   @Post('join')
   async join(
     @Body()
     body: JoinRoomHttpDto,
   ) {
-    const room =
-      await this.roomService.findOrCreate(
-        body.passcode.trim(),
-      );
+    const room = await this.roomService.findOrCreate(body.passcode.trim());
 
     return {
       success: true,

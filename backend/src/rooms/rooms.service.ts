@@ -35,7 +35,9 @@ export class RoomsService {
     }
 
     if (!room) {
-      throw new Error(`Failed to create or find room with passcode ${passcode}`);
+      throw new Error(
+        `Failed to create or find room with passcode ${passcode}`,
+      );
     }
 
     return room;

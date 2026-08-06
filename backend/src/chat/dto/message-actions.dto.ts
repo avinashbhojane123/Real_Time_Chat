@@ -1,10 +1,16 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class EditMessageDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   passcode!: string;
 
   @IsNumber()
@@ -24,7 +30,7 @@ export class EditMessageDto {
 export class DeleteMessageDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   passcode!: string;
 
   @IsNumber()
@@ -35,14 +41,14 @@ export class DeleteMessageDto {
 export class ClearHistoryDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   passcode!: string;
 }
 
 export class ReactToMessageDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   passcode!: string;
 
   @IsNumber()

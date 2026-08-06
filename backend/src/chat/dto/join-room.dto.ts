@@ -5,13 +5,13 @@ export class JoinRoomDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   nickname!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   passcode!: string;
 
   @IsString()

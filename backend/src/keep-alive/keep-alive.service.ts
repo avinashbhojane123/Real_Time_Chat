@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as http from 'http';
 import * as https from 'https';
@@ -26,7 +31,9 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
       this.configService.get<string>('DISABLE_KEEP_ALIVE') === 'true';
 
     if (isDisable) {
-      this.logger.log('Keep-Alive self-ping service is disabled via DISABLE_KEEP_ALIVE.');
+      this.logger.log(
+        'Keep-Alive self-ping service is disabled via DISABLE_KEEP_ALIVE.',
+      );
       return;
     }
 
@@ -52,7 +59,9 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
     );
     setTimeout(() => {
       this.pingServer().catch((err) => {
-        this.logger.warn(`Initial keep-alive ping skipped/failed: ${err.message}`);
+        this.logger.warn(
+          `Initial keep-alive ping skipped/failed: ${err.message}`,
+        );
       });
     }, initialDelayMs);
   }
@@ -84,7 +93,10 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
     baseUrl = baseUrl.replace(/\/+$/, '');
 
     // Append ping endpoint if not explicitly provided in URL
-    if (!baseUrl.includes('/api/keep-alive') && !baseUrl.includes('/api/ping')) {
+    if (
+      !baseUrl.includes('/api/keep-alive') &&
+      !baseUrl.includes('/api/ping')
+    ) {
       return `${baseUrl}/api/keep-alive/ping`;
     }
 
@@ -99,7 +111,9 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
     const startTime = Date.now();
     this.pingCount++;
 
-    this.logger.log(`[Ping #${this.pingCount}] Pinging keep-alive URL: ${targetUrl}`);
+    this.logger.log(
+      `[Ping #${this.pingCount}] Pinging keep-alive URL: ${targetUrl}`,
+    );
 
     try {
       const { statusCode, body } = await this.httpGet(targetUrl);
