@@ -80,14 +80,25 @@ export class InstagramService {
         authorUsername?: string;
       } = {};
 
-      // Attempt 1: Extract via yt-dlp CLI (--dump-single-json)
+      // Attempt 1: Extract via RapidAPI instagram120 API
       try {
-        extracted = await this.extractViaYtDlp(originalUrl);
+        const rapidMeta = await this.extractViaRapidApi(originalUrl);
+        extracted = { ...rapidMeta };
       } catch (err) {
-        this.logger.warn(`yt-dlp extraction failed for ${shortcode}: ${err.message}`);
+        this.logger.warn(`RapidAPI extraction failed for ${shortcode}: ${err.message}`);
       }
 
-      // Attempt 2: Extract via gallery-dl CLI (-j) if direct video URL is missing
+      // Attempt 2: Extract via yt-dlp CLI (--dump-single-json) if direct video URL is missing
+      if (!extracted.directVideoUrl) {
+        try {
+          const ytMeta = await this.extractViaYtDlp(originalUrl);
+          extracted = { ...extracted, ...ytMeta };
+        } catch (err) {
+          this.logger.warn(`yt-dlp extraction failed for ${shortcode}: ${err.message}`);
+        }
+      }
+
+      // Attempt 3: Extract via gallery-dl CLI (-j) if direct video URL is missing
       if (!extracted.directVideoUrl) {
         try {
           const gdlMeta = await this.extractViaGalleryDl(originalUrl);
@@ -97,7 +108,7 @@ export class InstagramService {
         }
       }
 
-      // Attempt 3: Extract via Playwright Headless Chromium
+      // Attempt 4: Extract via Playwright Headless Chromium
       if (!extracted.directVideoUrl || !extracted.thumbnailUrl) {
         try {
           const pwMeta = await this.extractViaPlaywright(originalUrl);
@@ -107,7 +118,7 @@ export class InstagramService {
         }
       }
 
-      // Attempt 4: Public embed HTML scraper fallback
+      // Attempt 5: Public embed HTML scraper fallback
       if (!extracted.directVideoUrl) {
         try {
           const fallback = await this.scrapePublicMeta(shortcode);
@@ -473,5 +484,88 @@ export class InstagramService {
     } catch (err) {
       throw new BadRequestException(`Failed to parse target media URL: ${err.message}`);
     }
+  }
+
+  /**
+   * Invokes RapidAPI instagram120 API endpoint to extract direct reel video URL & metadata.
+   */
+  private async extractViaRapidApi(url: string): Promise<{
+    thumbnailUrl?: string;
+    directVideoUrl?: string;
+    caption?: string;
+    authorUsername?: string;
+  }> {
+    return new Promise((resolve) => {
+      const postData = JSON.stringify({ url });
+      const options = {
+        method: 'POST',
+        hostname: 'instagram120.p.rapidapi.com',
+        path: '/api/instagram/links',
+        headers: {
+          'x-rapidapi-key': process.env.RAPIDAPI_INSTAGRAM_KEY || '59df956928msh884a74ccf199e2dp1f51f3jsnfae0b679277f',
+          'x-rapidapi-host': 'instagram120.p.rapidapi.com',
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+
+        res.on('end', () => {
+          try {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              const data = JSON.parse(body);
+              const result = data.result || data;
+
+              let directVideoUrl: string | undefined =
+                result?.video_url ||
+                result?.download_url ||
+                (Array.isArray(result) && result[0]?.url) ||
+                (Array.isArray(result?.urls) && result.urls[0]?.url) ||
+                result?.url;
+
+              if (!directVideoUrl && Array.isArray(result)) {
+                const vidObj = result.find((item: any) => item.type === 'video' || item.url?.includes('.mp4'));
+                if (vidObj) directVideoUrl = vidObj.url;
+              }
+
+              const thumbnailUrl =
+                result?.cover_url ||
+                result?.thumbnail_url ||
+                result?.thumbnail ||
+                (Array.isArray(result?.urls) && result.urls[0]?.cover) ||
+                (Array.isArray(result) && result[0]?.cover);
+
+              const caption = result?.title || result?.caption || result?.description;
+              const authorUsername = result?.author?.username || result?.username || result?.uploader;
+
+              if (directVideoUrl) {
+                return resolve({ directVideoUrl, thumbnailUrl, caption, authorUsername });
+              }
+            }
+          } catch (e) {
+            this.logger.warn(`Failed to parse RapidAPI response: ${e.message}`);
+          }
+          resolve({});
+        });
+      });
+
+      req.on('error', (err) => {
+        this.logger.warn(`RapidAPI request failed: ${err.message}`);
+        resolve({});
+      });
+
+      req.setTimeout(8000, () => {
+        req.destroy();
+        resolve({});
+      });
+
+      req.write(postData);
+      req.end();
+    });
   }
 }

@@ -120,7 +120,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
         </button>
       </div>
 
-      {/* Account-Free Native HTML5 Video Stream Player (No Instagram Redirection) */}
+      {/* Account-Free Native HTML5 Video Stream Player or Embed (No Instagram Redirection) */}
       {proxyUrl ? (
         <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
           <video
@@ -134,25 +134,18 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
         </div>
       ) : loading ? (
         <div style={{ height: '360px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', backgroundColor: '#121216', color: '#e2e2e6' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#e1306c' }}>sync</span>
-          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Extracting Reel Video (gallery-dl)...</span>
+          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#e1306c', animation: 'spin 1.5s linear infinite' }}>sync</span>
+          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Resolving Instagram Reel (RapidAPI)...</span>
         </div>
       ) : (
-        <div style={{ padding: '24px 16px', textAlign: 'center', backgroundColor: '#121216' }}>
-          {meta?.thumbnailUrl && (
-            <img src={meta.thumbnailUrl} alt="Reel thumbnail" style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '12px', marginBottom: '12px', objectFit: 'cover' }} />
-          )}
-          <p style={{ fontSize: '0.78rem', color: '#c7c5d0', margin: '0 0 12px 0' }}>
-            Reel preview ready. Use clean link to share.
-          </p>
-          <button
-            type="button"
-            className="m3-btn m3-btn-outlined"
-            onClick={handleCopyCleanUrl}
-            style={{ fontSize: '0.72rem' }}
-          >
-            {copied ? '✓ Clean Link Copied' : 'Copy Clean Link'}
-          </button>
+        <div style={{ position: 'relative', width: '100%', backgroundColor: '#000', overflow: 'hidden' }}>
+          <iframe
+            src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
+            style={{ width: '100%', height: '460px', border: 'none', background: '#000' }}
+            title="Instagram Reel Direct Browser Preview"
+            allowTransparency="true"
+            allow="encrypted-media"
+          />
         </div>
       )}
 
@@ -372,6 +365,9 @@ export default function ChatRoom() {
   const callStateRef = useRef('idle');
   const pendingIceCandidatesRef = useRef([]);
   const callTimerRef = useRef(null);
+  const watchDogTimerRef = useRef(null);
+  const lastInboundBytesRef = useRef(0);
+  const stalledCountRef = useRef(0);
 
   const updateCallState = (state) => {
     setCallState(state);
@@ -383,8 +379,14 @@ export default function ChatRoom() {
       clearInterval(callTimerRef.current);
       callTimerRef.current = null;
     }
+    if (watchDogTimerRef.current) {
+      clearInterval(watchDogTimerRef.current);
+      watchDogTimerRef.current = null;
+    }
     setCallDuration(0);
     pendingIceCandidatesRef.current = [];
+    lastInboundBytesRef.current = 0;
+    stalledCountRef.current = 0;
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -409,6 +411,18 @@ export default function ChatRoom() {
       document.exitPictureInPicture().catch(() => {});
     }
   }, []);
+
+  const triggerIceRestart = useCallback(() => {
+    const pc = peerConnectionRef.current;
+    if (!pc || pc.signalingState === 'closed') return;
+    console.log('[WebRTC] Connection stalled or degraded. Initiating ICE restart...');
+    pc.createOffer({ iceRestart: true })
+      .then((offer) => pc.setLocalDescription(offer))
+      .then(() => {
+        socketRef.current?.emit('webrtcOffer', { passcode, offer: pc.localDescription });
+      })
+      .catch((err) => console.warn('[WebRTC] ICE restart offer failed:', err));
+  }, [passcode]);
 
   const addIceCandidateSafely = useCallback((candidate) => {
     const pc = peerConnectionRef.current;
@@ -449,7 +463,17 @@ export default function ChatRoom() {
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
         { urls: 'stun:global.stun.twilio.com:3478' },
+        {
+          urls: [
+            'turn:openrelay.metered.ca:80',
+            'turn:openrelay.metered.ca:443',
+            'turn:openrelay.metered.ca:443?transport=tcp',
+          ],
+          username: 'openrelay',
+          credential: 'openrelay',
+        },
       ],
+      iceCandidatePoolSize: 10,
     });
 
     pc.onicecandidate = (e) => {
@@ -468,6 +492,10 @@ export default function ChatRoom() {
 
     pc.oniceconnectionstatechange = () => {
       console.log('[WebRTC ICE State]:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        console.warn('[WebRTC] ICE connection state degraded, attempting automatic recovery...');
+        triggerIceRestart();
+      }
     };
 
     if (localStreamRef.current) {
@@ -478,7 +506,7 @@ export default function ChatRoom() {
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [passcode]);
+  }, [passcode, triggerIceRestart]);
 
   // Video element binding effect
   useEffect(() => {
@@ -495,23 +523,59 @@ export default function ChatRoom() {
     }
   }, [remoteStream, callState]);
 
-  // Active call duration timer
+  // Active call duration timer & media stream health watchdog
   useEffect(() => {
     if (callState === 'active') {
       setCallDuration(0);
       callTimerRef.current = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
+
+      stalledCountRef.current = 0;
+      lastInboundBytesRef.current = 0;
+      watchDogTimerRef.current = setInterval(async () => {
+        const pc = peerConnectionRef.current;
+        if (!pc || pc.connectionState === 'closed') return;
+
+        try {
+          const stats = await pc.getStats();
+          let currentInboundBytes = 0;
+          stats.forEach((report) => {
+            if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.kind === 'audio')) {
+              currentInboundBytes += report.bytesReceived || 0;
+            }
+          });
+
+          if (currentInboundBytes > 0 && currentInboundBytes === lastInboundBytesRef.current) {
+            stalledCountRef.current += 1;
+            console.warn(`[WebRTC Watchdog] Inbound bytes unchanged for ${stalledCountRef.current * 5}s`);
+            if (stalledCountRef.current >= 2) {
+              stalledCountRef.current = 0;
+              triggerIceRestart();
+            }
+          } else {
+            stalledCountRef.current = 0;
+            lastInboundBytesRef.current = currentInboundBytes;
+          }
+        } catch (e) {
+          console.warn('[WebRTC Watchdog] Error checking stats:', e);
+        }
+      }, 5000);
     } else {
       if (callTimerRef.current) {
         clearInterval(callTimerRef.current);
         callTimerRef.current = null;
       }
+      if (watchDogTimerRef.current) {
+        clearInterval(watchDogTimerRef.current);
+        watchDogTimerRef.current = null;
+      }
     }
     return () => {
       if (callTimerRef.current) clearInterval(callTimerRef.current);
+      if (watchDogTimerRef.current) clearInterval(watchDogTimerRef.current);
     };
-  }, [callState]);
+  }, [callState, triggerIceRestart]);
 
   const formatTimer = (seconds) => {
     const mins = Math.floor(seconds / 60);

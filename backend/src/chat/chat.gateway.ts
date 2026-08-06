@@ -50,6 +50,8 @@ import {
   cors: {
     origin: '*',
   },
+  pingInterval: 10000,
+  pingTimeout: 5000,
 })
 export class ChatGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap, OnModuleDestroy {
