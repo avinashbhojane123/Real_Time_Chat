@@ -251,6 +251,11 @@ export default function ChatRoom() {
   const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
   const [toastText, setToastText] = useState(null);
 
+  // File Uploading, Drag-and-Drop & Lightbox State
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
+
   // Typing Feature State
   const [typingUsers, setTypingUsers] = useState([]);
   const typingTimeoutRef = useRef(null);
@@ -988,26 +993,67 @@ export default function ChatRoom() {
     setReplyingTo(null);
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
+  const uploadAndSendFile = async (file) => {
     if (!file) return;
+    setIsUploadingFile(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
       const cleanApiUrl = baseUrl.replace(/\/+$/, '');
-      const res = await axios.post(`${cleanApiUrl}/upload`, formData);
+      const res = await axios.post(`${cleanApiUrl}/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       if (res.data && res.data.fileUrl) {
         socketRef.current?.emit('sendMessage', {
           passcode,
           nickname,
           message: `[File Attachment] ${res.data.fileName || file.name}`,
           fileUrl: res.data.fileUrl,
-          replyTo: replyingTo ? { id: replyingTo.id, nickname: replyingTo.nickname, message: cleanInstagramMessage(replyingTo.message) } : null,
+          fileName: res.data.fileName || file.name,
+          fileType: res.data.fileType || file.type,
+          fileSize: res.data.fileSize || file.size,
+          replyTo: replyingTo
+            ? { id: replyingTo.id, nickname: replyingTo.nickname, message: cleanInstagramMessage(replyingTo.message) }
+            : null,
         });
         setReplyingTo(null);
+        showToast(`Uploaded "${res.data.fileName || file.name}"`);
       }
     } catch (err) {
+      console.error('File upload error', err);
       alert('File upload failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadAndSendFile(file);
+    e.target.value = '';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingFile) setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      await uploadAndSendFile(file);
     }
   };
 
