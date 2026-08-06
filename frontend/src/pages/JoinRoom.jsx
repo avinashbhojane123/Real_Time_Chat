@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { getApiBaseUrl } from '../utils/apiConfig';
 
 export default function JoinRoom() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function JoinRoom() {
   // Secret Room Passcode Portal State
   const [showSecretModal, setShowSecretModal] = useState(false);
   const [baseUrl, setBaseUrl] = useState(
-    localStorage.getItem('baseUrl') || 'https://backend-9i6w.onrender.com/api'
+    localStorage.getItem('baseUrl') || getApiBaseUrl()
   );
   const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
   const [passcode, setPasscode] = useState(localStorage.getItem('passcode') || '');

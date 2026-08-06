@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { cleanInstagramMessage } from '../utils/instagram';
+import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
 import YouTubePreview, { parseYouTubeUrl } from '../components/YouTubePreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
@@ -44,7 +45,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
     const fetchMeta = async () => {
       try {
         setLoading(true);
-        const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+        const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
         const res = await axios.get(`${cleanApiUrl}/instagram/view`, {
           params: { url: `https://www.instagram.com/reel/${shortcode}/` },
         });
@@ -65,7 +66,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
 
   if (!shortcode) return null;
 
-  const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+  const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
   const proxyUrl = meta?.proxyVideoUrl
     ? (meta.proxyVideoUrl.startsWith('http') ? meta.proxyVideoUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyVideoUrl}`)
     : null;
@@ -216,7 +217,7 @@ function formatLastSeen(lastSeenDate) {
 export default function ChatRoom() {
   const navigate = useNavigate();
 
-  const baseUrl = localStorage.getItem('baseUrl') || 'https://backend-9i6w.onrender.com/api';
+  const baseUrl = localStorage.getItem('baseUrl') || getApiBaseUrl();
   const nickname = (localStorage.getItem('nickname') || '').trim();
   const passcode = (localStorage.getItem('passcode') || '').trim();
   const avatarUrl = localStorage.getItem('avatarUrl') || '';
@@ -603,8 +604,13 @@ export default function ChatRoom() {
       return;
     }
 
-    const socketUrl = baseUrl.replace(/\/api\/?$/, '');
-    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+    const socketUrl = getSocketBaseUrl(baseUrl);
+    const socket = io(socketUrl, {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: 15,
+      reconnectionDelay: 1000,
+    });
     socketRef.current = socket;
 
     socket.on('connect', () => {

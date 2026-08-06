@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { getApiBaseUrl } from '../utils/apiConfig';
 
 const GRADIENTS = [
   'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
@@ -18,7 +19,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFileName, setMediaFileName] = useState('');
 
-  const cleanApiUrl = (baseUrl || 'https://backend-9i6w.onrender.com/api').replace(/\/+$/, '');
+  const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
