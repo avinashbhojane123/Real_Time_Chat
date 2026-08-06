@@ -508,7 +508,7 @@ export class InstagramService {
         hostname: 'instagram120.p.rapidapi.com',
         path: '/api/instagram/links',
         headers: {
-          'x-rapidapi-key': process.env.RAPIDAPI_INSTAGRAM_KEY || '59df956928msh884a74ccf199e2dp1f51f3jsnfae0b679277f',
+          'x-rapidapi-key': process.env.RAPIDAPI_INSTAGRAM_KEY || '',
           'x-rapidapi-host': 'instagram120.p.rapidapi.com',
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(postData),
