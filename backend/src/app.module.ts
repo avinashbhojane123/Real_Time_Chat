@@ -16,28 +16,28 @@ import { KeepAliveModule } from './keep-alive/keep-alive.module';
     }),
 
     TypeOrmModule.forRoot({
-      type: 'postgres',
+      type: (process.env.DB_TYPE as any) || 'postgres',
 
-      host: process.env.DB_HOST,
+      host: process.env.DB_HOST || 'localhost',
       port: Number(process.env.DB_PORT || 5432),
 
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+      database: process.env.DB_NAME || 'realtime_chat',
 
       ssl:
-        process.env.NODE_ENV ===
-        'production'
+        process.env.DB_SSL === 'true' || process.env.NODE_ENV === 'production'
           ? {
-              rejectUnauthorized:
-                false,
-            }
+            rejectUnauthorized:
+              process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
+          }
           : false,
 
       autoLoadEntities: true,
-      // synchronize: process.env.NODE_ENV !== 'production',
-      synchronize: true,
-      // logging: true,
+      synchronize:
+        process.env.DB_SYNCHRONIZE !== undefined
+          ? process.env.DB_SYNCHRONIZE === 'true'
+          : process.env.NODE_ENV !== 'production',
     }),
 
     RoomsModule,
@@ -48,6 +48,6 @@ import { KeepAliveModule } from './keep-alive/keep-alive.module';
     KeepAliveModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
 
 

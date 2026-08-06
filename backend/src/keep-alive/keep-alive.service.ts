@@ -46,12 +46,15 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
       });
     }, intervalMs);
 
-    // Do an initial ping after a short 15-second delay to ensure server startup complete
+    // Do an initial ping after initial delay to ensure server startup complete
+    const initialDelayMs = Number(
+      this.configService.get<string>('KEEP_ALIVE_INITIAL_DELAY_MS') || 15000,
+    );
     setTimeout(() => {
       this.pingServer().catch((err) => {
         this.logger.warn(`Initial keep-alive ping skipped/failed: ${err.message}`);
       });
-    }, 15000);
+    }, initialDelayMs);
   }
 
   onModuleDestroy() {
@@ -161,6 +164,9 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
     return new Promise((resolve, reject) => {
       const parsedUrl = new URL(url);
       const client = parsedUrl.protocol === 'https:' ? https : http;
+      const timeoutMs = Number(
+        this.configService.get<string>('KEEP_ALIVE_TIMEOUT_MS') || 10000,
+      );
 
       const req = client.get(url, (res) => {
         let body = '';
@@ -179,9 +185,9 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
         reject(err);
       });
 
-      req.setTimeout(10000, () => {
+      req.setTimeout(timeoutMs, () => {
         req.destroy();
-        reject(new Error('Request timed out after 10000ms'));
+        reject(new Error(`Request timed out after ${timeoutMs}ms`));
       });
 
       req.end();

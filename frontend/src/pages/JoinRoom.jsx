@@ -89,7 +89,7 @@ export default function JoinRoom() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ fontSize: '0.875rem', color: 'var(--m3-on-surface-variant)' }}>Req ID: #ENG-2026-X9</span>
-          
+
           {/* Discrete Hidden Corner Button for Secret Access */}
           <button
             onClick={() => {

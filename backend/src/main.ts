@@ -29,9 +29,10 @@ async function bootstrap() {
     }),
   );
 
+  const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
   const uploadPath = join(
     process.cwd(),
-    'uploads',
+    uploadDirName,
   );
 
   console.log(
@@ -39,8 +40,10 @@ async function bootstrap() {
     uploadPath,
   );
 
+  const uploadPrefix = process.env.UPLOAD_PREFIX || '/uploads/';
+
   app.useStaticAssets(uploadPath, {
-    prefix: '/uploads/',
+    prefix: uploadPrefix,
     setHeaders: (res) => {
       res.set('Access-Control-Allow-Origin', '*');
       res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -48,12 +51,15 @@ async function bootstrap() {
     },
   });
 
-  app.setGlobalPrefix('api', {
-    exclude: ['uploads/(.*)', 'uploads'],
+  const globalPrefix = process.env.GLOBAL_PREFIX || 'api';
+  const excludePath = uploadDirName + '/(.*)';
+
+  app.setGlobalPrefix(globalPrefix, {
+    exclude: [excludePath, uploadDirName],
   });
 
   const port =
-    process.env.PORT || 10000;
+    Number(process.env.PORT || 10000);
 
   await app.listen(port);
 

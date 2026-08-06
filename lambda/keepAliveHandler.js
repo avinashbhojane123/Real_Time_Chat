@@ -23,6 +23,8 @@ exports.handler = async (event, context) => {
   const parsedUrl = new URL(url);
   const client = parsedUrl.protocol === 'https:' ? https : http;
 
+  const timeoutMs = Number(process.env.PING_TIMEOUT_MS || 10000);
+
   return new Promise((resolve, reject) => {
     const req = client.get(url, (res) => {
       let body = '';
@@ -56,9 +58,9 @@ exports.handler = async (event, context) => {
       reject(error);
     });
 
-    req.setTimeout(10000, () => {
+    req.setTimeout(timeoutMs, () => {
       req.destroy();
-      reject(new Error(`Server ping to ${url} timed out after 10 seconds`));
+      reject(new Error(`Server ping to ${url} timed out after ${timeoutMs}ms`));
     });
 
     req.end();
@@ -68,7 +70,7 @@ exports.handler = async (event, context) => {
 // Allow direct execution locally for testing (node lambda/keepAliveHandler.js)
 if (require.main === module) {
   exports
-    .handler({ url: process.env.RENDER_SERVER_URL || 'http://localhost:10000/api/keep-alive/ping' })
+    .handler({ url: process.env.RENDER_SERVER_URL || process.env.TARGET_URL })
     .then((res) => console.log('Ping Result:', JSON.parse(res.body)))
     .catch((err) => console.error('Ping Error:', err.message));
 }

@@ -48,10 +48,12 @@ import {
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+      : '*',
   },
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 10000),
+  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 5000),
 })
 export class ChatGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnApplicationBootstrap, OnModuleDestroy {
@@ -83,7 +85,8 @@ export class ChatGateway
       .set({ isOnline: false })
       .execute();
 
-    this.cleanupTimer = setInterval(() => this.cleanupExpiredMessages(), 5000);
+    const cleanupInterval = Number(process.env.MESSAGE_CLEANUP_INTERVAL || 5000);
+    this.cleanupTimer = setInterval(() => this.cleanupExpiredMessages(), cleanupInterval);
   }
 
   onModuleDestroy() {

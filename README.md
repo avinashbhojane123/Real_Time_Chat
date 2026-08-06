@@ -77,18 +77,38 @@ cd Real_Time_Chat
 
 ```bash
 cd backend
-cp .env.example .env   # or create .env manually
+cp .env.example .env   # or copy from backend/.env.example
 ```
 
 Add the following variables to `backend/.env`:
 
 ```env
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USERNAME=your_db_user
-DATABASE_PASSWORD=your_db_password
-DATABASE_NAME=real_time_chat
 PORT=10000
+NODE_ENV=development
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+
+DB_TYPE=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_NAME=realtime_chat
+DB_SSL_REJECT_UNAUTHORIZED=false
+DB_SYNCHRONIZE=true
+
+UPLOAD_DIR=uploads
+UPLOAD_PREFIX=/uploads/
+MAX_FILE_SIZE_MB=100
+BLOCKED_FILE_EXTENSIONS=.exe,.bat,.cmd,.vbs,.com,.scr,.pif,.msi
+
+SOCKET_PING_INTERVAL=10000
+SOCKET_PING_TIMEOUT=5000
+MESSAGE_CLEANUP_INTERVAL=5000
+
+DISABLE_KEEP_ALIVE=false
+KEEP_ALIVE_INTERVAL_MINUTES=10
+KEEP_ALIVE_INITIAL_DELAY_MS=15000
+KEEP_ALIVE_TIMEOUT_MS=10000
 ```
 
 Install dependencies and start:

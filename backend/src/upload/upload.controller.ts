@@ -17,9 +17,10 @@ import { extname, join } from 'path';
 import * as fs from 'fs';
 import { readdirSync } from 'fs';
 
+const uploadFolder = process.env.UPLOAD_DIR || 'uploads';
 const uploadDir = join(
   process.cwd(),
-  'uploads',
+  uploadFolder,
 );
 
 if (!fs.existsSync(uploadDir)) {
@@ -27,6 +28,11 @@ if (!fs.existsSync(uploadDir)) {
     recursive: true,
   });
 }
+
+const maxFileSizeMB = Number(process.env.MAX_FILE_SIZE_MB || 100);
+const blockedExtList = process.env.BLOCKED_FILE_EXTENSIONS
+  ? process.env.BLOCKED_FILE_EXTENSIONS.split(',').map((e) => e.trim().toLowerCase())
+  : ['.exe', '.bat', '.cmd', '.vbs', '.com', '.scr', '.pif', '.msi'];
 
 @Controller('upload')
 export class UploadController {
@@ -64,16 +70,14 @@ export class UploadController {
 
       fileFilter: (req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase();
-        const blockedExtensions = ['.exe', '.bat', '.cmd', '.vbs', '.com', '.scr', '.pif', '.msi'];
-        if (blockedExtensions.includes(ext)) {
-          return cb(new Error(`Executable file type (${ext}) is not allowed`), false);
+        if (blockedExtList.includes(ext)) {
+          return cb(new Error(`Executable or blocked file type (${ext}) is not allowed`), false);
         }
         cb(null, true);
       },
 
       limits: {
-        fileSize:
-          100 * 1024 * 1024, // 100MB
+        fileSize: maxFileSizeMB * 1024 * 1024,
       },
     }),
   )
@@ -97,7 +101,9 @@ export class UploadController {
       file.path,
     );
 
-    const fileUrl = `/uploads/${file.filename}`;
+    const uploadPrefix = process.env.UPLOAD_PREFIX || '/uploads/';
+    const cleanPrefix = uploadPrefix.endsWith('/') ? uploadPrefix : `${uploadPrefix}/`;
+    const fileUrl = `${cleanPrefix}${file.filename}`;
 
     return {
       success: true,
