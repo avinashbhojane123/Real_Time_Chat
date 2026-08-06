@@ -7,6 +7,7 @@ import { ChatModule } from './chat/chat.module';
 import { UploadModule } from './upload/upload.module';
 import { InstagramModule } from './instagram/instagram.module';
 import { StatusModule } from './status/status.module';
+import { KeepAliveModule } from './keep-alive/keep-alive.module';
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { StatusModule } from './status/status.module';
 
       autoLoadEntities: true,
       // synchronize: process.env.NODE_ENV !== 'production',
-synchronize: true,
+      synchronize: true,
       // logging: true,
     }),
 
@@ -44,6 +45,7 @@ synchronize: true,
     UploadModule,
     InstagramModule,
     StatusModule,
+    KeepAliveModule,
   ],
 })
 export class AppModule {}

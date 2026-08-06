@@ -136,6 +136,25 @@ To deploy your own instance, update `VITE_API_URL` / `VITE_SOCKET_URL` in the fr
 
 ---
 
+## ⚡ Render Keep-Alive (Prevent Server Sleeping)
+
+Render free tier web services spin down after 15 minutes of inactivity. The application includes three keep-alive mechanisms:
+
+1. **Built-in NestJS Self-Ping Service (`KeepAliveModule`)**:
+   - Automatically pings `RENDER_EXTERNAL_URL` or `PING_URL` every 10 minutes.
+   - Endpoint: `GET /api/keep-alive/ping` (returns health status & uptime).
+   - Environment variables: `KEEP_ALIVE_INTERVAL_MINUTES=10`, `DISABLE_KEEP_ALIVE=false`.
+
+2. **AWS Lambda Script (`lambda/keepAliveHandler.js`)**:
+   - Deployable to AWS Lambda with an EventBridge trigger (cron every 10 mins).
+   - Set environment variable `RENDER_SERVER_URL=https://your-app.onrender.com`.
+
+3. **GitHub Actions Cron Workflow (`.github/workflows/keep-alive.yml`)**:
+   - Automated workflow running every 10 minutes (`*/10 * * * *`).
+   - Add your Render server URL as a repository secret `RENDER_SERVER_URL` on GitHub.
+
+---
+
 ## 📡 WebSocket Events
 
 ### Client → Server

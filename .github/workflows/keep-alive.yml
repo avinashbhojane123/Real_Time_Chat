@@ -1,0 +1,40 @@
+name: Keep Render Server Awake
+
+on:
+  schedule:
+    # Runs every 10 minutes (Render sleeps after 15 minutes of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping-server:
+    name: Ping Render Server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Keep-Alive Endpoint
+        run: |
+          TARGET_URL="${{ secrets.RENDER_SERVER_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            TARGET_URL="https://yoursitehere.onrender.com"
+          fi
+          
+          # Remove trailing slash if present
+          TARGET_URL="${TARGET_URL%/}"
+          
+          # Append health check endpoint if not specified
+          if [[ "$TARGET_URL" != *"/api/keep-alive"* ]] && [[ "$TARGET_URL" != *"/api/ping"* ]]; then
+            PING_ENDPOINT="${TARGET_URL}/api/keep-alive/ping"
+          else
+            PING_ENDPOINT="${TARGET_URL}"
+          fi
+          
+          echo "Pinging server at: $PING_ENDPOINT"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$PING_ENDPOINT")
+          echo "HTTP Status Code: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Successfully pinged Render server! Server status: OK"
+          else
+            echo "Failed to receive valid status code from Render server (Code: $HTTP_STATUS)"
+            exit 1
+          fi
