@@ -411,7 +411,7 @@ export default function ChatRoom() {
     setIsPipMode(false);
     setRemoteIsPip(false);
     if (typeof document !== 'undefined' && document.pictureInPictureElement) {
-      document.exitPictureInPicture().catch(() => {});
+      document.exitPictureInPicture().catch(() => { });
     }
   }, []);
 
@@ -454,7 +454,7 @@ export default function ChatRoom() {
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
-      } catch (e) {}
+      } catch (e) { }
     }
     pendingIceCandidatesRef.current = [];
 
@@ -515,14 +515,14 @@ export default function ChatRoom() {
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
-      localVideoRef.current.play().catch(() => {});
+      localVideoRef.current.play().catch(() => { });
     }
   }, [localStream, callState]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play().catch(() => {});
+      remoteVideoRef.current.play().catch(() => { });
     }
   }, [remoteStream, callState]);
 
@@ -704,11 +704,11 @@ export default function ChatRoom() {
         prev.map((msg) =>
           msg.id === messageId
             ? {
-                ...msg,
-                message: newMessage ?? msg.message,
-                fileUrl: fileUrl !== undefined ? fileUrl : msg.fileUrl,
-                isEdited: true,
-              }
+              ...msg,
+              message: newMessage ?? msg.message,
+              fileUrl: fileUrl !== undefined ? fileUrl : msg.fileUrl,
+              isEdited: true,
+            }
             : msg
         )
       );
@@ -719,14 +719,14 @@ export default function ChatRoom() {
         prev.map((msg) =>
           msg.id === messageId
             ? {
-                ...msg,
-                isDeleted: true,
-                message: 'This message was deleted',
-                fileUrl: null,
-                fileName: null,
-                fileType: null,
-                fileSize: null,
-              }
+              ...msg,
+              isDeleted: true,
+              message: 'This message was deleted',
+              fileUrl: null,
+              fileName: null,
+              fileType: null,
+              fileSize: null,
+            }
             : msg
         )
       );
@@ -1313,7 +1313,38 @@ export default function ChatRoom() {
         {/* Dynamic View Sections based on Active Tab */}
         {/* Main Side-by-Side Workspace */}
         <main className="m3-main-chat" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: '280px' }}>
+          <div
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: '280px', position: 'relative' }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {/* Drag and Drop File Upload Overlay */}
+            {isDraggingFile && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(37, 211, 102, 0.25)',
+                  backdropFilter: 'blur(6px)',
+                  border: '3px dashed #25d366',
+                  borderRadius: '16px',
+                  zIndex: 9999,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  pointerEvents: 'none',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '56px', color: '#25d366' }}>
+                  cloud_upload
+                </span>
+                <h3 style={{ margin: '12px 0 4px 0', fontSize: '1.3rem', fontWeight: 700 }}>Drop File to Upload</h3>
+                <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>Release file to send to space</p>
+              </div>
+            )}
             {/* Always Visible Top WhatsApp Status Header Bar */}
             <div
               style={{
@@ -1796,6 +1827,28 @@ export default function ChatRoom() {
               </div>
             )}
 
+            {/* Active File Uploading Indicator Bar */}
+            {isUploadingFile && (
+              <div
+                style={{
+                  padding: '8px 20px',
+                  backgroundColor: 'rgba(37, 211, 102, 0.15)',
+                  borderTop: '1px solid rgba(37, 211, 102, 0.3)',
+                  color: '#81c784',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px', animation: 'spin 1.5s linear infinite' }}>
+                  sync
+                </span>
+                <span>Uploading file attachment to space...</span>
+              </div>
+            )}
+
             {/* Chat Input Bar */}
             <div style={{ padding: '16px 20px', backgroundColor: 'var(--m3-surface-container)', borderTop: '1px solid var(--m3-outline-variant)' }}>
               <form onSubmit={sendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -1828,33 +1881,33 @@ export default function ChatRoom() {
               style={
                 isPipMode
                   ? {
-                      position: 'fixed',
-                      bottom: '24px',
-                      right: '24px',
-                      width: '360px',
-                      height: '270px',
-                      zIndex: 1000,
-                      borderRadius: 'var(--m3-radius-l)',
-                      border: '1px solid var(--m3-primary)',
-                      backgroundColor: 'var(--m3-surface-container-high)',
-                      boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                      transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
-                    }
+                    position: 'fixed',
+                    bottom: '24px',
+                    right: '24px',
+                    width: '360px',
+                    height: '270px',
+                    zIndex: 1000,
+                    borderRadius: 'var(--m3-radius-l)',
+                    border: '1px solid var(--m3-primary)',
+                    backgroundColor: 'var(--m3-surface-container-high)',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
+                  }
                   : {
-                      width: '420px',
-                      maxWidth: '45%',
-                      minWidth: '300px',
-                      borderLeft: '1px solid var(--m3-outline-variant)',
-                      backgroundColor: 'var(--m3-surface-container-lowest)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      position: 'relative',
-                      transition: 'all 0.3s ease',
-                      height: '100%',
-                    }
+                    width: '420px',
+                    maxWidth: '45%',
+                    minWidth: '300px',
+                    borderLeft: '1px solid var(--m3-outline-variant)',
+                    backgroundColor: 'var(--m3-surface-container-lowest)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    transition: 'all 0.3s ease',
+                    height: '100%',
+                  }
               }
             >
               {/* Video Panel Header */}
@@ -2258,6 +2311,68 @@ export default function ChatRoom() {
             check_circle
           </span>
           <span>{toastText}</span>
+        </div>
+      )}
+
+      {/* Image Lightbox Viewer Modal */}
+      {lightboxImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.92)',
+            zIndex: 999999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(8px)',
+          }}
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: 'rgba(255,255,255,0.15)',
+              border: 'none',
+              color: '#fff',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => setLightboxImage(null)}
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <img
+            src={lightboxImage.url}
+            alt={lightboxImage.name}
+            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 12px 40px rgba(0,0,0,0.8)' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{lightboxImage.name}</span>
+            <a
+              href={lightboxImage.url}
+              download
+              target="_blank"
+              rel="noreferrer"
+              className="m3-btn m3-btn-filled"
+              style={{ padding: '6px 16px', fontSize: '0.8rem', borderRadius: '20px' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
+              Download
+            </a>
+          </div>
         </div>
       )}
     </div>

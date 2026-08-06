@@ -49,7 +49,7 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api', {
-    exclude: ['uploads/*path'],
+    exclude: ['uploads/(.*)', 'uploads'],
   });
 
   const port =

@@ -45,6 +45,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
       alert('Failed to upload media file.');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
