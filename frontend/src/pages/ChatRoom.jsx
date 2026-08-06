@@ -69,6 +69,9 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
   const proxyUrl = meta?.proxyVideoUrl
     ? (meta.proxyVideoUrl.startsWith('http') ? meta.proxyVideoUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyVideoUrl}`)
     : null;
+  const posterUrl = meta?.proxyThumbnailUrl
+    ? (meta.proxyThumbnailUrl.startsWith('http') ? meta.proxyThumbnailUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyThumbnailUrl}`)
+    : meta?.thumbnailUrl;
   const cleanUrl = `https://www.instagram.com/reel/${shortcode}/`;
 
   const handleCopyCleanUrl = (e) => {
@@ -128,7 +131,7 @@ function InstagramVideoPlayer({ shortcode, baseUrl }) {
             controls
             loop
             playsInline
-            poster={meta?.thumbnailUrl}
+            poster={posterUrl}
             style={{ width: '100%', maxHeight: '460px', display: 'block', objectFit: 'contain' }}
           />
         </div>

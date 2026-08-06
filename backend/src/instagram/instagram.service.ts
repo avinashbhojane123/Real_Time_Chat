@@ -23,6 +23,7 @@ export interface InstagramMediaResult {
   thumbnailUrl?: string;
   directVideoUrl?: string;
   proxyVideoUrl?: string;
+  proxyThumbnailUrl?: string;
   embedUrl: string;
   originalUrl: string;
   canViewWithoutAccount: boolean;
@@ -132,6 +133,10 @@ export class InstagramService {
         ? `/api/instagram/stream?url=${encodeURIComponent(extracted.directVideoUrl)}`
         : undefined;
 
+      const proxyThumbnailUrl = extracted.thumbnailUrl
+        ? `/api/instagram/stream?url=${encodeURIComponent(extracted.thumbnailUrl)}`
+        : undefined;
+
       return {
         success: true,
         type: 'instagram',
@@ -145,10 +150,11 @@ export class InstagramService {
         thumbnailUrl: extracted.thumbnailUrl,
         directVideoUrl: extracted.directVideoUrl,
         proxyVideoUrl,
+        proxyThumbnailUrl,
         embedUrl,
         originalUrl,
         canViewWithoutAccount: true,
-        message: 'Instagram media extracted successfully via yt-dlp/gallery-dl/Playwright for account-free viewing.',
+        message: 'Instagram media extracted successfully via RapidAPI for direct in-browser account-free viewing.',
       };
     }
 
@@ -519,29 +525,35 @@ export class InstagramService {
           try {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               const data = JSON.parse(body);
-              const result = data.result || data;
+              const item = Array.isArray(data) ? data[0] : (data.result || data);
 
               let directVideoUrl: string | undefined =
-                result?.video_url ||
-                result?.download_url ||
-                (Array.isArray(result) && result[0]?.url) ||
-                (Array.isArray(result?.urls) && result.urls[0]?.url) ||
-                result?.url;
+                (Array.isArray(item?.urls) && item.urls[0]?.url) ||
+                item?.video_url ||
+                item?.download_url ||
+                item?.url;
 
-              if (!directVideoUrl && Array.isArray(result)) {
-                const vidObj = result.find((item: any) => item.type === 'video' || item.url?.includes('.mp4'));
-                if (vidObj) directVideoUrl = vidObj.url;
+              if (!directVideoUrl && Array.isArray(data)) {
+                for (const sub of data) {
+                  if (Array.isArray(sub?.urls)) {
+                    const found = sub.urls.find((u: any) => u.url && (u.extension === 'mp4' || u.url.includes('.mp4')));
+                    if (found) {
+                      directVideoUrl = found.url;
+                      break;
+                    }
+                  }
+                }
               }
 
               const thumbnailUrl =
-                result?.cover_url ||
-                result?.thumbnail_url ||
-                result?.thumbnail ||
-                (Array.isArray(result?.urls) && result.urls[0]?.cover) ||
-                (Array.isArray(result) && result[0]?.cover);
+                item?.pictureUrl ||
+                item?.cover_url ||
+                item?.thumbnail_url ||
+                item?.thumbnail ||
+                (Array.isArray(item?.urls) && item.urls[0]?.cover);
 
-              const caption = result?.title || result?.caption || result?.description;
-              const authorUsername = result?.author?.username || result?.username || result?.uploader;
+              const caption = item?.meta?.title || item?.title || item?.caption || item?.description;
+              const authorUsername = item?.meta?.username || item?.author?.username || item?.username || item?.uploader;
 
               if (directVideoUrl) {
                 return resolve({ directVideoUrl, thumbnailUrl, caption, authorUsername });
