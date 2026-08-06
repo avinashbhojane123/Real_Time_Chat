@@ -351,7 +351,7 @@ export default function ChatRoom() {
 
 
 
-  // Call States
+  // Call States & Controls
   const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
   const [callerName, setCallerName] = useState('');
   const [remoteUserName, setRemoteUserName] = useState('');
@@ -361,13 +361,17 @@ export default function ChatRoom() {
   const [cameraOff, setCameraOff] = useState(false);
   const [isPipMode, setIsPipMode] = useState(false);
   const [remoteIsPip, setRemoteIsPip] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
 
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const localVideoRef = useRef(null);
   const chatBottomRef = useRef(null);
   const callStateRef = useRef('idle');
+  const pendingIceCandidatesRef = useRef([]);
+  const callTimerRef = useRef(null);
 
   const updateCallState = (state) => {
     setCallState(state);
@@ -375,13 +379,24 @@ export default function ChatRoom() {
   };
 
   const cleanUpCall = useCallback(() => {
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+    setCallDuration(0);
+    pendingIceCandidatesRef.current = [];
+
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       setLocalStream(null);
     }
     if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
+      try {
+        peerConnectionRef.current.close();
+      } catch (err) {
+        console.warn('Error closing peerConnection:', err);
+      }
       peerConnectionRef.current = null;
     }
     setRemoteStream(null);
@@ -391,17 +406,49 @@ export default function ChatRoom() {
     setIsPipMode(false);
     setRemoteIsPip(false);
     if (typeof document !== 'undefined' && document.pictureInPictureElement) {
-      document.exitPictureInPicture().catch(() => { });
+      document.exitPictureInPicture().catch(() => {});
+    }
+  }, []);
+
+  const addIceCandidateSafely = useCallback((candidate) => {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+      pc.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
+        console.warn('Error adding ICE candidate:', err);
+      });
+    } else {
+      pendingIceCandidatesRef.current.push(candidate);
+    }
+  }, []);
+
+  const processPendingIceCandidates = useCallback(() => {
+    const pc = peerConnectionRef.current;
+    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+      while (pendingIceCandidatesRef.current.length > 0) {
+        const cand = pendingIceCandidatesRef.current.shift();
+        pc.addIceCandidate(new RTCIceCandidate(cand)).catch((err) => {
+          console.warn('Error processing pending ICE candidate:', err);
+        });
+      }
     }
   }, []);
 
   const createPeerConnection = useCallback(() => {
-    if (peerConnectionRef.current) peerConnectionRef.current.close();
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
+    }
+    pendingIceCandidatesRef.current = [];
 
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
       ],
     });
 
@@ -412,7 +459,15 @@ export default function ChatRoom() {
     };
 
     pc.ontrack = (e) => {
-      if (e.streams[0]) setRemoteStream(e.streams[0]);
+      if (e.streams && e.streams[0]) {
+        setRemoteStream(e.streams[0]);
+      } else if (e.track) {
+        setRemoteStream(new MediaStream([e.track]));
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('[WebRTC ICE State]:', pc.iceConnectionState);
     };
 
     if (localStreamRef.current) {
@@ -424,6 +479,45 @@ export default function ChatRoom() {
     peerConnectionRef.current = pc;
     return pc;
   }, [passcode]);
+
+  // Video element binding effect
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [localStream, callState]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteStream, callState]);
+
+  // Active call duration timer
+  useEffect(() => {
+    if (callState === 'active') {
+      setCallDuration(0);
+      callTimerRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+    };
+  }, [callState]);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Auto scroll chat
   useEffect(() => {
@@ -491,15 +585,20 @@ export default function ChatRoom() {
     });
 
     socket.on('callDeclined', () => {
-      alert('Call was declined');
+      setToastText('Call was declined');
+      setTimeout(() => setToastText(''), 3500);
       cleanUpCall();
     });
 
     socket.on('webrtcOfferRelay', ({ offer }) => {
-      if (callStateRef.current === 'active') {
-        const pc = createPeerConnection();
+      if (callStateRef.current === 'active' || callStateRef.current === 'incoming') {
+        updateCallState('active');
+        const pc = peerConnectionRef.current || createPeerConnection();
         pc.setRemoteDescription(new RTCSessionDescription(offer))
-          .then(() => pc.createAnswer())
+          .then(() => {
+            processPendingIceCandidates();
+            return pc.createAnswer();
+          })
           .then((answer) => pc.setLocalDescription(answer))
           .then(() => socket.emit('webrtcAnswer', { passcode, answer: pc.localDescription }))
           .catch(console.error);
@@ -507,19 +606,23 @@ export default function ChatRoom() {
     });
 
     socket.on('webrtcAnswerRelay', ({ answer }) => {
-      if (callStateRef.current === 'active' && peerConnectionRef.current) {
-        peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer)).catch(console.error);
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current
+          .setRemoteDescription(new RTCSessionDescription(answer))
+          .then(() => {
+            processPendingIceCandidates();
+          })
+          .catch(console.error);
       }
     });
 
     socket.on('webrtcCandidateRelay', ({ candidate }) => {
-      if (callStateRef.current === 'active' && peerConnectionRef.current) {
-        peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-      }
+      addIceCandidateSafely(candidate);
     });
 
     socket.on('callEnded', () => {
-      alert('Call ended');
+      setToastText('Call ended');
+      setTimeout(() => setToastText(''), 3500);
       cleanUpCall();
     });
 
@@ -873,6 +976,57 @@ export default function ChatRoom() {
 
   return (
     <div className="m3-app-container">
+      {/* Floating Top Incoming Call Banner */}
+      {callState === 'incoming' && (
+        <div className="m3-incoming-call-banner">
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--m3-tertiary-container)',
+              color: 'var(--m3-tertiary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '1.1rem',
+              border: '2px solid var(--m3-tertiary)',
+            }}
+          >
+            {(callerName || 'U').slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>
+              {callerName || 'Someone'} is calling...
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)' }}>
+              Incoming Video Call
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginLeft: '12px' }}>
+            <button
+              type="button"
+              className="m3-btn m3-btn-filled pulse-accept-btn"
+              style={{ backgroundColor: '#81c784', color: '#000', padding: '8px 18px' }}
+              onClick={acceptCall}
+            >
+              <span className="material-symbols-outlined">call</span>
+              Accept
+            </button>
+            <button
+              type="button"
+              className="m3-btn m3-btn-danger"
+              style={{ padding: '8px 18px' }}
+              onClick={declineCall}
+            >
+              <span className="material-symbols-outlined">call_end</span>
+              Decline
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* M3 Top App Bar */}
       <header className="m3-top-app-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1600,21 +1754,41 @@ export default function ChatRoom() {
             </div>
           </div>
 
-          {/* Side-by-Side Video Call Panel */}
+          {/* Side-by-Side Video Call Panel / Floating Overlay */}
           {(showVideoPanel || callState !== 'idle') && (
             <div
               className="m3-video-panel"
-              style={{
-                flex: 1,
-                maxWidth: isPipMode ? '340px' : '450px',
-                minWidth: '280px',
-                borderLeft: '1px solid var(--m3-outline-variant)',
-                backgroundColor: 'var(--m3-surface-container-lowest)',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-                transition: 'all 0.3s ease',
-              }}
+              style={
+                isPipMode
+                  ? {
+                      position: 'fixed',
+                      bottom: '24px',
+                      right: '24px',
+                      width: '360px',
+                      height: '270px',
+                      zIndex: 1000,
+                      borderRadius: 'var(--m3-radius-l)',
+                      border: '1px solid var(--m3-primary)',
+                      backgroundColor: 'var(--m3-surface-container-high)',
+                      boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
+                    }
+                  : {
+                      width: '420px',
+                      maxWidth: '45%',
+                      minWidth: '300px',
+                      borderLeft: '1px solid var(--m3-outline-variant)',
+                      backgroundColor: 'var(--m3-surface-container-lowest)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                      transition: 'all 0.3s ease',
+                      height: '100%',
+                    }
+              }
             >
               {/* Video Panel Header */}
               <div
@@ -1625,46 +1799,110 @@ export default function ChatRoom() {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   backgroundColor: 'var(--m3-surface-container)',
+                  flexShrink: 0,
                 }}
               >
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--m3-primary)' }}>
-                  <span className="material-symbols-outlined">videocam</span>
-                  Video Call Space
-                </h3>
-                <button
-                  className="m3-btn m3-btn-icon m3-btn-outlined"
-                  style={{ width: '28px', height: '28px' }}
-                  onClick={() => setShowVideoPanel(false)}
-                  title="Close Video Panel"
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)', fontSize: '20px' }}>
+                    videocam
+                  </span>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--m3-on-surface)' }}>
+                    Video Call Space
+                  </h3>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-outlined'}`}
+                    style={{ width: '28px', height: '28px' }}
+                    onClick={togglePipMode}
+                    title={isPipMode ? 'Dock to Side Panel' : 'Float over Chat'}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                      {isPipMode ? 'dock' : 'picture_in_picture_alt'}
+                    </span>
+                  </button>
+
+                  <button
+                    className="m3-btn m3-btn-icon m3-btn-outlined"
+                    style={{ width: '28px', height: '28px' }}
+                    onClick={() => setShowVideoPanel(false)}
+                    title="Hide Video Panel"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                      close
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {/* Video Panel Body */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', backgroundColor: '#0c0a0f' }}>
                 {callState === 'idle' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--m3-primary)', marginBottom: '12px', opacity: 0.8 }}>
-                      videocam
-                    </span>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>Video Call Ready</h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '20px', maxWidth: '240px' }}>
-                      Start an instant video call right beside your chat window.
+                    <div
+                      style={{
+                        width: '72px',
+                        height: '72px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--m3-primary-container)',
+                        color: 'var(--m3-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>
+                        videocam
+                      </span>
+                    </div>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '6px', color: 'var(--m3-on-surface)' }}>
+                      Ready to Connect
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px', maxWidth: '240px', lineHeight: 1.4 }}>
+                      Start an instant peer-to-peer video call with members in Space #{passcode}.
                     </p>
-                    <button className="m3-btn m3-btn-filled" onClick={startCall} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 20px' }}>
+                    <button
+                      className="m3-btn m3-btn-filled"
+                      onClick={startCall}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px', borderRadius: 'var(--m3-radius-full)' }}
+                    >
                       <span className="material-symbols-outlined">call</span>
-                      <span>Start Call</span>
+                      <span>Start Video Call</span>
                     </button>
                   </div>
                 )}
 
                 {callState === 'calling' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '44px', color: 'var(--m3-primary)', marginBottom: '12px' }}>call</span>
-                    <h4 style={{ fontSize: '1rem' }}>Calling {remoteUserName || 'Space Members'}...</h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '20px' }}>Waiting for response</p>
-                    <button className="m3-btn m3-btn-danger" onClick={endCall}>
+                    <div
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--m3-secondary-container)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.8rem',
+                        fontWeight: 700,
+                        color: 'var(--m3-primary)',
+                        marginBottom: '16px',
+                        border: '3px solid var(--m3-primary)',
+                        animation: 'storyPulse 2s infinite',
+                      }}
+                    >
+                      {(remoteUserName || 'S').slice(0, 2).toUpperCase()}
+                    </div>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--m3-on-surface)' }}>
+                      Calling {remoteUserName || 'Space Members'}...
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px' }}>
+                      Ringing space members
+                    </p>
+                    <button className="m3-btn m3-btn-danger" onClick={endCall} style={{ padding: '8px 20px' }}>
+                      <span className="material-symbols-outlined">call_end</span>
                       Cancel Call
                     </button>
                   </div>
@@ -1672,13 +1910,38 @@ export default function ChatRoom() {
 
                 {callState === 'incoming' && (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '44px', color: 'var(--m3-tertiary)', marginBottom: '12px' }}>ring_volume</span>
-                    <h4 style={{ fontSize: '1rem' }}>{callerName} is calling you</h4>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                      <button className="m3-btn m3-btn-filled" style={{ backgroundColor: '#81c784', color: '#000' }} onClick={acceptCall}>
+                    <div
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--m3-tertiary-container)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.8rem',
+                        fontWeight: 700,
+                        color: 'var(--m3-tertiary)',
+                        marginBottom: '16px',
+                        border: '3px solid var(--m3-tertiary)',
+                        animation: 'pulseRinging 1.5s infinite',
+                      }}
+                    >
+                      {(callerName || 'C').slice(0, 2).toUpperCase()}
+                    </div>
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--m3-on-surface)' }}>
+                      {callerName} is calling...
+                    </h4>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px' }}>
+                      Incoming Video Call
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button className="m3-btn m3-btn-filled pulse-accept-btn" style={{ backgroundColor: '#81c784', color: '#000', padding: '8px 20px' }} onClick={acceptCall}>
+                        <span className="material-symbols-outlined">call</span>
                         Accept
                       </button>
-                      <button className="m3-btn m3-btn-danger" onClick={declineCall}>
+                      <button className="m3-btn m3-btn-danger" onClick={declineCall} style={{ padding: '8px 20px' }}>
+                        <span className="material-symbols-outlined">call_end</span>
                         Decline
                       </button>
                     </div>
@@ -1686,62 +1949,135 @@ export default function ChatRoom() {
                 )}
 
                 {callState === 'active' && (
-                  <div style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#000', flex: 1 }}>
+                  <div style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#000', flex: 1, overflow: 'hidden' }}>
+                    {/* Live Duration Timer Badge */}
+                    <div className="m3-call-timer">
+                      <div className="m3-call-timer-dot"></div>
+                      <span>{formatTimer(callDuration)}</span>
+                    </div>
+
+                    {/* Remote Video Feed */}
                     <video
-                      ref={remoteVideoCallback}
+                      ref={remoteVideoRef}
                       autoPlay
                       playsInline
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: remoteStream ? 'block' : 'none',
+                      }}
                     />
 
+                    {/* Fallback Remote User Avatar when camera off or stream connecting */}
+                    {!remoteStream && (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#17151c',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '88px',
+                            height: '88px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--m3-primary-container)',
+                            color: 'var(--m3-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '2rem',
+                            fontWeight: 700,
+                            marginBottom: '12px',
+                            border: '3px solid var(--m3-primary)',
+                          }}
+                        >
+                          {(remoteUserName || 'U').slice(0, 2).toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--m3-on-surface)' }}>
+                          {remoteUserName || 'Remote User'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#81c784', marginTop: '4px' }}>Connected</span>
+                      </div>
+                    )}
+
+                    {/* Self Local Video Overlay (PIP) */}
                     <div
                       style={{
                         position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        width: isPipMode ? '70px' : '110px',
-                        height: isPipMode ? '50px' : '80px',
+                        top: '14px',
+                        right: '14px',
+                        width: isPipMode ? '80px' : '120px',
+                        height: isPipMode ? '56px' : '85px',
                         borderRadius: 'var(--m3-radius-m)',
                         overflow: 'hidden',
                         border: '2px solid var(--m3-primary)',
-                        backgroundColor: '#111',
-                        zIndex: 10,
+                        backgroundColor: '#121116',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                        zIndex: 30,
                       }}
                     >
                       <video
-                        ref={localVideoCallback}
+                        ref={localVideoRef}
                         autoPlay
                         playsInline
                         muted
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: cameraOff ? 'none' : 'block',
+                        }}
                       />
+                      {cameraOff && (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#2b2833',
+                            color: 'var(--m3-primary)',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {nickname.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
                     </div>
 
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '16px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        gap: '10px',
-                        backgroundColor: 'rgba(33, 31, 38, 0.85)',
-                        padding: '6px 14px',
-                        borderRadius: 'var(--m3-radius-full)',
-                        backdropFilter: 'blur(10px)',
-                        zIndex: 10,
-                      }}
-                    >
-                      <button className={`m3-btn m3-btn-icon ${micMuted ? 'm3-btn-danger' : 'm3-btn-tonal'}`} onClick={toggleMic}>
+                    {/* M3 Glassmorphism Control Dock */}
+                    <div className="m3-video-dock">
+                      <button
+                        className={`m3-btn m3-btn-icon ${micMuted ? 'm3-btn-danger' : 'm3-btn-tonal'}`}
+                        onClick={toggleMic}
+                        title={micMuted ? 'Unmute Mic' : 'Mute Mic'}
+                      >
                         <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
                       </button>
-                      <button className={`m3-btn m3-btn-icon ${cameraOff ? 'm3-btn-danger' : 'm3-btn-tonal'}`} onClick={toggleCamera}>
+                      <button
+                        className={`m3-btn m3-btn-icon ${cameraOff ? 'm3-btn-danger' : 'm3-btn-tonal'}`}
+                        onClick={toggleCamera}
+                        title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+                      >
                         <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
                       </button>
-                      <button className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-tonal'}`} onClick={togglePipMode}>
-                        <span className="material-symbols-outlined">{isPipMode ? 'fullscreen' : 'picture_in_picture_alt'}</span>
+                      <button
+                        className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
+                        onClick={togglePipMode}
+                        title={isPipMode ? 'Dock to Side' : 'Float Window'}
+                      >
+                        <span className="material-symbols-outlined">{isPipMode ? 'dock' : 'picture_in_picture_alt'}</span>
                       </button>
-                      <button className="m3-btn m3-btn-icon m3-btn-danger" onClick={endCall}>
+                      <button className="m3-btn m3-btn-icon m3-btn-danger" onClick={endCall} title="End Call">
                         <span className="material-symbols-outlined">call_end</span>
                       </button>
                     </div>

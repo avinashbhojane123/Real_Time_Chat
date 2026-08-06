@@ -217,8 +217,10 @@ input, button, select, textarea {
 .m3-main-chat {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   background-color: var(--m3-surface-container-low);
+  position: relative;
+  overflow: hidden;
 }
 
 /* M3 Navigation Bar (Mobile Bottom Nav) */
@@ -271,6 +273,18 @@ input, button, select, textarea {
   .m3-bottom-nav {
     display: none; /* Removed for max height chat workspace */
   }
+
+  .m3-main-chat {
+    flex-direction: column !important;
+  }
+
+  .m3-video-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 340px !important;
+    border-left: none !important;
+    border-top: 1px solid var(--m3-outline-variant) !important;
+  }
 }
 
 @media (max-width: 768px) {
@@ -293,18 +307,6 @@ input, button, select, textarea {
 
   .m3-btn {
     padding: 8px 12px;
-  }
-
-  .m3-main-chat {
-    flex-direction: column !important;
-  }
-
-  .m3-video-panel {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 280px !important;
-    border-left: none !important;
-    border-bottom: 1px solid var(--m3-outline-variant) !important;
   }
 }
 
@@ -362,4 +364,110 @@ input, button, select, textarea {
   border: 3px solid #25d366 !important;
   animation: storyPulse 2s infinite;
 }
+
+/* ==========================================================================
+   Video Call Advanced Aesthetics & Floating Banner System
+   ========================================================================== */
+
+/* Incoming Call Floating Banner */
+.m3-incoming-call-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(33, 31, 38, 0.95);
+  border: 1px solid var(--m3-primary);
+  backdrop-filter: blur(16px);
+  padding: 12px 24px;
+  border-radius: var(--m3-radius-xl);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(208, 188, 255, 0.2);
+  animation: bannerSlideDown 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes bannerSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes pulseRinging {
+  0% {
+    box-shadow: 0 0 0 0 rgba(129, 199, 132, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(129, 199, 132, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(129, 199, 132, 0);
+  }
+}
+
+.pulse-accept-btn {
+  animation: pulseRinging 1.5s infinite;
+}
+
+/* Video Control Glassmorphism Dock */
+.m3-video-dock {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(20, 18, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 20px;
+  border-radius: var(--m3-radius-full);
+  backdrop-filter: blur(12px);
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.m3-video-dock .m3-btn-icon {
+  width: 42px;
+  height: 42px;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+
+.m3-video-dock .m3-btn-icon:hover {
+  transform: scale(1.08);
+}
+
+/* Call Duration Badge */
+.m3-call-timer {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #81c784;
+  border: 1px solid rgba(129, 199, 132, 0.3);
+  z-index: 20;
+}
+
+.m3-call-timer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #81c784;
+  animation: storyPulse 1.5s infinite;
+}
+
 
