@@ -26,6 +26,11 @@ export interface InstagramPreviewResult {
     commentCount?: number;
     videoViewCount?: number;
   };
+  audio?: {
+    hasAudio?: boolean;
+    musicTitle?: string;
+    musicArtist?: string;
+  };
   embedHtml?: string;
   originalUrl: string;
   cleanUrl: string;
@@ -561,6 +566,16 @@ export class InstagramService {
     const videoViewCount =
       item.view_count ?? item.video_view_count ?? item.play_count;
 
+    const hasAudio = item.has_audio !== undefined ? Boolean(item.has_audio) : true;
+    const musicInfo =
+      item.clips_metadata?.music_info?.music_asset_info ||
+      item.music_metadata?.music_info?.music_asset_info ||
+      item.clips_metadata?.original_sound_info;
+    const musicTitle =
+      musicInfo?.title || musicInfo?.original_audio_title || undefined;
+    const musicArtist =
+      musicInfo?.display_artist || musicInfo?.ig_artist?.username || undefined;
+
     return {
       success: true,
       shortcode,
@@ -587,6 +602,11 @@ export class InstagramService {
         likeCount,
         commentCount,
         videoViewCount,
+      },
+      audio: {
+        hasAudio,
+        musicTitle,
+        musicArtist,
       },
       originalUrl: cleanUrl,
       cleanUrl,
