@@ -58,7 +58,7 @@ export class InstagramService {
 
   /**
    * Resolves Instagram media view using multi-layer extraction:
-   * 1. RapidAPI / direct metadata endpoint
+   * 1. RapidAPI (Configured via RAPIDAPI_INSTAGRAM_HOST, RAPIDAPI_INSTAGRAM_PATH, RAPIDAPI_INSTAGRAM_KEY)
    * 2. yt-dlp (--dump-single-json)
    * 3. gallery-dl (-j)
    * 4. Playwright Headless Chromium Scraping (meta tags)
@@ -86,9 +86,9 @@ export class InstagramService {
         authorUsername?: string;
       } = {};
 
-      // Attempt 1: Extract via RapidAPI API
+      // Attempt 1: Extract via RapidAPI API (Reads Host, Path, Key from env)
       try {
-        const rapidMeta = await this.extractViaRapidApi(originalUrl);
+        const rapidMeta = await this.extractViaRapidApi(originalUrl, shortcode);
         extracted = { ...extracted, ...rapidMeta };
       } catch (err) {
         this.logger.warn(
@@ -210,6 +210,252 @@ export class InstagramService {
     throw new BadRequestException(
       'Invalid Instagram URL. Formats supported: Reels, Posts, IGTV, Profiles.',
     );
+  }
+
+  /**
+   * Universal recursive parser extracting media from varied RapidAPI JSON responses.
+   */
+  private extractMediaFromData(data: any): {
+    directVideoUrl?: string;
+    thumbnailUrl?: string;
+    caption?: string;
+    authorUsername?: string;
+  } {
+    let directVideoUrl: string | undefined;
+    let thumbnailUrl: string | undefined;
+    let caption: string | undefined;
+    let authorUsername: string | undefined;
+
+    if (!data) return { directVideoUrl, thumbnailUrl, caption, authorUsername };
+
+    const isVideoUrl = (str: any) => {
+      if (typeof str !== 'string' || !str.startsWith('http')) return false;
+      const lower = str.toLowerCase();
+      return (
+        lower.includes('.mp4') ||
+        lower.includes('video') ||
+        lower.includes('googlevideo') ||
+        lower.includes('cdninstagram') ||
+        lower.includes('fbcdn.net') ||
+        lower.includes('scontent') ||
+        lower.includes('snapsave') ||
+        lower.includes('rapidapi') ||
+        lower.includes('instagram.com/media')
+      );
+    };
+
+    const isImageUrl = (str: any) => {
+      if (typeof str !== 'string' || !str.startsWith('http')) return false;
+      const lower = str.toLowerCase();
+      return (
+        lower.includes('.jpg') ||
+        lower.includes('.jpeg') ||
+        lower.includes('.png') ||
+        lower.includes('.webp') ||
+        lower.includes('image') ||
+        lower.includes('display_url') ||
+        lower.includes('cover') ||
+        lower.includes('thumb')
+      );
+    };
+
+    const traverse = (obj: any, depth = 0) => {
+      if (!obj || depth > 8) return;
+
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          traverse(item, depth + 1);
+        }
+        return;
+      }
+
+      if (typeof obj === 'object') {
+        const videoProps = [
+          'video_url', 'videoUrl', 'video', 'download_url', 'downloadUrl',
+          'media_url', 'mediaUrl', 'play_url', 'playUrl', 'video_link',
+          'videoLink', 'link', 'url', 'src', 'stream_url', 'streamUrl',
+          'video_hd', 'video_sd', 'hd', 'sd'
+        ];
+
+        for (const prop of videoProps) {
+          if (!directVideoUrl && obj[prop] && typeof obj[prop] === 'string' && isVideoUrl(obj[prop])) {
+            directVideoUrl = obj[prop];
+            break;
+          }
+        }
+
+        const thumbProps = [
+          'thumbnail', 'thumbnail_url', 'thumbnailUrl', 'thumbnail_src',
+          'picture', 'pictureUrl', 'picture_url', 'cover', 'cover_url',
+          'coverUrl', 'display_url', 'displayUrl', 'image', 'image_url',
+          'imageUrl', 'poster', 'poster_url', 'posterUrl', 'thumb', 'thumb_url'
+        ];
+
+        for (const prop of thumbProps) {
+          if (!thumbnailUrl && obj[prop] && typeof obj[prop] === 'string' && isImageUrl(obj[prop])) {
+            thumbnailUrl = obj[prop];
+            break;
+          }
+        }
+
+        const capProps = ['caption', 'title', 'description', 'desc', 'text', 'message'];
+        for (const prop of capProps) {
+          if (!caption && obj[prop]) {
+            if (typeof obj[prop] === 'string' && obj[prop].trim()) {
+              caption = obj[prop].trim();
+              break;
+            } else if (typeof obj[prop] === 'object' && obj[prop].text) {
+              caption = String(obj[prop].text).trim();
+              break;
+            }
+          }
+        }
+
+        const authorProps = ['username', 'owner', 'author', 'user', 'uploader', 'channel', 'screen_name'];
+        for (const prop of authorProps) {
+          if (!authorUsername && obj[prop]) {
+            if (typeof obj[prop] === 'string' && obj[prop].trim()) {
+              authorUsername = obj[prop].trim().replace(/^@/, '');
+              break;
+            } else if (typeof obj[prop] === 'object' && (obj[prop].username || obj[prop].name)) {
+              authorUsername = String(obj[prop].username || obj[prop].name).trim().replace(/^@/, '');
+              break;
+            }
+          }
+        }
+
+        for (const key of Object.keys(obj)) {
+          if (typeof obj[key] === 'object') {
+            traverse(obj[key], depth + 1);
+          }
+        }
+      }
+    };
+
+    traverse(data);
+
+    return { directVideoUrl, thumbnailUrl, caption, authorUsername };
+  }
+
+  /**
+   * Invokes RapidAPI endpoint to extract direct reel video URL & metadata.
+   * Dynamically utilizes RAPIDAPI_INSTAGRAM_HOST, RAPIDAPI_INSTAGRAM_PATH, and RAPIDAPI_INSTAGRAM_KEY.
+   */
+  private async extractViaRapidApi(
+    url: string,
+    shortcode?: string,
+  ): Promise<{
+    thumbnailUrl?: string;
+    directVideoUrl?: string;
+    caption?: string;
+    authorUsername?: string;
+  }> {
+    const apiKey =
+      process.env.RAPIDAPI_INSTAGRAM_KEY ||
+      '59df956928msh884a74ccf199e2dp1f51f3jsnfae0b679277f';
+
+    const host =
+      process.env.RAPIDAPI_INSTAGRAM_HOST || 'instagram120.p.rapidapi.com';
+
+    const rawPath =
+      process.env.RAPIDAPI_INSTAGRAM_PATH || '/api/instagram/links';
+
+    if (!apiKey) return {};
+
+    const code = shortcode || (url.match(/\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i)?.[1] || '');
+
+    // Formatted request candidates
+    const makeRequest = (targetPath: string, method: string, postBody?: any) => {
+      return new Promise<any>((resolve) => {
+        let pathWithParams = targetPath
+          .replace(/\{url\}/gi, encodeURIComponent(url))
+          .replace(/\{link\}/gi, encodeURIComponent(url))
+          .replace(/\{code\}/gi, encodeURIComponent(code));
+
+        if (method === 'GET' && !pathWithParams.includes('=')) {
+          const sep = pathWithParams.includes('?') ? '&' : '?';
+          pathWithParams = `${pathWithParams}${sep}url=${encodeURIComponent(url)}`;
+        }
+
+        const postData = postBody ? JSON.stringify(postBody) : undefined;
+
+        const options: https.RequestOptions = {
+          method,
+          hostname: host,
+          path: pathWithParams,
+          headers: {
+            'x-rapidapi-key': apiKey,
+            'x-rapidapi-host': host,
+            'Accept': 'application/json',
+          },
+          timeout: 9000,
+        };
+
+        if (postData && options.headers) {
+          options.headers['Content-Type'] = 'application/json';
+          options.headers['Content-Length'] = Buffer.byteLength(postData);
+        }
+
+        const req = https.request(options, (res) => {
+          let body = '';
+          res.on('data', (chunk) => {
+            body += chunk;
+          });
+
+          res.on('end', () => {
+            try {
+              if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                const data = JSON.parse(body);
+                resolve(data);
+              } else {
+                resolve(null);
+              }
+            } catch {
+              resolve(null);
+            }
+          });
+        });
+
+        req.on('error', () => resolve(null));
+        req.on('timeout', () => {
+          req.destroy();
+          resolve(null);
+        });
+
+        if (postData) req.write(postData);
+        req.end();
+      });
+    };
+
+    // Try primary configured method & path
+    const isGetPath =
+      rawPath.includes('?') ||
+      rawPath.startsWith('/index') ||
+      rawPath.startsWith('/download') ||
+      rawPath.startsWith('/rapid') ||
+      rawPath.includes('code_or_id');
+
+    let responseData = await makeRequest(
+      rawPath,
+      isGetPath ? 'GET' : 'POST',
+      isGetPath ? undefined : { url, link: url, code }
+    );
+
+    let extracted = this.extractMediaFromData(responseData);
+    if (extracted.directVideoUrl) return extracted;
+
+    // If primary failed, try inverse method (GET if was POST, POST if was GET)
+    if (!isGetPath) {
+      responseData = await makeRequest(rawPath, 'GET');
+      extracted = this.extractMediaFromData(responseData);
+      if (extracted.directVideoUrl) return extracted;
+    } else {
+      responseData = await makeRequest(rawPath, 'POST', { url, link: url, code });
+      extracted = this.extractMediaFromData(responseData);
+      if (extracted.directVideoUrl) return extracted;
+    }
+
+    return extracted;
   }
 
   /**
@@ -593,121 +839,5 @@ export class InstagramService {
         `Failed to parse target media URL: ${err.message}`,
       );
     }
-  }
-
-  /**
-   * Invokes RapidAPI endpoint to extract direct reel video URL & metadata.
-   */
-  private async extractViaRapidApi(url: string): Promise<{
-    thumbnailUrl?: string;
-    directVideoUrl?: string;
-    caption?: string;
-    authorUsername?: string;
-  }> {
-    const apiKey =
-      process.env.RAPIDAPI_INSTAGRAM_KEY ||
-      '59df956928msh884a74ccf199e2dp1f51f3jsnfae0b679277f';
-
-    if (!apiKey) return {};
-
-    return new Promise((resolve) => {
-      const postData = JSON.stringify({ url });
-      const options = {
-        method: 'POST',
-        hostname: 'instagram120.p.rapidapi.com',
-        path: '/api/instagram/links',
-        headers: {
-          'x-rapidapi-key': apiKey,
-          'x-rapidapi-host': 'instagram120.p.rapidapi.com',
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData),
-        },
-      };
-
-      const req = https.request(options, (res) => {
-        let body = '';
-        res.on('data', (chunk) => {
-          body += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            if (
-              res.statusCode &&
-              res.statusCode >= 200 &&
-              res.statusCode < 300
-            ) {
-              const data = JSON.parse(body);
-              const item = Array.isArray(data) ? data[0] : data.result || data;
-
-              let directVideoUrl: string | undefined =
-                (Array.isArray(item?.urls) && item.urls[0]?.url) ||
-                item?.video_url ||
-                item?.download_url ||
-                item?.url;
-
-              if (!directVideoUrl && Array.isArray(data)) {
-                for (const sub of data) {
-                  if (Array.isArray(sub?.urls)) {
-                    const found = sub.urls.find(
-                      (u: any) =>
-                        u.url &&
-                        (u.extension === 'mp4' || u.url.includes('.mp4')),
-                    );
-                    if (found) {
-                      directVideoUrl = found.url;
-                      break;
-                    }
-                  }
-                }
-              }
-
-              const thumbnailUrl =
-                item?.pictureUrl ||
-                item?.cover_url ||
-                item?.thumbnail_url ||
-                item?.thumbnail ||
-                (Array.isArray(item?.urls) && item.urls[0]?.cover);
-
-              const caption =
-                item?.meta?.title ||
-                item?.title ||
-                item?.caption ||
-                item?.description;
-              const authorUsername =
-                item?.meta?.username ||
-                item?.author?.username ||
-                item?.username ||
-                item?.uploader;
-
-              if (directVideoUrl) {
-                return resolve({
-                  directVideoUrl,
-                  thumbnailUrl,
-                  caption,
-                  authorUsername,
-                });
-              }
-            }
-          } catch (e) {
-            this.logger.warn(`Failed to parse RapidAPI response: ${e.message}`);
-          }
-          resolve({});
-        });
-      });
-
-      req.on('error', (err) => {
-        this.logger.warn(`RapidAPI request failed: ${err.message}`);
-        resolve({});
-      });
-
-      req.setTimeout(8000, () => {
-        req.destroy();
-        resolve({});
-      });
-
-      req.write(postData);
-      req.end();
-    });
   }
 }
