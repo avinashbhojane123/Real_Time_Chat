@@ -58,10 +58,11 @@ export class InstagramService {
 
   /**
    * Resolves Instagram media view using multi-layer extraction:
-   * 1. yt-dlp (--dump-single-json)
-   * 2. gallery-dl (-j)
-   * 3. Playwright Headless Chromium Scraping (meta tags)
-   * 4. Public embed HTML scraper fallback
+   * 1. RapidAPI / direct metadata endpoint
+   * 2. yt-dlp (--dump-single-json)
+   * 3. gallery-dl (-j)
+   * 4. Playwright Headless Chromium Scraping (meta tags)
+   * 5. Public embed HTML scraper fallback
    */
   public async resolveMediaView(
     inputUrl?: string,
@@ -85,10 +86,10 @@ export class InstagramService {
         authorUsername?: string;
       } = {};
 
-      // Attempt 1: Extract via RapidAPI instagram120 API
+      // Attempt 1: Extract via RapidAPI API
       try {
         const rapidMeta = await this.extractViaRapidApi(originalUrl);
-        extracted = { ...rapidMeta };
+        extracted = { ...extracted, ...rapidMeta };
       } catch (err) {
         this.logger.warn(
           `RapidAPI extraction failed for ${shortcode}: ${err.message}`,
@@ -132,7 +133,7 @@ export class InstagramService {
       }
 
       // Attempt 5: Public embed HTML scraper fallback
-      if (!extracted.directVideoUrl) {
+      if (!extracted.directVideoUrl || !extracted.caption) {
         try {
           const fallback = await this.scrapePublicMeta(shortcode);
           extracted = { ...fallback, ...extracted };
@@ -172,7 +173,7 @@ export class InstagramService {
         originalUrl,
         canViewWithoutAccount: true,
         message:
-          'Instagram media extracted successfully via RapidAPI for direct in-browser account-free viewing.',
+          'Instagram media resolved for secure in-chat viewing without external navigation.',
       };
     }
 
@@ -184,7 +185,7 @@ export class InstagramService {
     if (
       profileMatch &&
       profileMatch[1] &&
-      !['p', 'reel', 'reels', 'tv', 'explore', 'stories'].includes(
+      !['p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'login'].includes(
         profileMatch[1].toLowerCase(),
       )
     ) {
@@ -220,39 +221,43 @@ export class InstagramService {
     caption?: string;
     authorUsername?: string;
   }> {
-    const cmd = `python -m yt_dlp --dump-single-json --skip-download "${url}"`;
-    const { stdout } = await execAsync(cmd, { timeout: 12000 });
+    try {
+      const cmd = `python -m yt_dlp --dump-single-json --skip-download "${url}"`;
+      const { stdout } = await execAsync(cmd, { timeout: 12000 });
 
-    if (!stdout || !stdout.trim()) {
-      return {};
-    }
-
-    const data = JSON.parse(stdout.trim());
-    if (!data || typeof data !== 'object') {
-      return {};
-    }
-
-    let directVideoUrl: string | undefined = data.url;
-    if (
-      !directVideoUrl &&
-      Array.isArray(data.formats) &&
-      data.formats.length > 0
-    ) {
-      const videoFormats = data.formats.filter(
-        (f: any) => f.url && (f.vcodec !== 'none' || f.ext === 'mp4'),
-      );
-      if (videoFormats.length > 0) {
-        directVideoUrl = videoFormats[videoFormats.length - 1].url;
-      } else {
-        directVideoUrl = data.formats[data.formats.length - 1].url;
+      if (!stdout || !stdout.trim()) {
+        return {};
       }
+
+      const data = JSON.parse(stdout.trim());
+      if (!data || typeof data !== 'object') {
+        return {};
+      }
+
+      let directVideoUrl: string | undefined = data.url;
+      if (
+        !directVideoUrl &&
+        Array.isArray(data.formats) &&
+        data.formats.length > 0
+      ) {
+        const videoFormats = data.formats.filter(
+          (f: any) => f.url && (f.vcodec !== 'none' || f.ext === 'mp4'),
+        );
+        if (videoFormats.length > 0) {
+          directVideoUrl = videoFormats[videoFormats.length - 1].url;
+        } else {
+          directVideoUrl = data.formats[data.formats.length - 1].url;
+        }
+      }
+
+      const thumbnailUrl = data.thumbnail || data.thumbnails?.[0]?.url;
+      const caption = data.description || data.title;
+      const authorUsername = data.uploader_id || data.uploader || data.channel;
+
+      return { directVideoUrl, thumbnailUrl, caption, authorUsername };
+    } catch {
+      return {};
     }
-
-    const thumbnailUrl = data.thumbnail || data.thumbnails?.[0]?.url;
-    const caption = data.description || data.title;
-    const authorUsername = data.uploader_id || data.uploader || data.channel;
-
-    return { directVideoUrl, thumbnailUrl, caption, authorUsername };
   }
 
   /**
@@ -264,68 +269,72 @@ export class InstagramService {
     caption?: string;
     authorUsername?: string;
   }> {
-    const cmd = `python -m gallery_dl -j "${url}"`;
-    const { stdout } = await execAsync(cmd, { timeout: 10000 });
+    try {
+      const cmd = `python -m gallery_dl -j "${url}"`;
+      const { stdout } = await execAsync(cmd, { timeout: 10000 });
 
-    if (!stdout || !stdout.trim()) {
+      if (!stdout || !stdout.trim()) {
+        return {};
+      }
+
+      const lines = stdout.trim().split('\n');
+      let directVideoUrl: string | undefined;
+      let thumbnailUrl: string | undefined;
+      let caption: string | undefined;
+      let authorUsername: string | undefined;
+
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          const data = Array.isArray(parsed) ? parsed[1] || parsed[0] : parsed;
+
+          if (data && typeof data === 'object') {
+            if (
+              !directVideoUrl &&
+              (data.video_versions?.[0]?.url || data.url || data.video_url)
+            ) {
+              directVideoUrl =
+                data.video_versions?.[0]?.url || data.url || data.video_url;
+            }
+
+            if (
+              !thumbnailUrl &&
+              (data.display_url ||
+                data.thumbnail ||
+                data.image_versions2?.candidates?.[0]?.url)
+            ) {
+              thumbnailUrl =
+                data.display_url ||
+                data.thumbnail ||
+                data.image_versions2?.candidates?.[0]?.url;
+            }
+
+            if (
+              !caption &&
+              (data.description || data.caption?.text || data.caption)
+            ) {
+              const rawCap =
+                data.description || data.caption?.text || data.caption;
+              caption = typeof rawCap === 'string' ? rawCap : undefined;
+            }
+
+            if (
+              !authorUsername &&
+              (data.user?.username || data.username || data.author)
+            ) {
+              authorUsername =
+                data.user?.username || data.username || data.author;
+            }
+          }
+        } catch {
+          // Skip invalid JSON lines
+        }
+      }
+
+      return { directVideoUrl, thumbnailUrl, caption, authorUsername };
+    } catch {
       return {};
     }
-
-    const lines = stdout.trim().split('\n');
-    let directVideoUrl: string | undefined;
-    let thumbnailUrl: string | undefined;
-    let caption: string | undefined;
-    let authorUsername: string | undefined;
-
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        const data = Array.isArray(parsed) ? parsed[1] || parsed[0] : parsed;
-
-        if (data && typeof data === 'object') {
-          if (
-            !directVideoUrl &&
-            (data.video_versions?.[0]?.url || data.url || data.video_url)
-          ) {
-            directVideoUrl =
-              data.video_versions?.[0]?.url || data.url || data.video_url;
-          }
-
-          if (
-            !thumbnailUrl &&
-            (data.display_url ||
-              data.thumbnail ||
-              data.image_versions2?.candidates?.[0]?.url)
-          ) {
-            thumbnailUrl =
-              data.display_url ||
-              data.thumbnail ||
-              data.image_versions2?.candidates?.[0]?.url;
-          }
-
-          if (
-            !caption &&
-            (data.description || data.caption?.text || data.caption)
-          ) {
-            const rawCap =
-              data.description || data.caption?.text || data.caption;
-            caption = typeof rawCap === 'string' ? rawCap : undefined;
-          }
-
-          if (
-            !authorUsername &&
-            (data.user?.username || data.username || data.author)
-          ) {
-            authorUsername =
-              data.user?.username || data.username || data.author;
-          }
-        }
-      } catch {
-        // Skip invalid JSON lines
-      }
-    }
-
-    return { directVideoUrl, thumbnailUrl, caption, authorUsername };
   }
 
   /**
@@ -341,7 +350,7 @@ export class InstagramService {
       const { chromium } = await import('playwright');
       const browser = await chromium.launch({ headless: true });
       const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 8000 });
 
       const thumbnailUrl =
         (await page
@@ -403,15 +412,15 @@ export class InstagramService {
         {
           headers: {
             'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           },
-          timeout: 4000,
+          timeout: 5000,
         },
         (res) => {
           let data = '';
           res.on('data', (chunk) => {
             data += chunk;
-            if (data.length > 1024 * 1024) req.destroy();
+            if (data.length > 2 * 1024 * 1024) req.destroy();
           });
 
           res.on('end', () => {
@@ -426,6 +435,9 @@ export class InstagramService {
               data.match(/video_url["']:\s*["']([^"']+)["']/i) ||
               data.match(
                 /<meta property=["']og:video["'] content=["']([^"']+)["']/i,
+              ) ||
+              data.match(
+                /<meta property=["']og:video:secure_url["'] content=["']([^"']+)["']/i,
               );
             if (videoMatch && videoMatch[1]) {
               meta.directVideoUrl = videoMatch[1]
@@ -477,7 +489,7 @@ export class InstagramService {
   }
 
   /**
-   * Proxies direct MP4 stream binary to client browser with CORS and Range header support.
+   * Proxies direct MP4 or Image stream binary to client browser with CORS and Range header support.
    */
   public async proxyMediaStream(
     mediaUrl: string,
@@ -507,7 +519,7 @@ export class InstagramService {
 
       const headers: Record<string, string> = {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         Accept: '*/*',
       };
 
@@ -547,7 +559,6 @@ export class InstagramService {
             'content-length',
             'accept-ranges',
             'content-range',
-            'cache-control',
             'etag',
             'last-modified',
           ];
@@ -558,6 +569,7 @@ export class InstagramService {
             }
           });
 
+          res.setHeader('Cache-Control', 'public, max-age=86400');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
           res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
@@ -584,7 +596,7 @@ export class InstagramService {
   }
 
   /**
-   * Invokes RapidAPI instagram120 API endpoint to extract direct reel video URL & metadata.
+   * Invokes RapidAPI endpoint to extract direct reel video URL & metadata.
    */
   private async extractViaRapidApi(url: string): Promise<{
     thumbnailUrl?: string;
@@ -592,6 +604,12 @@ export class InstagramService {
     caption?: string;
     authorUsername?: string;
   }> {
+    const apiKey =
+      process.env.RAPIDAPI_INSTAGRAM_KEY ||
+      '59df956928msh884a74ccf199e2dp1f51f3jsnfae0b679277f';
+
+    if (!apiKey) return {};
+
     return new Promise((resolve) => {
       const postData = JSON.stringify({ url });
       const options = {
@@ -599,7 +617,7 @@ export class InstagramService {
         hostname: 'instagram120.p.rapidapi.com',
         path: '/api/instagram/links',
         headers: {
-          'x-rapidapi-key': process.env.RAPIDAPI_INSTAGRAM_KEY || '',
+          'x-rapidapi-key': apiKey,
           'x-rapidapi-host': 'instagram120.p.rapidapi.com',
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(postData),

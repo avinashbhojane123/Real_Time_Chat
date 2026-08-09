@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { cleanInstagramMessage } from '../utils/instagram';
+import { cleanInstagramMessage, parseInstagramUrl } from '../utils/instagram';
 import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
 import YouTubePreview, { parseYouTubeUrl } from '../components/YouTubePreview';
+import InstagramPreview from '../components/InstagramPreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
 
@@ -32,157 +33,6 @@ function formatDateHeader(dateStr) {
   } else {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   }
-}
-
-function InstagramVideoPlayer({ shortcode, baseUrl }) {
-  const [meta, setMeta] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!shortcode) return;
-    let isMounted = true;
-    const fetchMeta = async () => {
-      try {
-        setLoading(true);
-        const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
-        const res = await axios.get(`${cleanApiUrl}/instagram/view`, {
-          params: { url: `https://www.instagram.com/reel/${shortcode}/` },
-        });
-        if (isMounted && res.data) {
-          setMeta(res.data);
-        }
-      } catch (err) {
-        console.log('Failed to fetch Instagram metadata via gallery-dl', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    fetchMeta();
-    return () => {
-      isMounted = false;
-    };
-  }, [shortcode, baseUrl]);
-
-  if (!shortcode) return null;
-
-  const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
-  const proxyUrl = meta?.proxyVideoUrl
-    ? (meta.proxyVideoUrl.startsWith('http') ? meta.proxyVideoUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyVideoUrl}`)
-    : null;
-  const posterUrl = meta?.proxyThumbnailUrl
-    ? (meta.proxyThumbnailUrl.startsWith('http') ? meta.proxyThumbnailUrl : `${cleanApiUrl.replace(/\/api\/?$/, '')}${meta.proxyThumbnailUrl}`)
-    : meta?.thumbnailUrl;
-  const cleanUrl = `https://www.instagram.com/reel/${shortcode}/`;
-
-  const handleCopyCleanUrl = (e) => {
-    if (e) e.stopPropagation();
-    navigator.clipboard.writeText(cleanUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div
-      style={{
-        marginTop: '10px',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        border: '1px solid var(--m3-outline-variant)',
-        backgroundColor: '#0a0a0c',
-        maxWidth: '380px',
-        width: '100%',
-        position: 'relative',
-        boxShadow: 'var(--m3-elevation-2)',
-        transition: 'all 0.3s ease',
-      }}
-    >
-      {/* Top Header Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px 12px',
-          backgroundColor: 'rgba(18, 18, 22, 0.95)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#e2e2e6', fontWeight: 600 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#e1306c' }}>movie</span>
-          <span>{meta?.author?.username ? `@${meta.author.username}` : 'Instagram Reel'}</span>
-        </div>
-
-        <button
-          className="m3-btn m3-btn-outlined"
-          type="button"
-          style={{ padding: '2px 8px', fontSize: '0.68rem', borderRadius: '10px', color: copied ? '#81c784' : '#fff', borderColor: copied ? '#81c784' : 'rgba(255,255,255,0.2)' }}
-          onClick={handleCopyCleanUrl}
-          title="Copy clean reel link without tracking tags"
-        >
-          {copied ? '✓ Clean Link Copied' : 'Copy Clean Link'}
-        </button>
-      </div>
-
-      {/* Account-Free Native HTML5 Video Stream Player or Embed (No Instagram Redirection) */}
-      {proxyUrl ? (
-        <div style={{ position: 'relative', width: '100%', backgroundColor: '#000' }}>
-          <video
-            src={proxyUrl}
-            controls
-            loop
-            playsInline
-            poster={posterUrl}
-            style={{ width: '100%', maxHeight: '460px', display: 'block', objectFit: 'contain' }}
-          />
-        </div>
-      ) : loading ? (
-        <div style={{ height: '360px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', backgroundColor: '#121216', color: '#e2e2e6' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#e1306c', animation: 'spin 1.5s linear infinite' }}>sync</span>
-          <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Resolving Instagram Reel (RapidAPI)...</span>
-        </div>
-      ) : (
-        <div style={{ position: 'relative', width: '100%', backgroundColor: '#000', overflow: 'hidden' }}>
-          <iframe
-            src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
-            style={{ width: '100%', height: '460px', border: 'none', background: '#000' }}
-            title="Instagram Reel Direct Browser Preview"
-            allowTransparency="true"
-            allow="encrypted-media"
-          />
-        </div>
-      )}
-
-      {/* Caption & Account-Free Indicator Footer */}
-      <div
-        style={{
-          padding: '8px 12px',
-          backgroundColor: 'rgba(20,20,26,0.95)',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '8px',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {meta?.caption ? (
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#c7c5d0', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-              {meta.caption}
-            </p>
-          ) : (
-            <span style={{ fontSize: '0.72rem', color: 'var(--m3-on-surface-variant)' }}>
-              {loading ? 'Resolving via gallery-dl...' : `Reel Stream (${shortcode})`}
-            </span>
-          )}
-        </div>
-
-        <span style={{ fontSize: '0.68rem', color: '#81c784', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>check_circle</span> Account Free
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function formatLastSeen(lastSeenDate) {
@@ -1075,7 +925,7 @@ export default function ChatRoom() {
 
     try {
       const cleanApiUrl = baseUrl.replace(/\/+$/, '');
-      const res = await axios.get(`${cleanApiUrl}/upload/instagram/view`, {
+      const res = await axios.get(`${cleanApiUrl}/instagram/view`, {
         params: { url: cleanedUrl },
       });
       setInstaResult(res.data);
@@ -1088,9 +938,7 @@ export default function ChatRoom() {
 
   // Instagram Shortcode Matcher
   const getInstagramEmbed = (text) => {
-    if (!text) return null;
-    const match = text.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([a-zA-Z0-9-_]+)/i);
-    return match ? match[1] : null;
+    return parseInstagramUrl(text)?.shortcode || null;
   };
 
   return (
@@ -1530,7 +1378,7 @@ export default function ChatRoom() {
                   const msgId = m.id || idx;
                   const isDragging = activeDragId === msgId;
                   const currentTranslate = isDragging ? dragTranslateX : 0;
-                  const instaShortcode = getInstagramEmbed(m.message);
+                  const instaData = parseInstagramUrl(m.message);
                   const ytData = parseYouTubeUrl(m.message);
                   const currentDateHeader = formatDateHeader(m.createdAt);
                   let renderDateHeader = false;
@@ -1775,7 +1623,13 @@ export default function ChatRoom() {
                               )}
 
                               {/* Direct In-Chat Instagram Video Preview Player */}
-                              {instaShortcode && <InstagramVideoPlayer shortcode={instaShortcode} baseUrl={baseUrl} />}
+                              {instaData && (
+                                <InstagramPreview
+                                  messageText={m.message}
+                                  baseUrl={baseUrl}
+                                  onCopySuccess={showToast}
+                                />
+                              )}
 
                               {/* Emoji Reactions Display Pills */}
                               {m.reactions && Object.keys(m.reactions).length > 0 && (

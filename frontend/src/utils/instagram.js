@@ -1,8 +1,68 @@
 /**
- * Utility to sanitize Instagram share/paste text.
+ * Utility to sanitize Instagram share/paste text and parse Instagram URLs.
  * Strips out boilerplate text like "View profile", "View more on Instagram",
  * "Add a comment ...", author lines, and music metadata lines that get copied
  * when users copy/share Instagram Reels or Posts.
+ */
+
+/**
+ * Parses any Instagram URL from a text message.
+ * Extracts shortcode, mediaType ('reel' | 'post' | 'tv' | 'profile'), and clean URL.
+ */
+export const parseInstagramUrl = (text) => {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Reel / Post / IGTV match
+  const mediaMatch = text.match(
+    /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(reel|reels|p|tv)\/([a-zA-Z0-9-_]+)/i
+  );
+
+  if (mediaMatch && mediaMatch[2]) {
+    const rawType = mediaMatch[1].toLowerCase();
+    const shortcode = mediaMatch[2];
+    const type = rawType.startsWith('reel') ? 'reel' : rawType === 'p' ? 'post' : 'tv';
+    return {
+      type,
+      shortcode,
+      cleanUrl: `https://www.instagram.com/${rawType.startsWith('reel') ? 'reel' : 'p'}/${shortcode}/`,
+      originalUrl: mediaMatch[0],
+    };
+  }
+
+  // 2. Profile match
+  const profileMatch = text.match(
+    /(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)\/(?:@)?([a-zA-Z0-9._]+)/i
+  );
+
+  if (
+    profileMatch &&
+    profileMatch[1] &&
+    !['p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'login'].includes(
+      profileMatch[1].toLowerCase()
+    )
+  ) {
+    const username = profileMatch[1].replace(/^@/, '');
+    return {
+      type: 'profile',
+      username,
+      cleanUrl: `https://www.instagram.com/${username}/`,
+      originalUrl: profileMatch[0],
+    };
+  }
+
+  return null;
+};
+
+/**
+ * Helper to get just the shortcode from message text.
+ */
+export const getInstagramEmbed = (text) => {
+  const parsed = parseInstagramUrl(text);
+  return parsed?.shortcode || null;
+};
+
+/**
+ * Strips Instagram copy-share boilerplate lines.
  */
 export const cleanInstagramMessage = (text) => {
   if (!text || typeof text !== 'string') return text;
@@ -52,7 +112,6 @@ export const cleanInstagramMessage = (text) => {
       const isUrl = line.match(/(?:https?:\/\/)?(?:www\.)?(?:instagram\.com|instagr\.am)/i);
 
       if (isAdjacentToBoilerplate && !isUrl) {
-        // If line is short username or music credit without sentence punctuation
         if (/^[a-zA-Z0-9_.]+$|^[a-zA-Z0-9_., -]+ \. [a-zA-Z0-9_., -]+$/i.test(line)) {
           continue;
         }
@@ -64,14 +123,17 @@ export const cleanInstagramMessage = (text) => {
 
   const cleanedText = cleanedLines.join('\n').trim();
 
-  // If filtering resulted in no text (or only metadata stripped) and an Instagram URL exists, return the URL
+  // If filtering resulted in no text and an Instagram URL exists, return clean URL
   if (!cleanedText && instaUrls && instaUrls.length > 0) {
-    return instaUrls[0];
+    const parsed = parseInstagramUrl(instaUrls[0]);
+    return parsed?.cleanUrl || instaUrls[0];
   }
 
   // If an Instagram URL exists but was not included in cleanedText, append it nicely
   if (cleanedText && instaUrls && instaUrls.length > 0 && !cleanedText.includes(instaUrls[0])) {
-    return `${cleanedText}\n${instaUrls[0]}`.trim();
+    const parsed = parseInstagramUrl(instaUrls[0]);
+    const urlToAppend = parsed?.cleanUrl || instaUrls[0];
+    return `${cleanedText}\n${urlToAppend}`.trim();
   }
 
   return cleanedText || (instaUrls ? instaUrls[0] : text);
