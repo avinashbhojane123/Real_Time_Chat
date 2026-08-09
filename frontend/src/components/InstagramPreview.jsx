@@ -153,6 +153,8 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     setTimeout(() => setCopiedText(false), 2200);
   };
 
+  const audioOffset = (data?.audio?.audioStartTimeMs || 0) / 1000;
+
   const togglePlay = (e) => {
     if (e) e.stopPropagation();
     if (!videoRef.current) return;
@@ -162,7 +164,8 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
       videoRef.current.volume = volume;
 
       if (audioRef.current && audioSrc) {
-        audioRef.current.currentTime = videoRef.current.currentTime || 0;
+        audioRef.current.currentTime =
+          (videoRef.current.currentTime || 0) + audioOffset;
         audioRef.current.muted = isMuted;
         audioRef.current.volume = volume;
         audioRef.current.play().catch(() => {});
@@ -202,7 +205,8 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     if (audioRef.current && audioSrc) {
       audioRef.current.muted = false;
       audioRef.current.volume = 1.0;
-      audioRef.current.currentTime = videoRef.current ? videoRef.current.currentTime : 0;
+      audioRef.current.currentTime =
+        (videoRef.current ? videoRef.current.currentTime : 0) + audioOffset;
       audioRef.current.play().catch(() => {});
     }
     setIsMuted(false);
@@ -218,7 +222,8 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     if (audioRef.current && audioSrc) {
       audioRef.current.muted = nextMuted;
       if (!nextMuted && isPlaying) {
-        audioRef.current.currentTime = videoRef.current.currentTime;
+        audioRef.current.currentTime =
+          videoRef.current.currentTime + audioOffset;
         audioRef.current.play().catch(() => {});
       }
     }
@@ -270,11 +275,12 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     setCurrentTimeStr(formatSec(videoRef.current.currentTime));
     setDurationStr(formatSec(videoRef.current.duration));
 
-    // Keep audio synced with video
+    // Keep audio synced with video with start offset
     if (audioRef.current && audioSrc && !audioRef.current.paused) {
-      const diff = Math.abs(audioRef.current.currentTime - videoRef.current.currentTime);
-      if (diff > 0.3) {
-        audioRef.current.currentTime = videoRef.current.currentTime;
+      const targetAudioTime = videoRef.current.currentTime + audioOffset;
+      const diff = Math.abs(audioRef.current.currentTime - targetAudioTime);
+      if (diff > 0.35) {
+        audioRef.current.currentTime = targetAudioTime;
       }
     }
   };
@@ -287,7 +293,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     const newTime = pos * videoRef.current.duration;
     videoRef.current.currentTime = newTime;
     if (audioRef.current && audioSrc) {
-      audioRef.current.currentTime = newTime;
+      audioRef.current.currentTime = newTime + audioOffset;
     }
   };
 

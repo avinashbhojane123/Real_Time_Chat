@@ -32,6 +32,7 @@ export interface InstagramPreviewResult {
     proxyAudioUrl?: string;
     musicTitle?: string;
     musicArtist?: string;
+    audioStartTimeMs?: number;
   };
   embedHtml?: string;
   originalUrl: string;
@@ -606,6 +607,32 @@ export class InstagramService {
       audioUrl = item.audio_versions[0]?.url;
     }
 
+    // Check DASH manifest for separate audio track if still not found
+    if (!audioUrl && item.video_dash_manifest) {
+      const manifest = item.video_dash_manifest;
+      const audioAdaptationMatch =
+        manifest.match(
+          /<AdaptationSet[^>]*mimeType=["']audio\/mp4["'][^>]*>[\s\S]*?<BaseURL>([^<]+)<\/BaseURL>/i,
+        ) ||
+        manifest.match(
+          /<AdaptationSet[^>]*contentType=["']audio["'][^>]*>[\s\S]*?<BaseURL>([^<]+)<\/BaseURL>/i,
+        ) ||
+        manifest.match(
+          /<Representation[^>]*mimeType=["']audio\/mp4["'][^>]*>[\s\S]*?<BaseURL>([^<]+)<\/BaseURL>/i,
+        );
+      if (audioAdaptationMatch && audioAdaptationMatch[1]) {
+        audioUrl = this.decodeHtmlEntities(audioAdaptationMatch[1]);
+      }
+    }
+
+    const audioStartTimeMs =
+      musicInfo?.audio_start_time_in_ms ??
+      item.clips_metadata?.music_info?.music_asset_info
+        ?.audio_start_time_in_ms ??
+      item.music_metadata?.music_info?.music_asset_info
+        ?.audio_start_time_in_ms ??
+      0;
+
     return {
       success: true,
       shortcode,
@@ -641,6 +668,7 @@ export class InstagramService {
           : undefined,
         musicTitle,
         musicArtist,
+        audioStartTimeMs,
       },
       originalUrl: cleanUrl,
       cleanUrl,
