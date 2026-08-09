@@ -2,10 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { cleanInstagramMessage, parseInstagramUrl } from '../utils/instagram';
 import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
 import YouTubePreview, { parseYouTubeUrl } from '../components/YouTubePreview';
-import InstagramPreview from '../components/InstagramPreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
 
@@ -158,11 +156,7 @@ export default function ChatRoom() {
     });
   };
 
-  // Instagram Viewer State
-  const [instaInputUrl, setInstaInputUrl] = useState('');
-  const [instaResult, setInstaResult] = useState(null);
-  const [instaLoading, setInstaLoading] = useState(false);
-  const [instaError, setInstaError] = useState('');
+
 
   const startEditing = (msg) => {
     setEditingMsgId(msg.id);
@@ -815,23 +809,9 @@ export default function ChatRoom() {
   };
 
   // Messaging & File Upload
-  const handleInputPaste = (e) => {
-    const pastedText = e.clipboardData?.getData('text');
-    if (
-      pastedText &&
-      (/view profile|view more on instagram|add a comment/i.test(pastedText) ||
-        /instagram\.com\/(?:p|reel)/i.test(pastedText))
-    ) {
-      e.preventDefault();
-      const cleaned = cleanInstagramMessage(pastedText);
-      setInputText((prev) => (prev ? `${prev} ${cleaned}` : cleaned));
-    }
-  };
-
   const sendMessage = (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
-    const msgText = cleanInstagramMessage(inputText.trim());
+    const msgText = inputText.trim();
     if (!msgText) return;
     setInputText('');
 
@@ -843,7 +823,7 @@ export default function ChatRoom() {
       nickname,
       message: msgText,
       replyTo: replyingTo
-        ? { id: replyingTo.id, nickname: replyingTo.nickname, message: cleanInstagramMessage(replyingTo.message) }
+        ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
         : null,
     });
     setReplyingTo(null);
@@ -869,7 +849,7 @@ export default function ChatRoom() {
           fileType: res.data.fileType || file.type,
           fileSize: res.data.fileSize || file.size,
           replyTo: replyingTo
-            ? { id: replyingTo.id, nickname: replyingTo.nickname, message: cleanInstagramMessage(replyingTo.message) }
+            ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
             : null,
         });
         setReplyingTo(null);
@@ -913,33 +893,7 @@ export default function ChatRoom() {
     }
   };
 
-  // Instagram Viewer API Call
-  const handleViewInstagram = async (e) => {
-    e.preventDefault();
-    const rawUrl = instaInputUrl.trim();
-    if (!rawUrl) return;
-    const cleanedUrl = cleanInstagramMessage(rawUrl);
-    setInstaLoading(true);
-    setInstaError('');
-    setInstaResult(null);
 
-    try {
-      const cleanApiUrl = baseUrl.replace(/\/+$/, '');
-      const res = await axios.get(`${cleanApiUrl}/instagram/view`, {
-        params: { url: cleanedUrl },
-      });
-      setInstaResult(res.data);
-    } catch (err) {
-      setInstaError(err.response?.data?.message || err.message || 'Failed to view Instagram media');
-    } finally {
-      setInstaLoading(false);
-    }
-  };
-
-  // Instagram Shortcode Matcher
-  const getInstagramEmbed = (text) => {
-    return parseInstagramUrl(text)?.shortcode || null;
-  };
 
   return (
     <div className="m3-app-container">
@@ -1378,7 +1332,6 @@ export default function ChatRoom() {
                   const msgId = m.id || idx;
                   const isDragging = activeDragId === msgId;
                   const currentTranslate = isDragging ? dragTranslateX : 0;
-                  const instaData = parseInstagramUrl(m.message);
                   const ytData = parseYouTubeUrl(m.message);
                   const currentDateHeader = formatDateHeader(m.createdAt);
                   let renderDateHeader = false;
@@ -1589,13 +1542,13 @@ export default function ChatRoom() {
                                 >
                                   <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
                                   <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
-                                    {cleanInstagramMessage(m.replyTo.message)}
+                                    {m.replyTo.message}
                                   </div>
                                 </div>
                               )}
 
                               <p style={{ margin: 0, wordBreak: 'break-word', lineHeight: '1.45' }}>
-                                {cleanInstagramMessage(m.message)}
+                                {m.message}
                                 {m.isEdited && (
                                   <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
                                     (edited)
@@ -1620,15 +1573,6 @@ export default function ChatRoom() {
                                     Attachment
                                   </a>
                                 </div>
-                              )}
-
-                              {/* Direct In-Chat Instagram Video Preview Player */}
-                              {instaData && (
-                                <InstagramPreview
-                                  messageText={m.message}
-                                  baseUrl={baseUrl}
-                                  onCopySuccess={showToast}
-                                />
                               )}
 
                               {/* Emoji Reactions Display Pills */}
