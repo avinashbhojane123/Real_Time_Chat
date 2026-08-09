@@ -872,6 +872,16 @@ export default function ChatRoom() {
     e.target.value = '';
   };
 
+  const handleInputPaste = async (e) => {
+    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const file = e.clipboardData.files[0];
+      if (file) {
+        e.preventDefault();
+        await uploadAndSendFile(file);
+      }
+    }
+  };
+
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
