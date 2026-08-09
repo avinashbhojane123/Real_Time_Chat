@@ -5,6 +5,7 @@ import axios from 'axios';
 
 import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
 import YouTubePreview, { parseYouTubeUrl } from '../components/YouTubePreview';
+import InstagramPreview, { parseInstagramUrl } from '../components/InstagramPreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
 
@@ -1334,6 +1335,7 @@ export default function ChatRoom() {
                   const isDragging = activeDragId === msgId;
                   const currentTranslate = isDragging ? dragTranslateX : 0;
                   const ytData = parseYouTubeUrl(m.message);
+                  const igData = parseInstagramUrl(m.message);
                   const currentDateHeader = formatDateHeader(m.createdAt);
                   let renderDateHeader = false;
                   if (currentDateHeader && currentDateHeader !== lastDateHeader) {
@@ -1559,6 +1561,9 @@ export default function ChatRoom() {
 
                               {/* YouTube Interactive Video Preview Card */}
                               {ytData && <YouTubePreview messageText={m.message} onCopySuccess={showToast} />}
+
+                              {/* Instagram Interactive Video/Reel Preview Card */}
+                              {igData && <InstagramPreview messageText={m.message} onCopySuccess={showToast} />}
 
                               {/* File Attachment Preview */}
                               {m.fileUrl && (

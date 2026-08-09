@@ -7,6 +7,7 @@ import { ChatModule } from './chat/chat.module';
 import { UploadModule } from './upload/upload.module';
 import { StatusModule } from './status/status.module';
 import { KeepAliveModule } from './keep-alive/keep-alive.module';
+import { InstagramModule } from './instagram/instagram.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { KeepAliveModule } from './keep-alive/keep-alive.module';
     UploadModule,
     StatusModule,
     KeepAliveModule,
+    InstagramModule,
   ],
 })
 export class AppModule {}
