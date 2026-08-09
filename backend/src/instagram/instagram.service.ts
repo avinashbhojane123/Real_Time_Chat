@@ -28,6 +28,8 @@ export interface InstagramPreviewResult {
   };
   audio?: {
     hasAudio?: boolean;
+    audioUrl?: string;
+    proxyAudioUrl?: string;
     musicTitle?: string;
     musicArtist?: string;
   };
@@ -576,6 +578,34 @@ export class InstagramService {
     const musicArtist =
       musicInfo?.display_artist || musicInfo?.ig_artist?.username || undefined;
 
+    let audioUrl: string | undefined;
+    if (musicInfo?.progressive_download_url) {
+      audioUrl = musicInfo.progressive_download_url;
+    } else if (musicInfo?.fast_start_progressive_download_url) {
+      audioUrl = musicInfo.fast_start_progressive_download_url;
+    } else if (
+      item.clips_metadata?.music_info?.music_asset_info?.progressive_download_url
+    ) {
+      audioUrl =
+        item.clips_metadata.music_info.music_asset_info.progressive_download_url;
+    } else if (
+      item.clips_metadata?.original_sound_info?.progressive_download_url
+    ) {
+      audioUrl =
+        item.clips_metadata.original_sound_info.progressive_download_url;
+    } else if (
+      item.music_metadata?.music_info?.music_asset_info?.progressive_download_url
+    ) {
+      audioUrl =
+        item.music_metadata.music_info.music_asset_info.progressive_download_url;
+    } else if (
+      item.audio_versions &&
+      Array.isArray(item.audio_versions) &&
+      item.audio_versions.length > 0
+    ) {
+      audioUrl = item.audio_versions[0]?.url;
+    }
+
     return {
       success: true,
       shortcode,
@@ -605,6 +635,10 @@ export class InstagramService {
       },
       audio: {
         hasAudio,
+        audioUrl,
+        proxyAudioUrl: audioUrl
+          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(audioUrl)}`
+          : undefined,
         musicTitle,
         musicArtist,
       },

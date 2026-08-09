@@ -45,8 +45,9 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
   const [copiedText, setCopiedText] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
 
-  // Video playback states
+  // Video & Audio playback states
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -91,15 +92,47 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     };
   }, [igData?.cleanUrl, apiBaseUrl]);
 
-  // Synchronize audio properties with DOM video element
+  // Synchronize audio properties with DOM video & audio elements
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = isMuted;
       videoRef.current.volume = volume;
     }
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted;
+      audioRef.current.volume = volume;
+    }
   }, [isMuted, volume]);
 
   if (!igData) return null;
+
+  // Media sources
+  const videoSrc = data?.proxyVideoUrl
+    ? (data.proxyVideoUrl.startsWith('http')
+        ? data.proxyVideoUrl
+        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyVideoUrl}`)
+    : data?.videoUrl;
+
+  const rawAudioUrl = data?.audio?.proxyAudioUrl || data?.audio?.audioUrl;
+  const audioSrc = rawAudioUrl
+    ? (rawAudioUrl.startsWith('http')
+        ? rawAudioUrl
+        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${rawAudioUrl}`)
+    : null;
+
+  const posterSrc = data?.proxyThumbnailUrl
+    ? (data.proxyThumbnailUrl.startsWith('http')
+        ? data.proxyThumbnailUrl
+        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyThumbnailUrl}`)
+    : data?.thumbnailUrl;
+
+  const authorAvatar = data?.author?.proxyProfilePicUrl
+    ? (data.author.proxyProfilePicUrl.startsWith('http')
+        ? data.author.proxyProfilePicUrl
+        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.author.proxyProfilePicUrl}`)
+    : data?.author?.profilePicUrl;
+
+  const isVideoPost = data?.isVideo && videoSrc && !hasVideoError;
 
   const handleCopyLink = (e) => {
     if (e) e.stopPropagation();
@@ -123,15 +156,24 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
   const togglePlay = (e) => {
     if (e) e.stopPropagation();
     if (!videoRef.current) return;
+
     if (videoRef.current.paused) {
       videoRef.current.muted = isMuted;
       videoRef.current.volume = volume;
+
+      if (audioRef.current && audioSrc) {
+        audioRef.current.currentTime = videoRef.current.currentTime || 0;
+        audioRef.current.muted = isMuted;
+        audioRef.current.volume = volume;
+        audioRef.current.play().catch(() => {});
+      }
+
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => setIsPlaying(true))
           .catch((err) => {
-            console.warn('Autoplay with sound blocked by browser, trying muted:', err);
+            console.warn('Autoplay sound blocked, fallback to muted:', err);
             if (videoRef.current) {
               videoRef.current.muted = true;
               setIsMuted(true);
@@ -144,15 +186,25 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
       }
     } else {
       videoRef.current.pause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setIsPlaying(false);
     }
   };
 
   const handleUnmute = (e) => {
     if (e) e.stopPropagation();
-    if (!videoRef.current) return;
-    videoRef.current.muted = false;
-    videoRef.current.volume = 1.0;
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1.0;
+    }
+    if (audioRef.current && audioSrc) {
+      audioRef.current.muted = false;
+      audioRef.current.volume = 1.0;
+      audioRef.current.currentTime = videoRef.current ? videoRef.current.currentTime : 0;
+      audioRef.current.play().catch(() => {});
+    }
     setIsMuted(false);
     setVolume(1.0);
   };
@@ -160,11 +212,21 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
   const toggleMute = (e) => {
     if (e) e.stopPropagation();
     if (!videoRef.current) return;
-    const nextMuted = !videoRef.current.muted;
+    const nextMuted = !isMuted;
     videoRef.current.muted = nextMuted;
+
+    if (audioRef.current && audioSrc) {
+      audioRef.current.muted = nextMuted;
+      if (!nextMuted && isPlaying) {
+        audioRef.current.currentTime = videoRef.current.currentTime;
+        audioRef.current.play().catch(() => {});
+      }
+    }
+
     setIsMuted(nextMuted);
-    if (!nextMuted && videoRef.current.volume === 0) {
+    if (!nextMuted && volume === 0) {
       videoRef.current.volume = 1.0;
+      if (audioRef.current) audioRef.current.volume = 1.0;
       setVolume(1.0);
     }
   };
@@ -183,6 +245,14 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
         setIsMuted(true);
       }
     }
+    if (audioRef.current) {
+      audioRef.current.volume = val;
+      if (val > 0 && isMuted) {
+        audioRef.current.muted = false;
+      } else if (val === 0 && !isMuted) {
+        audioRef.current.muted = true;
+      }
+    }
   };
 
   const formatSec = (sec) => {
@@ -199,6 +269,14 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     setVideoProgress(progress);
     setCurrentTimeStr(formatSec(videoRef.current.currentTime));
     setDurationStr(formatSec(videoRef.current.duration));
+
+    // Keep audio synced with video
+    if (audioRef.current && audioSrc && !audioRef.current.paused) {
+      const diff = Math.abs(audioRef.current.currentTime - videoRef.current.currentTime);
+      if (diff > 0.3) {
+        audioRef.current.currentTime = videoRef.current.currentTime;
+      }
+    }
   };
 
   const handleSeek = (e) => {
@@ -206,34 +284,17 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
     if (!videoRef.current || !videoRef.current.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
-    videoRef.current.currentTime = pos * videoRef.current.duration;
+    const newTime = pos * videoRef.current.duration;
+    videoRef.current.currentTime = newTime;
+    if (audioRef.current && audioSrc) {
+      audioRef.current.currentTime = newTime;
+    }
   };
 
   const handleVideoError = () => {
     console.warn('Direct Instagram video playback error, falling back to embed');
     setHasVideoError(true);
   };
-
-  // Video source: prioritize proxyVideoUrl to bypass Instagram CORS / CDN referrer blocks
-  const videoSrc = data?.proxyVideoUrl
-    ? (data.proxyVideoUrl.startsWith('http')
-        ? data.proxyVideoUrl
-        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyVideoUrl}`)
-    : data?.videoUrl;
-
-  const posterSrc = data?.proxyThumbnailUrl
-    ? (data.proxyThumbnailUrl.startsWith('http')
-        ? data.proxyThumbnailUrl
-        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyThumbnailUrl}`)
-    : data?.thumbnailUrl;
-
-  const authorAvatar = data?.author?.proxyProfilePicUrl
-    ? (data.author.proxyProfilePicUrl.startsWith('http')
-        ? data.author.proxyProfilePicUrl
-        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.author.proxyProfilePicUrl}`)
-    : data?.author?.profilePicUrl;
-
-  const isVideoPost = data?.isVideo && videoSrc && !hasVideoError;
 
   return (
     <div
@@ -436,6 +497,18 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
           }}
           onClick={togglePlay}
         >
+          {/* Synchronized Background Audio Stream for Reels with Instagram Music Library */}
+          {audioSrc && (
+            <audio
+              ref={audioRef}
+              src={audioSrc}
+              playsInline
+              loop
+              preload="auto"
+              style={{ display: 'none' }}
+            />
+          )}
+
           <video
             ref={videoRef}
             src={videoSrc}
