@@ -210,6 +210,8 @@ export default function ChatRoom() {
   const [isPipMode, setIsPipMode] = useState(false);
   const [remoteIsPip, setRemoteIsPip] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [isFullscreenCall, setIsFullscreenCall] = useState(false);
+  const [videoFitMode, setVideoFitMode] = useState('cover');
 
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -262,8 +264,14 @@ export default function ChatRoom() {
     setCameraOff(false);
     setIsPipMode(false);
     setRemoteIsPip(false);
-    if (typeof document !== 'undefined' && document.pictureInPictureElement) {
-      document.exitPictureInPicture().catch(() => { });
+    setIsFullscreenCall(false);
+    if (typeof document !== 'undefined') {
+      if (document.pictureInPictureElement) {
+        document.exitPictureInPicture().catch(() => { });
+      }
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => { });
+      }
     }
   }, []);
 
@@ -742,6 +750,12 @@ export default function ChatRoom() {
 
   const togglePipMode = async () => {
     const nextPip = !isPipMode;
+    if (nextPip && isFullscreenCall) {
+      setIsFullscreenCall(false);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
     setIsPipMode(nextPip);
     socketRef.current?.emit('togglePip', { passcode, isPip: nextPip });
 
@@ -764,6 +778,38 @@ export default function ChatRoom() {
       console.log('Native PiP fallback to floating layout', err);
     }
   };
+
+  const toggleFullscreenCall = useCallback(async () => {
+    const nextFs = !isFullscreenCall;
+    setIsFullscreenCall(nextFs);
+    if (nextFs) {
+      setIsPipMode(false);
+      setShowVideoPanel(true);
+      try {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (e) {}
+    } else {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+      } catch (e) {}
+    }
+  }, [isFullscreenCall]);
+
+  const toggleVideoFit = () => {
+    setVideoFitMode((prev) => (prev === 'cover' ? 'contain' : 'cover'));
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreenCall(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   // Drag Gesture Handlers
   const handleTouchStart = (msg, e) => {
@@ -1740,40 +1786,54 @@ export default function ChatRoom() {
             </div>
           </div>
 
-          {/* Side-by-Side Video Call Panel / Floating Overlay */}
+          {/* Side-by-Side Video Call Panel / Floating Overlay / Fullscreen */}
           {(showVideoPanel || callState !== 'idle') && (
             <div
-              className="m3-video-panel"
+              className={`m3-video-panel ${isFullscreenCall ? 'fullscreen' : ''}`}
               style={
-                isPipMode
+                isFullscreenCall
                   ? {
                     position: 'fixed',
-                    bottom: '24px',
-                    right: '24px',
-                    width: '360px',
-                    height: '270px',
-                    zIndex: 1000,
-                    borderRadius: 'var(--m3-radius-l)',
-                    border: '1px solid var(--m3-primary)',
-                    backgroundColor: 'var(--m3-surface-container-high)',
-                    boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                    inset: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    maxWidth: '100vw',
+                    minWidth: '100vw',
+                    zIndex: 999999,
+                    backgroundColor: '#07060a',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
-                    transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
                   }
-                  : {
-                    width: '420px',
-                    maxWidth: '45%',
-                    minWidth: '300px',
-                    borderLeft: '1px solid var(--m3-outline-variant)',
-                    backgroundColor: 'var(--m3-surface-container-lowest)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    position: 'relative',
-                    transition: 'all 0.3s ease',
-                    height: '100%',
-                  }
+                  : isPipMode
+                    ? {
+                      position: 'fixed',
+                      bottom: '24px',
+                      right: '24px',
+                      width: '360px',
+                      height: '270px',
+                      zIndex: 1000,
+                      borderRadius: 'var(--m3-radius-l)',
+                      border: '1px solid var(--m3-primary)',
+                      backgroundColor: 'var(--m3-surface-container-high)',
+                      boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
+                    }
+                    : {
+                      width: '420px',
+                      maxWidth: '45%',
+                      minWidth: '300px',
+                      borderLeft: '1px solid var(--m3-outline-variant)',
+                      backgroundColor: 'var(--m3-surface-container-lowest)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                      transition: 'all 0.3s ease',
+                      height: '100%',
+                    }
               }
             >
               {/* Video Panel Header */}
@@ -1793,12 +1853,25 @@ export default function ChatRoom() {
                     videocam
                   </span>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--m3-on-surface)' }}>
-                    Video Call Space
+                    {remoteUserName ? `Call with ${remoteUserName}` : 'Video Call Space'}
                   </h3>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <button
+                    type="button"
+                    className="m3-btn m3-btn-icon m3-btn-outlined"
+                    style={{ width: '28px', height: '28px' }}
+                    onClick={toggleFullscreenCall}
+                    title="Full Screen Video Call"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                      {isFullscreenCall ? 'fullscreen_exit' : 'fullscreen'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
                     className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-outlined'}`}
                     style={{ width: '28px', height: '28px' }}
                     onClick={togglePipMode}
@@ -1810,9 +1883,13 @@ export default function ChatRoom() {
                   </button>
 
                   <button
+                    type="button"
                     className="m3-btn m3-btn-icon m3-btn-outlined"
                     style={{ width: '28px', height: '28px' }}
-                    onClick={() => setShowVideoPanel(false)}
+                    onClick={() => {
+                      setShowVideoPanel(false);
+                      if (isFullscreenCall) setIsFullscreenCall(false);
+                    }}
                     title="Hide Video Panel"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
@@ -1935,23 +2012,27 @@ export default function ChatRoom() {
                 )}
 
                 {callState === 'active' && (
-                  <div style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#000', flex: 1, overflow: 'hidden' }}>
+                  <div
+                    style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#000', flex: 1, overflow: 'hidden' }}
+                    onDoubleClick={toggleFullscreenCall}
+                  >
                     {/* Live Duration Timer Badge */}
                     <div className="m3-call-timer">
-                      <div className="m3-call-timer-dot"></div>
+                      <div className="m3-call-timer-dot" />
                       <span>{formatTimer(callDuration)}</span>
                     </div>
 
                     {/* Remote Video Feed */}
                     <video
-                      ref={remoteVideoRef}
+                      ref={remoteVideoCallback}
                       autoPlay
                       playsInline
                       style={{
                         width: '100%',
                         height: '100%',
-                        objectFit: 'cover',
+                        objectFit: videoFitMode,
                         display: remoteStream ? 'block' : 'none',
+                        cursor: 'pointer',
                       }}
                     />
 
@@ -1970,15 +2051,15 @@ export default function ChatRoom() {
                       >
                         <div
                           style={{
-                            width: '88px',
-                            height: '88px',
+                            width: isFullscreenCall ? '120px' : '88px',
+                            height: isFullscreenCall ? '120px' : '88px',
                             borderRadius: '50%',
                             backgroundColor: 'var(--m3-primary-container)',
                             color: 'var(--m3-primary)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '2rem',
+                            fontSize: isFullscreenCall ? '3rem' : '2rem',
                             fontWeight: 700,
                             marginBottom: '12px',
                             border: '3px solid var(--m3-primary)',
@@ -1986,7 +2067,7 @@ export default function ChatRoom() {
                         >
                           {(remoteUserName || 'U').slice(0, 2).toUpperCase()}
                         </div>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--m3-on-surface)' }}>
+                        <span style={{ fontSize: isFullscreenCall ? '1.2rem' : '0.9rem', fontWeight: 600, color: 'var(--m3-on-surface)' }}>
                           {remoteUserName || 'Remote User'}
                         </span>
                         <span style={{ fontSize: '0.75rem', color: '#81c784', marginTop: '4px' }}>Connected</span>
@@ -1999,18 +2080,19 @@ export default function ChatRoom() {
                         position: 'absolute',
                         top: '14px',
                         right: '14px',
-                        width: isPipMode ? '80px' : '120px',
-                        height: isPipMode ? '56px' : '85px',
+                        width: isFullscreenCall ? '180px' : isPipMode ? '80px' : '120px',
+                        height: isFullscreenCall ? '120px' : isPipMode ? '56px' : '85px',
                         borderRadius: 'var(--m3-radius-m)',
                         overflow: 'hidden',
                         border: '2px solid var(--m3-primary)',
                         backgroundColor: '#121116',
                         boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                         zIndex: 30,
+                        transition: 'all 0.2s ease',
                       }}
                     >
                       <video
-                        ref={localVideoRef}
+                        ref={localVideoCallback}
                         autoPlay
                         playsInline
                         muted
@@ -2043,6 +2125,7 @@ export default function ChatRoom() {
                     {/* M3 Glassmorphism Control Dock */}
                     <div className="m3-video-dock">
                       <button
+                        type="button"
                         className={`m3-btn m3-btn-icon ${micMuted ? 'm3-btn-danger' : 'm3-btn-tonal'}`}
                         onClick={toggleMic}
                         title={micMuted ? 'Unmute Mic' : 'Mute Mic'}
@@ -2050,6 +2133,7 @@ export default function ChatRoom() {
                         <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
                       </button>
                       <button
+                        type="button"
                         className={`m3-btn m3-btn-icon ${cameraOff ? 'm3-btn-danger' : 'm3-btn-tonal'}`}
                         onClick={toggleCamera}
                         title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
@@ -2057,13 +2141,30 @@ export default function ChatRoom() {
                         <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
                       </button>
                       <button
+                        type="button"
+                        className="m3-btn m3-btn-icon m3-btn-tonal"
+                        onClick={toggleVideoFit}
+                        title={`Fit: ${videoFitMode}`}
+                      >
+                        <span className="material-symbols-outlined">{videoFitMode === 'cover' ? 'fit_screen' : 'crop_free'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="m3-btn m3-btn-icon m3-btn-tonal"
+                        onClick={toggleFullscreenCall}
+                        title="Toggle Fullscreen"
+                      >
+                        <span className="material-symbols-outlined">{isFullscreenCall ? 'fullscreen_exit' : 'fullscreen'}</span>
+                      </button>
+                      <button
+                        type="button"
                         className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
                         onClick={togglePipMode}
                         title={isPipMode ? 'Dock to Side' : 'Float Window'}
                       >
                         <span className="material-symbols-outlined">{isPipMode ? 'dock' : 'picture_in_picture_alt'}</span>
                       </button>
-                      <button className="m3-btn m3-btn-icon m3-btn-danger" onClick={endCall} title="End Call">
+                      <button type="button" className="m3-btn m3-btn-icon m3-btn-danger" onClick={endCall} title="End Call">
                         <span className="material-symbols-outlined">call_end</span>
                       </button>
                     </div>

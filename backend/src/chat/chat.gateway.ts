@@ -62,11 +62,10 @@ import {
 })
 export class ChatGateway
   implements
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    OnApplicationBootstrap,
-    OnModuleDestroy
-{
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnApplicationBootstrap,
+  OnModuleDestroy {
   @WebSocketServer()
   server!: Server;
 
@@ -82,18 +81,22 @@ export class ChatGateway
 
     @InjectRepository(Status)
     private readonly statusRepo: Repository<Status>,
-  ) {}
+  ) { }
 
   private cleanupTimer?: NodeJS.Timeout;
   private isCleaning = false;
 
   async onApplicationBootstrap() {
-    console.log('Resetting all users online status to offline on startup...');
-    await this.userRepo
-      .createQueryBuilder()
-      .update(User)
-      .set({ isOnline: false })
-      .execute();
+    try {
+      console.log('Resetting all users online status to offline on startup...');
+      await this.userRepo
+        .createQueryBuilder()
+        .update(User)
+        .set({ isOnline: false })
+        .execute();
+    } catch (e) {
+      console.log('User status reset skipped during startup');
+    }
 
     const cleanupInterval = Number(
       process.env.MESSAGE_CLEANUP_INTERVAL || 5000,

@@ -24,7 +24,7 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
   private pingCount = 0;
   private lastPingResult: PingResult | null = null;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   onModuleInit() {
     const isDisable =

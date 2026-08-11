@@ -88,7 +88,10 @@ body {
 }
 
 /* Base Form & Input Tokens */
-input, button, select, textarea {
+input,
+button,
+select,
+textarea {
   font-family: inherit;
   font-size: 1rem;
 }
@@ -271,7 +274,8 @@ input, button, select, textarea {
   }
 
   .m3-bottom-nav {
-    display: none; /* Removed for max height chat workspace */
+    display: none;
+    /* Removed for max height chat workspace */
   }
 
   .m3-main-chat {
@@ -352,9 +356,11 @@ input, button, select, textarea {
   0% {
     box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.6);
   }
+
   70% {
     box-shadow: 0 0 0 8px rgba(37, 211, 102, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(37, 211, 102, 0);
   }
@@ -393,6 +399,7 @@ input, button, select, textarea {
     opacity: 0;
     transform: translate(-50%, -20px);
   }
+
   to {
     opacity: 1;
     transform: translate(-50%, 0);
@@ -403,9 +410,11 @@ input, button, select, textarea {
   0% {
     box-shadow: 0 0 0 0 rgba(129, 199, 132, 0.6);
   }
+
   70% {
     box-shadow: 0 0 0 12px rgba(129, 199, 132, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(129, 199, 132, 0);
   }
@@ -469,5 +478,3 @@ input, button, select, textarea {
   background-color: #81c784;
   animation: storyPulse 1.5s infinite;
 }
-
-
