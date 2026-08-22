@@ -650,16 +650,55 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
           style={{
             position: 'relative',
             width: '100%',
-            minHeight: '380px',
+            height: '440px',
             backgroundColor: '#000',
+            overflow: 'hidden',
           }}
         >
+          {/* Floating Pop-Out Lightbox Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsLightboxOpen(true);
+            }}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              padding: '6px 10px',
+              borderRadius: '20px',
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              color: '#fff',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 10,
+            }}
+            title="Expand in full-screen modal"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: '15px', color: '#ff7597' }}
+            >
+              open_in_full
+            </span>
+            <span>Pop-Out</span>
+          </button>
+
           <iframe
             src={`https://www.instagram.com/p/${igData.shortcode}/embed/`}
             title="Instagram Reel Player"
             style={{
               width: '100%',
-              height: '420px',
+              height: '520px',
+              marginTop: '-56px',
               border: 0,
               overflow: 'hidden',
             }}

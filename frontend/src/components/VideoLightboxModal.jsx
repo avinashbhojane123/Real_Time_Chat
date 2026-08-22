@@ -218,18 +218,29 @@ export default function VideoLightboxModal({
                 }}
               />
             ) : (
-              <iframe
-                src={embedUrl}
-                title="Instagram Reel Player"
+              <div
                 style={{
+                  position: 'relative',
                   width: '100%',
-                  height: '520px',
-                  border: 0,
+                  height: '560px',
                   overflow: 'hidden',
+                  backgroundColor: '#000',
                 }}
-                scrolling="no"
-                allowTransparency="true"
-              />
+              >
+                <iframe
+                  src={embedUrl}
+                  title="Instagram Reel Player"
+                  style={{
+                    width: '100%',
+                    height: '630px',
+                    marginTop: '-56px',
+                    border: 0,
+                    overflow: 'hidden',
+                  }}
+                  scrolling="no"
+                  allowTransparency="true"
+                />
+              </div>
             )
           )}
         </div>
