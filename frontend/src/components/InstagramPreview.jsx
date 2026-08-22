@@ -655,7 +655,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
           }}
         >
           <iframe
-            src={`https://www.instagram.com/p/${igData.shortcode}/embed/captioned/`}
+            src={`https://www.instagram.com/p/${igData.shortcode}/embed/`}
             title="Instagram Reel Player"
             style={{
               width: '100%',
@@ -671,8 +671,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
 
       {/* Post Metadata & Caption Footer */}
       {!loading &&
-        (data?.audio?.musicTitle ||
-          data?.metrics?.likeCount != null ||
+        (data?.metrics?.likeCount != null ||
           data?.metrics?.commentCount != null ||
           data?.caption) && (
           <div
@@ -685,40 +684,6 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
               gap: '8px',
             }}
           >
-            {/* Audio Music Track Info Pill (if present) */}
-            {data?.audio?.musicTitle && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 8px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(225, 48, 108, 0.12)',
-                  border: '1px solid rgba(225, 48, 108, 0.25)',
-                  fontSize: '0.7rem',
-                  color: '#ff7597',
-                }}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '14px', color: '#ff4b72' }}
-                >
-                  music_note
-                </span>
-                <span
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontWeight: 600,
-                  }}
-                >
-                  {data.audio.musicTitle}
-                  {data.audio.musicArtist ? ` • ${data.audio.musicArtist}` : ''}
-                </span>
-              </div>
-            )}
 
             {/* Metrics Pills (Likes, Comments) */}
             {(data?.metrics?.likeCount != null ||
@@ -828,7 +793,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
         onClose={() => setIsLightboxOpen(false)}
         type="instagram"
         videoSrc={videoSrc}
-        embedUrl={`https://www.instagram.com/p/${igData.shortcode}/embed/captioned/`}
+        embedUrl={`https://www.instagram.com/p/${igData.shortcode}/embed/`}
         posterSrc={posterSrc}
         title={data?.caption || `Instagram ${igData.type}`}
         cleanUrl={igData.cleanUrl}

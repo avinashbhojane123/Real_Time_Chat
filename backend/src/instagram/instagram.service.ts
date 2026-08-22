@@ -227,7 +227,7 @@ export class InstagramService {
       author: {
         username: 'Instagram User',
       },
-      embedHtml: `<iframe src="https://www.instagram.com/p/${shortcode}/embed/captioned/" width="100%" height="480" frameborder="0" scrolling="no" allowtransparency="true"></iframe>`,
+      embedHtml: `<iframe src="https://www.instagram.com/p/${shortcode}/embed/" width="100%" height="480" frameborder="0" scrolling="no" allowtransparency="true"></iframe>`,
     };
   }
 
