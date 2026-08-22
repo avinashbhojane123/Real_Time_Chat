@@ -29,15 +29,47 @@ const blockedExtList = process.env.BLOCKED_FILE_EXTENSIONS
   ? process.env.BLOCKED_FILE_EXTENSIONS.split(',').map((e) =>
     e.trim().toLowerCase(),
   )
-  : ['.exe', '.bat', '.cmd', '.vbs', '.com', '.scr', '.pif', '.msi'];
+  : [
+      '.exe',
+      '.bat',
+      '.cmd',
+      '.vbs',
+      '.com',
+      '.scr',
+      '.pif',
+      '.msi',
+      '.ps1',
+      '.hta',
+      '.jar',
+      '.html',
+      '.htm',
+      '.xhtml',
+      '.php',
+      '.phtml',
+      '.js',
+      '.mjs',
+      '.sh',
+      '.py',
+      '.pl',
+      '.cgi',
+      '.asp',
+      '.aspx',
+      '.jsp',
+      '.svg',
+    ];
 
 @Controller('upload')
 export class UploadController {
   @Get('files')
   files() {
-    return {
-      files: readdirSync(uploadDir),
-    };
+    try {
+      const allFiles = readdirSync(uploadDir).filter(
+        (f) => !f.startsWith('.') && !f.includes('..'),
+      );
+      return { files: allFiles };
+    } catch {
+      return { files: [] };
+    }
   }
 
   @Post()

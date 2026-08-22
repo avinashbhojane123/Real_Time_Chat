@@ -704,6 +704,19 @@ export class InstagramService {
       throw new BadRequestException('Invalid protocol');
     }
 
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const isAllowedHost =
+      hostname.endsWith('.cdninstagram.com') ||
+      hostname.endsWith('.fbcdn.net') ||
+      hostname.endsWith('.instagram.com') ||
+      hostname === 'cdninstagram.com' ||
+      hostname === 'fbcdn.net' ||
+      hostname === 'instagram.com';
+
+    if (!isAllowedHost) {
+      throw new BadRequestException('Disallowed target domain for media proxy');
+    }
+
     const headers: http.OutgoingHttpHeaders = {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
