@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/apiConfig';
+import VideoLightboxModal from './VideoLightboxModal';
 
 /**
  * Extract Instagram shortcode and clean URL from message text
@@ -40,10 +41,8 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedText, setCopiedText] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   // Video & Audio playback states
   const videoRef = useRef(null);
@@ -134,24 +133,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
 
   const isVideoPost = data?.isVideo && videoSrc && !hasVideoError;
 
-  const handleCopyLink = (e) => {
-    if (e) e.stopPropagation();
-    navigator.clipboard.writeText(igData.cleanUrl);
-    setCopiedLink(true);
-    if (onCopySuccess) onCopySuccess('Instagram link copied!');
-    setTimeout(() => setCopiedLink(false), 2200);
-  };
 
-  const handleCopyCaption = (e) => {
-    if (e) e.stopPropagation();
-    const text = data?.caption
-      ? `${data.caption}\n\n${igData.cleanUrl}`
-      : igData.cleanUrl;
-    navigator.clipboard.writeText(text);
-    setCopiedText(true);
-    if (onCopySuccess) onCopySuccess('Caption copied to clipboard!');
-    setTimeout(() => setCopiedText(false), 2200);
-  };
 
   const audioOffset = (data?.audio?.audioStartTimeMs || 0) / 1000;
 
@@ -319,142 +301,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
         transition: 'all 0.3s ease',
       }}
     >
-      {/* Top Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '10px 12px',
-          background:
-            'linear-gradient(90deg, rgba(225, 48, 108, 0.15) 0%, rgba(131, 58, 180, 0.15) 100%)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            minWidth: 0,
-          }}
-        >
-          {/* Instagram Gradient Logo Icon */}
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '7px',
-              background:
-                'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(225, 48, 108, 0.4)',
-            }}
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: '15px', color: '#fff' }}
-            >
-              play_arrow
-            </span>
-          </div>
 
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                color: '#fff',
-                letterSpacing: '0.3px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <span>Instagram {igData.type}</span>
-            </div>
-            {data?.author?.username && (
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: 'rgba(255, 255, 255, 0.65)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                @{data.author.username}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
-          <button
-            type="button"
-            className="m3-btn m3-btn-outlined"
-            style={{
-              padding: '3px 8px',
-              fontSize: '0.68rem',
-              borderRadius: '8px',
-              color: copiedLink ? '#81c784' : '#fff',
-              borderColor: copiedLink ? '#81c784' : 'rgba(255,255,255,0.2)',
-              backgroundColor: copiedLink
-                ? 'rgba(129, 199, 132, 0.15)'
-                : 'transparent',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            onClick={handleCopyLink}
-            title="Copy Instagram link"
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: '13px' }}
-            >
-              {copiedLink ? 'check' : 'link'}
-            </span>
-            {copiedLink ? 'Copied' : 'Link'}
-          </button>
-
-          <button
-            type="button"
-            className="m3-btn m3-btn-outlined"
-            style={{
-              padding: '3px 8px',
-              fontSize: '0.68rem',
-              borderRadius: '8px',
-              color: copiedText ? '#81c784' : '#fff',
-              borderColor: copiedText ? '#81c784' : 'rgba(255,255,255,0.2)',
-              backgroundColor: copiedText
-                ? 'rgba(129, 199, 132, 0.15)'
-                : 'transparent',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            onClick={handleCopyCaption}
-            title="Copy caption"
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: '13px' }}
-            >
-              {copiedText ? 'check' : 'content_copy'}
-            </span>
-            {copiedText ? 'Copied' : 'Caption'}
-          </button>
-        </div>
-      </div>
 
       {/* Loading Skeleton */}
       {loading && (
@@ -514,6 +361,43 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
               style={{ display: 'none' }}
             />
           )}
+
+          {/* Floating Pop-Out Lightbox Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsLightboxOpen(true);
+            }}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '12px',
+              padding: '6px 10px',
+              borderRadius: '20px',
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              color: '#fff',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 10,
+            }}
+            title="Expand in full-screen modal"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: '15px', color: '#ff7597' }}
+            >
+              open_in_full
+            </span>
+            <span>Pop-Out</span>
+          </button>
 
           <video
             ref={videoRef}
@@ -786,222 +670,169 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
       )}
 
       {/* Post Metadata & Caption Footer */}
-      {!loading && (
-        <div
-          style={{
-            padding: '10px 12px',
-            backgroundColor: 'rgba(18, 14, 22, 0.95)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          {/* Audio Music Track Info Pill (if present) */}
-          {data?.audio?.musicTitle && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 8px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(225, 48, 108, 0.12)',
-                border: '1px solid rgba(225, 48, 108, 0.25)',
-                fontSize: '0.7rem',
-                color: '#ff7597',
-              }}
-            >
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: '14px', color: '#ff4b72' }}
-              >
-                music_note
-              </span>
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontWeight: 600,
-                }}
-              >
-                {data.audio.musicTitle}
-                {data.audio.musicArtist ? ` • ${data.audio.musicArtist}` : ''}
-              </span>
-            </div>
-          )}
-
-          {/* Author & Stats Row */}
+      {!loading &&
+        (data?.audio?.musicTitle ||
+          data?.metrics?.likeCount != null ||
+          data?.metrics?.commentCount != null ||
+          data?.caption) && (
           <div
             style={{
+              padding: '10px 12px',
+              backgroundColor: 'rgba(18, 14, 22, 0.95)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              flexDirection: 'column',
+              gap: '8px',
             }}
           >
-            {/* Author */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {authorAvatar ? (
-                <img
-                  src={authorAvatar}
-                  alt={data?.author?.username || 'User'}
-                  style={{
-                    width: '22px',
-                    height: '22px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '1px solid rgba(225, 48, 108, 0.5)',
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              ) : (
+            {/* Audio Music Track Info Pill (if present) */}
+            {data?.audio?.musicTitle && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(225, 48, 108, 0.12)',
+                  border: '1px solid rgba(225, 48, 108, 0.25)',
+                  fontSize: '0.7rem',
+                  color: '#ff7597',
+                }}
+              >
                 <span
                   className="material-symbols-outlined"
-                  style={{ fontSize: '18px', color: '#e1306c' }}
+                  style={{ fontSize: '14px', color: '#ff4b72' }}
                 >
-                  account_circle
+                  music_note
                 </span>
-              )}
-              <span
-                style={{
-                  fontSize: '0.74rem',
-                  fontWeight: 600,
-                  color: '#f0f0f5',
-                }}
-              >
-                {data?.author?.fullName ||
-                  data?.author?.username ||
-                  'Instagram User'}
-              </span>
-            </div>
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 600,
+                  }}
+                >
+                  {data.audio.musicTitle}
+                  {data.audio.musicArtist ? ` • ${data.audio.musicArtist}` : ''}
+                </span>
+              </div>
+            )}
 
             {/* Metrics Pills (Likes, Comments) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {data?.metrics?.likeCount !== undefined &&
-                data?.metrics?.likeCount !== null && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      fontSize: '0.7rem',
-                      color: '#ff4b72',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontSize: '13px' }}
-                    >
-                      favorite
-                    </span>
-                    <span>{formatNumber(data.metrics.likeCount)}</span>
-                  </div>
-                )}
-
-              {data?.metrics?.commentCount !== undefined &&
-                data?.metrics?.commentCount !== null && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      fontSize: '0.7rem',
-                      color: '#a0a0b0',
-                    }}
-                  >
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontSize: '13px' }}
-                    >
-                      chat_bubble
-                    </span>
-                    <span>{formatNumber(data.metrics.commentCount)}</span>
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* Caption Text */}
-          {data?.caption && (
-            <div
-              style={{
-                fontSize: '0.76rem',
-                color: '#d5d5e2',
-                lineHeight: '1.35',
-              }}
-            >
-              <span
+            {(data?.metrics?.likeCount != null ||
+              data?.metrics?.commentCount != null) && (
+              <div
                 style={{
-                  display: showFullCaption ? 'inline' : '-webkit-box',
-                  WebkitLineClamp: showFullCaption ? 'unset' : 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  wordBreak: 'break-word',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '8px',
                 }}
               >
-                {data.caption}
-              </span>
-              {data.caption.length > 90 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowFullCaption(!showFullCaption);
-                  }}
+                {data?.metrics?.likeCount !== undefined &&
+                  data?.metrics?.likeCount !== null && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        fontSize: '0.7rem',
+                        color: '#ff4b72',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span
+                        className="material-symbols-outlined"
+                        style={{ fontSize: '13px' }}
+                      >
+                        favorite
+                      </span>
+                      <span>{formatNumber(data.metrics.likeCount)}</span>
+                    </div>
+                  )}
+
+                {data?.metrics?.commentCount !== undefined &&
+                  data?.metrics?.commentCount !== null && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        fontSize: '0.7rem',
+                        color: '#a0a0b0',
+                      }}
+                    >
+                      <span
+                        className="material-symbols-outlined"
+                        style={{ fontSize: '13px' }}
+                      >
+                        chat_bubble
+                      </span>
+                      <span>{formatNumber(data.metrics.commentCount)}</span>
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {/* Caption Text */}
+            {data?.caption && (
+              <div
+                style={{
+                  fontSize: '0.76rem',
+                  color: '#d5d5e2',
+                  lineHeight: '1.35',
+                }}
+              >
+                <span
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#e1306c',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    padding: '0 4px',
-                    marginLeft: '2px',
+                    display: showFullCaption ? 'inline' : '-webkit-box',
+                    WebkitLineClamp: showFullCaption ? 'unset' : 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    wordBreak: 'break-word',
                   }}
                 >
-                  {showFullCaption ? 'less' : 'more'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Open in Instagram Link */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginTop: '2px',
-            }}
-          >
-            <a
-              href={igData.cleanUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: '0.7rem',
-                color: '#e1306c',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-                fontWeight: 600,
-              }}
-            >
-              <span>Watch on Instagram</span>
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: '12px' }}
-              >
-                open_in_new
-              </span>
-            </a>
+                  {data.caption}
+                </span>
+                {data.caption.length > 90 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullCaption(!showFullCaption);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#e1306c',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: '0 4px',
+                      marginLeft: '2px',
+                    }}
+                  >
+                    {showFullCaption ? 'less' : 'more'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+
+      {/* Lightbox Modal */}
+      <VideoLightboxModal
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        type="instagram"
+        videoSrc={videoSrc}
+        embedUrl={`https://www.instagram.com/p/${igData.shortcode}/embed/captioned/`}
+        posterSrc={posterSrc}
+        title={data?.caption || `Instagram ${igData.type}`}
+        cleanUrl={igData.cleanUrl}
+      />
     </div>
   );
 }

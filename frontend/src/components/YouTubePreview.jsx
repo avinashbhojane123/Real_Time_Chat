@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import VideoLightboxModal from './VideoLightboxModal';
 
 export function parseYouTubeUrl(text) {
   if (!text || typeof text !== 'string') return null;
@@ -17,10 +18,11 @@ export function parseYouTubeUrl(text) {
 
 export default function YouTubePreview({ messageText, onCopySuccess }) {
   const ytData = parseYouTubeUrl(messageText);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedText, setCopiedText] = useState(false);
+
   const [meta, setMeta] = useState(null);
   const [loadingMeta, setLoadingMeta] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   useEffect(() => {
     if (!ytData?.cleanUrl) return;
@@ -48,22 +50,7 @@ export default function YouTubePreview({ messageText, onCopySuccess }) {
 
   if (!ytData) return null;
 
-  const handleCopyCleanLink = (e) => {
-    if (e) e.stopPropagation();
-    navigator.clipboard.writeText(ytData.cleanUrl);
-    setCopiedLink(true);
-    if (onCopySuccess) onCopySuccess('Link copied to clipboard!');
-    setTimeout(() => setCopiedLink(false), 2200);
-  };
 
-  const handleCopyText = (e) => {
-    if (e) e.stopPropagation();
-    const textToCopy = meta?.title ? `${meta.title}\n${ytData.cleanUrl}` : messageText;
-    navigator.clipboard.writeText(textToCopy);
-    setCopiedText(true);
-    if (onCopySuccess) onCopySuccess('Text copied to clipboard!');
-    setTimeout(() => setCopiedText(false), 2200);
-  };
 
   return (
     <div
@@ -80,103 +67,112 @@ export default function YouTubePreview({ messageText, onCopySuccess }) {
         transition: 'all 0.3s ease',
       }}
     >
-      {/* Top Header */}
+
+
+      {/* Embedded Iframe Player or Click-to-Play Thumbnail Cover */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px 12px',
-          backgroundColor: 'rgba(255, 0, 0, 0.1)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          position: 'relative',
+          width: '100%',
+          paddingTop: '56.25%',
+          backgroundColor: '#000',
+          cursor: isPlaying ? 'default' : 'pointer',
+        }}
+        onClick={() => {
+          if (!isPlaying) setIsPlaying(true);
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '0.78rem',
-            color: '#ff4e4e',
-            fontWeight: 700,
-            letterSpacing: '0.3px',
+        {/* Floating Pop-Out Lightbox Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsLightboxOpen(true);
           }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#ff0000' }}>
-            play_circle
-          </span>
-          <span>YouTube Video</span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <button
-            className="m3-btn m3-btn-outlined"
-            type="button"
-            style={{
-              padding: '2px 10px',
-              fontSize: '0.68rem',
-              borderRadius: '8px',
-              color: copiedLink ? '#81c784' : '#fff',
-              borderColor: copiedLink ? '#81c784' : 'rgba(255,255,255,0.2)',
-              backgroundColor: copiedLink ? 'rgba(129, 199, 132, 0.15)' : 'transparent',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            onClick={handleCopyCleanLink}
-            title="Copy clean YouTube link"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
-              {copiedLink ? 'check' : 'link'}
-            </span>
-            {copiedLink ? 'Copied Link' : 'Copy Link'}
-          </button>
-
-          <button
-            className="m3-btn m3-btn-outlined"
-            type="button"
-            style={{
-              padding: '2px 10px',
-              fontSize: '0.68rem',
-              borderRadius: '8px',
-              color: copiedText ? '#81c784' : '#fff',
-              borderColor: copiedText ? '#81c784' : 'rgba(255,255,255,0.2)',
-              backgroundColor: copiedText ? 'rgba(129, 199, 132, 0.15)' : 'transparent',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            onClick={handleCopyText}
-            title="Copy video title & text"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
-              {copiedText ? 'check' : 'content_copy'}
-            </span>
-            {copiedText ? 'Copied Text' : 'Copy Text'}
-          </button>
-        </div>
-      </div>
-
-      {/* Embedded Iframe Player */}
-      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', backgroundColor: '#000' }}>
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${ytData.videoId}?autoplay=0&rel=0`}
-          title={meta?.title || 'YouTube Video Player'}
           style={{
             position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            border: 0,
+            top: '12px',
+            left: '12px',
+            padding: '6px 10px',
+            borderRadius: '20px',
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            color: '#fff',
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 10,
           }}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-        />
+          title="Expand in full-screen modal"
+        >
+          <span
+            className="material-symbols-outlined"
+            style={{ fontSize: '15px', color: '#ff6b6b' }}
+          >
+            open_in_full
+          </span>
+          <span>Pop-Out</span>
+        </button>
+
+        {isPlaying ? (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${ytData.videoId}?autoplay=1&rel=0`}
+            title={meta?.title || 'YouTube Video Player'}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              border: 0,
+            }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        ) : (
+          /* Thumbnail Cover with Big Red Play Overlay */
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundImage: `url(https://img.youtube.com/vi/${ytData.videoId}/hqdefault.jpg)`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 0, 0, 0.88)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 20px rgba(255, 0, 0, 0.6)',
+                transition: 'transform 0.2s ease',
+              }}
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: '36px', color: '#fff', marginLeft: '3px' }}
+              >
+                play_arrow
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Meta Footer */}
@@ -216,6 +212,16 @@ export default function YouTubePreview({ messageText, onCopySuccess }) {
           )}
         </div>
       )}
+
+      {/* Lightbox Modal */}
+      <VideoLightboxModal
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        type="youtube"
+        embedUrl={`https://www.youtube-nocookie.com/embed/${ytData.videoId}`}
+        title={meta?.title || 'YouTube Video'}
+        cleanUrl={ytData.cleanUrl}
+      />
     </div>
   );
 }
