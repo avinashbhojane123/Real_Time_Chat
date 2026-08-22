@@ -8,9 +8,15 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  const defaultOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://front-end-is6k.onrender.com',
+  ];
+
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-    : '*';
+    : defaultOrigins;
 
   app.enableCors({
     origin: allowedOrigins,
@@ -39,6 +45,13 @@ async function bootstrap() {
       res.set('Access-Control-Allow-Origin', '*');
       res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       res.set('Access-Control-Allow-Headers', 'Content-Type');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set(
+        'Content-Security-Policy',
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      );
+      res.set('X-Frame-Options', 'DENY');
+      res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     },
   });
 
