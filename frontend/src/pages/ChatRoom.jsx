@@ -67,10 +67,10 @@ function formatLastSeen(lastSeenDate) {
 export default function ChatRoom() {
   const navigate = useNavigate();
 
-  const baseUrl = localStorage.getItem('baseUrl') || getApiBaseUrl();
-  const nickname = (localStorage.getItem('nickname') || '').trim();
-  const passcode = (localStorage.getItem('passcode') || '').trim();
-  const avatarUrl = localStorage.getItem('avatarUrl') || '';
+  const baseUrl = sessionStorage.getItem('baseUrl') || localStorage.getItem('baseUrl') || getApiBaseUrl();
+  const nickname = (sessionStorage.getItem('nickname') || '').trim();
+  const passcode = (sessionStorage.getItem('passcode') || '').trim();
+  const avatarUrl = sessionStorage.getItem('avatarUrl') || localStorage.getItem('avatarUrl') || '';
 
   // Side-by-side Video Panel Toggle State
   const [showVideoPanel, setShowVideoPanel] = useState(false);
@@ -1046,8 +1046,10 @@ export default function ChatRoom() {
           <button
             className="m3-btn m3-btn-tonal"
             onClick={() => {
-              localStorage.clear();
-              navigate('/');
+              sessionStorage.clear();
+              localStorage.removeItem('passcode');
+              localStorage.removeItem('nickname');
+              navigate('/', { replace: true });
             }}
           >
             <span className="material-symbols-outlined">logout</span>

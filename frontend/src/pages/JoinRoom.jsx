@@ -20,9 +20,9 @@ export default function JoinRoom() {
   const [baseUrl, setBaseUrl] = useState(
     localStorage.getItem('baseUrl') || getApiBaseUrl()
   );
-  const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
-  const [passcode, setPasscode] = useState(localStorage.getItem('passcode') || '');
-  const [avatarUrl, setAvatarUrl] = useState(localStorage.getItem('avatarUrl') || '');
+  const [nickname, setNickname] = useState(sessionStorage.getItem('nickname') || '');
+  const [passcode, setPasscode] = useState(sessionStorage.getItem('passcode') || '');
+  const [avatarUrl, setAvatarUrl] = useState(sessionStorage.getItem('avatarUrl') || localStorage.getItem('avatarUrl') || '');
   const [uploading, setUploading] = useState(false);
   const [joining, setJoining] = useState(false);
   const [roomVerified, setRoomVerified] = useState(false);
@@ -40,7 +40,7 @@ export default function JoinRoom() {
       const res = await axios.post(`${cleanApiUrl}/upload`, formData);
       if (res.data && res.data.fileUrl) {
         setAvatarUrl(res.data.fileUrl);
-        localStorage.setItem('avatarUrl', res.data.fileUrl);
+        sessionStorage.setItem('avatarUrl', res.data.fileUrl);
       }
     } catch (err) {
       setError('Avatar upload failed: ' + (err.response?.data?.message || err.message));
@@ -72,10 +72,14 @@ export default function JoinRoom() {
       });
 
       if (res.data && res.data.success) {
-        localStorage.setItem('baseUrl', baseUrl.trim());
-        localStorage.setItem('nickname', finalNickname);
-        localStorage.setItem('passcode', passcode.trim());
-        if (avatarUrl) localStorage.setItem('avatarUrl', avatarUrl);
+        sessionStorage.setItem('baseUrl', baseUrl.trim());
+        sessionStorage.setItem('nickname', finalNickname);
+        sessionStorage.setItem('passcode', passcode.trim());
+        if (avatarUrl) sessionStorage.setItem('avatarUrl', avatarUrl);
+
+        // Remove permanent passcode and nickname from localStorage so closing browser tab destroys session
+        localStorage.removeItem('passcode');
+        localStorage.removeItem('nickname');
         setRoomVerified(true);
       } else {
         setError('Failed to authenticate room passcode');
