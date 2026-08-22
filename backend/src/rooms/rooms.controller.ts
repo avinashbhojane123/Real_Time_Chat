@@ -1,12 +1,14 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomHttpDto } from './dto/join-room-http.dto';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
 
 @Controller('rooms')
 export class RoomsController {
   constructor(private readonly roomService: RoomsService) {}
 
   @Post('join')
+  @UseGuards(RateLimitGuard)
   async join(
     @Body()
     body: JoinRoomHttpDto,

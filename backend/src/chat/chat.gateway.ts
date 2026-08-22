@@ -169,11 +169,14 @@ export class ChatGateway
     }
   >();
 
+  private socketMessageTimes = new Map<string, number[]>();
+
   handleConnection(client: Socket) {
     console.log('Client connected:', client.id);
   }
 
   async handleDisconnect(client: Socket) {
+    this.socketMessageTimes.delete(client.id);
     const userInfo = this.users.get(client.id);
 
     if (!userInfo) return;
@@ -392,6 +395,17 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SendMessageDto,
   ) {
+    const now = Date.now();
+    const timestamps = (this.socketMessageTimes.get(client.id) || []).filter(
+      (t) => now - t < 3000,
+    );
+    if (timestamps.length >= 10) {
+      client.emit('error', { message: 'Too many messages. Please slow down.' });
+      return { success: false, message: 'Rate limit exceeded' };
+    }
+    timestamps.push(now);
+    this.socketMessageTimes.set(client.id, timestamps);
+
     let session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) {
       if (data.passcode) {

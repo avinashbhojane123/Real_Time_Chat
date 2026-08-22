@@ -4,8 +4,10 @@ import {
   Get,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -73,6 +75,7 @@ export class UploadController {
   }
 
   @Post()
+  @UseGuards(RateLimitGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
