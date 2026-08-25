@@ -1530,53 +1530,6 @@ export default function ChatRoom() {
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>call</span>
             </button>
 
-            {/* Disappearing Messages Timer Menu Toggle */}
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={() => setShowDisappearingMenu(!showDisappearingMenu)}
-                style={{ background: 'none', border: 'none', color: disappearingTimer > 0 ? '#ff9800' : '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
-                title={`Disappearing Messages: ${disappearingTimer > 0 ? `${disappearingTimer}s` : 'Off'}`}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>timer</span>
-              </button>
-              {showDisappearingMenu && (
-                <div style={{ position: 'absolute', top: '34px', right: '0px', backgroundColor: '#233138', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.7)', border: '1px solid rgba(134,150,160,0.2)', padding: '6px 0', zIndex: 60, minWidth: '160px' }}>
-                  <div style={{ padding: '6px 14px', fontSize: '0.72rem', fontWeight: 700, color: '#8696a0' }}>Self-Destruct Timer</div>
-                  {[
-                    { label: 'Off', val: 0 },
-                    { label: '10 Seconds', val: 10 },
-                    { label: '30 Seconds', val: 30 },
-                    { label: '60 Seconds', val: 60 },
-                  ].map((item) => (
-                    <button
-                      key={item.val}
-                      onClick={() => {
-                        setDisappearingTimer(item.val);
-                        setShowDisappearingMenu(false);
-                        showToast(`Self-destruct timer set to ${item.label}`);
-                      }}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: disappearingTimer === item.val ? '#00a884' : '#e9edef', fontSize: '0.82rem', cursor: 'pointer' }}
-                      className="hover:bg-[#182229]"
-                    >
-                      <span>{item.label}</span>
-                      {disappearingTimer === item.val && <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Theme Selector Button */}
-            <button
-              type="button"
-              onClick={() => setShowThemeModal(true)}
-              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-              title="Change Theme & Wallpaper"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>palette</span>
-            </button>
-
             {/* Search Icon Button */}
             <button
               type="button"
@@ -2802,6 +2755,66 @@ export default function ChatRoom() {
               </button>
               <button onClick={handleCreatePoll} style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
                 Send Poll
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disappearing Messages Modal */}
+      {showDisappearingMenu && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.85)', backdropFilter: 'blur(8px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '100%', maxWidth: '380px', backgroundColor: '#111b21', borderRadius: '18px', border: '1px solid rgba(134, 150, 160, 0.2)', padding: '24px', boxShadow: '0 16px 40px rgba(0,0,0,0.8)' }} className="animate-fade-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', color: '#e9edef' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1.1rem' }}>
+                <span className="material-symbols-outlined" style={{ color: '#ff9800' }}>timer</span>
+                <span>Disappearing Messages</span>
+              </div>
+              <button onClick={() => setShowDisappearingMenu(false)} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <p style={{ fontSize: '0.82rem', color: '#8696a0', marginBottom: '16px', lineHeight: 1.4 }}>
+              Set a self-destruct countdown timer for new messages. Messages automatically disappear after the selected duration.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {[
+                { label: 'Off', val: 0 },
+                { label: '10 Seconds', val: 10 },
+                { label: '30 Seconds', val: 30 },
+                { label: '60 Seconds', val: 60 },
+              ].map((item) => (
+                <button
+                  key={item.val}
+                  onClick={() => {
+                    setDisappearingTimer(item.val);
+                    setShowDisappearingMenu(false);
+                    showToast(`Self-destruct timer set to ${item.label}`);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    backgroundColor: disappearingTimer === item.val ? '#202c33' : '#182229',
+                    border: `1px solid ${disappearingTimer === item.val ? '#00a884' : 'rgba(134,150,160,0.15)'}`,
+                    color: '#e9edef',
+                    fontSize: '0.86rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontWeight: disappearingTimer === item.val ? 700 : 400 }}>{item.label}</span>
+                  {disappearingTimer === item.val && <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '18px' }}>check_circle</span>}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowDisappearingMenu(false)} style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
+                Done
               </button>
             </div>
           </div>
