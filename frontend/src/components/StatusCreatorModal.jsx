@@ -3,6 +3,8 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import AnimatedModal from './animated/AnimatedModal';
+import MagneticButton from './animated/MagneticButton';
+
 
 
 
@@ -498,8 +500,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
           >
             Cancel
           </button>
-          <button
-            type="button"
+          <MagneticButton
             onClick={handleSubmit}
             disabled={uploading}
             style={{
@@ -510,7 +511,6 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
               borderRadius: '24px',
               padding: '10px 24px',
               border: 'none',
-              cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(0, 168, 132, 0.3)',
               display: 'flex',
               alignItems: 'center',
@@ -521,7 +521,8 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
               send
             </span>
             Post Status
-          </button>
+          </MagneticButton>
+
         </div>
       </div>
     </AnimatedModal>

@@ -14,7 +14,9 @@ import AnimatedMessageBubble from '../components/animated/AnimatedMessageBubble'
 import AnimatedTypingIndicator from '../components/animated/AnimatedTypingIndicator';
 import AnimatedReactionPicker from '../components/animated/AnimatedReactionPicker';
 import ScrollToBottomPill from '../components/animated/ScrollToBottomPill';
+import MagneticButton from '../components/animated/MagneticButton';
 import { animate, random } from 'animejs';
+
 
 
 function formatMessageTime(dateStr) {
@@ -1798,15 +1800,17 @@ export default function ChatRoom() {
                       <div>
                         {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
 
-                        {/* Image Attachment Preview */}
+                        {/* Image Attachment Preview with Motion layoutId */}
                         {msg.fileUrl && msg.fileType?.startsWith('image/') && (
-                          <img
+                          <motion.img
+                            layoutId={`chat-img-${msg.id}`}
                             src={msg.fileUrl}
                             alt="Attachment"
                             style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
-                            onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName })}
+                            onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName, id: msg.id })}
                           />
                         )}
+
 
                         {/* Audio Voice Note Player */}
                         {msg.fileUrl && msg.fileType?.startsWith('audio/') && (
@@ -2521,7 +2525,7 @@ export default function ChatRoom() {
 
             {/* Send / Save or Voice Record Button */}
             {inputText.trim() || editingMsg ? (
-              <button
+              <MagneticButton
                 type="submit"
                 style={{
                   width: '42px',
@@ -2530,7 +2534,6 @@ export default function ChatRoom() {
                   backgroundColor: '#00a884',
                   color: '#ffffff',
                   border: 'none',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2542,9 +2545,9 @@ export default function ChatRoom() {
                 <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: editingMsg ? '0' : '2px' }}>
                   {editingMsg ? 'check' : 'send'}
                 </span>
-              </button>
+              </MagneticButton>
             ) : (
-              <button
+              <MagneticButton
                 type="button"
                 onClick={startAudioRecording}
                 style={{
@@ -2554,7 +2557,6 @@ export default function ChatRoom() {
                   backgroundColor: '#00a884',
                   color: '#ffffff',
                   border: 'none',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2564,8 +2566,9 @@ export default function ChatRoom() {
                 title="Record Voice Note"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>mic</span>
-              </button>
+              </MagneticButton>
             )}
+
           </form>
         )}
       </main>
@@ -2732,25 +2735,37 @@ export default function ChatRoom() {
         />
       )}
 
-      {/* Lightbox Viewer */}
-      {lightboxImage && (
-        <div
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.94)', backdropFilter: 'blur(12px)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-          onClick={() => setLightboxImage(null)}
-        >
-          <button type="button" onClick={() => setLightboxImage(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined">close</span>
-          </button>
-          <img src={lightboxImage.url} alt={lightboxImage.name} style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 12px 40px rgba(0,0,0,0.8)' }} onClick={(e) => e.stopPropagation()} />
-          <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{lightboxImage.name}</span>
-            <a href={lightboxImage.url} download target="_blank" rel="noreferrer" style={{ backgroundColor: '#00a884', color: '#fff', textDecoration: 'none', padding: '6px 18px', borderRadius: '20px', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
-              Download
-            </a>
-          </div>
-        </div>
-      )}
+      {/* Lightbox Viewer with Motion layoutId morph */}
+      <AnimatePresence>
+        {lightboxImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.94)', backdropFilter: 'blur(12px)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+            onClick={() => setLightboxImage(null)}
+          >
+            <button type="button" onClick={() => setLightboxImage(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <motion.img
+              layoutId={lightboxImage.id ? `chat-img-${lightboxImage.id}` : undefined}
+              src={lightboxImage.url}
+              alt={lightboxImage.name}
+              style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 12px 40px rgba(0,0,0,0.8)' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{lightboxImage.name}</span>
+              <a href={lightboxImage.url} download target="_blank" rel="noreferrer" style={{ backgroundColor: '#00a884', color: '#fff', textDecoration: 'none', padding: '6px 18px', borderRadius: '20px', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
+                Download
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
 
       {/* Theme Selector Modal */}
       {showThemeModal && (
