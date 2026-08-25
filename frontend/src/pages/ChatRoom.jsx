@@ -182,9 +182,10 @@ export default function ChatRoom() {
   const [editingMsgId, setEditingMsgId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
-  // Emoji & Reaction State
+  // Emoji & Reaction & Context Menu State
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+  const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
 
   // Clear Confirmation Modal State
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -1509,65 +1510,121 @@ export default function ChatRoom() {
                         )}
                       </div>
 
-                      {/* Quick Hover Options Toolbar */}
-                      <div
+                      {/* Message 3 Dots Button Trigger */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
+                        }}
                         style={{
                           position: 'absolute',
                           top: '2px',
-                          right: '6px',
-                          display: 'none',
-                          backgroundColor: '#111b21',
-                          borderRadius: '12px',
-                          padding: '2px 4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                          right: '2px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#8696a0',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 15,
                         }}
-                        className="group-hover:flex"
+                        className="group-hover:opacity-100 opacity-60 hover:opacity-100"
+                        title="Message options"
                       >
-                        <button
-                          type="button"
-                          onClick={() => setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id)}
-                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                          title="React"
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
+                      </button>
+
+                      {/* 3 Dots Context Dropdown Menu */}
+                      {activeMenuMsgId === msg.id && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '26px',
+                            right: '6px',
+                            backgroundColor: '#233138',
+                            borderRadius: '10px',
+                            boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
+                            border: '1px solid rgba(134, 150, 160, 0.2)',
+                            padding: '4px 0',
+                            zIndex: 60,
+                            minWidth: '150px',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add_reaction</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setReplyingTo(msg)}
-                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                          title="Reply"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>reply</span>
-                        </button>
-                        {isMe && (
                           <button
                             type="button"
-                            onClick={() => startEditing(msg)}
-                            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                            title="Edit"
+                            onClick={() => {
+                              setActiveReactionMsgId(msg.id);
+                              setActiveMenuMsgId(null);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            className="hover:bg-[#182229]"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>add_reaction</span>
+                            <span>React</span>
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePinMessage(msg)}
-                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                          title="Pin"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>push_pin</span>
-                        </button>
-                        {isMe && (
+
                           <button
                             type="button"
-                            onClick={() => handleDeleteMessage(msg.id)}
-                            style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '2px 4px' }}
-                            title="Delete"
+                            onClick={() => {
+                              setReplyingTo(msg);
+                              setActiveMenuMsgId(null);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            className="hover:bg-[#182229]"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>reply</span>
+                            <span>Reply</span>
                           </button>
-                        )}
-                      </div>
+
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                startEditing(msg);
+                                setActiveMenuMsgId(null);
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                              className="hover:bg-[#182229]"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>edit</span>
+                              <span>Edit</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleTogglePinMessage(msg);
+                              setActiveMenuMsgId(null);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            className="hover:bg-[#182229]"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>push_pin</span>
+                            <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
+                          </button>
+
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleDeleteMessage(msg.id);
+                                setActiveMenuMsgId(null);
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                              className="hover:bg-[#182229]"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f44336' }}>delete</span>
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                       {/* Emoji Reactions Popover */}
                       {activeReactionMsgId === msg.id && (
