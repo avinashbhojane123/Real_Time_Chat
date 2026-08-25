@@ -35,30 +35,126 @@ function formatDateHeader(dateStr) {
   }
 }
 
-function formatLastSeen(lastSeenDate) {
-  if (!lastSeenDate) return 'online';
+function detectClientDevice() {
+  const ua = navigator.userAgent;
+  let deviceType = 'Desktop';
+  let deviceModel = 'PC';
+  let os = 'Windows';
+  let browser = 'Browser';
+
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    deviceType = 'Mobile';
+    deviceModel = 'iPhone';
+    os = 'iOS';
+  } else if (/Android/i.test(ua)) {
+    deviceType = 'Mobile';
+    deviceModel = 'Android Phone';
+    os = 'Android';
+  } else if (/Macintosh|Mac OS X/i.test(ua)) {
+    deviceType = 'Desktop';
+    deviceModel = 'MacBook';
+    os = 'Mac';
+  } else if (/Windows/i.test(ua)) {
+    deviceType = 'Desktop';
+    deviceModel = 'Windows PC';
+    os = 'Windows';
+  } else if (/Linux/i.test(ua)) {
+    deviceType = 'Desktop';
+    deviceModel = 'Linux PC';
+    os = 'Linux';
+  }
+
+  if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) {
+    browser = 'Chrome';
+  } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+    browser = 'Safari';
+  } else if (/Firefox/i.test(ua)) {
+    browser = 'Firefox';
+  } else if (/Edg/i.test(ua)) {
+    browser = 'Edge';
+  }
+
+  return { deviceType, deviceModel, browser, os };
+}
+
+function formatUserPresence(isOnline, lastSeenDate) {
+  if (isOnline) return { text: 'online', isOnline: true };
+  if (!lastSeenDate) return { text: 'offline', isOnline: false };
+
   const date = new Date(lastSeenDate);
-  if (isNaN(date.getTime())) return 'online';
+  if (isNaN(date.getTime())) return { text: 'offline', isOnline: false };
 
   const now = new Date();
-  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-  if (diffSec < 60) {
-    return 'online';
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (targetDate.getTime() === today.getTime()) {
+    return { text: `last seen today at ${timeStr}`, isOnline: false };
+  } else if (targetDate.getTime() === yesterday.getTime()) {
+    return { text: `last seen yesterday at ${timeStr}`, isOnline: false };
+  } else {
+    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    if (diffHours < 24) {
+      return { text: `last seen ${diffHours}h ago`, isOnline: false };
+    }
+    return {
+      text: `last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${timeStr}`,
+      isOnline: false,
+    };
   }
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) {
-    return `last seen ${diffMin}m ago`;
+}
+
+function renderDeviceBadge(user) {
+  const os = user.os || '';
+  const deviceType = user.deviceType || '';
+  const browser = user.browser || '';
+
+  let icon = 'computer';
+  let label = 'Desktop';
+
+  if (os === 'iOS' || user.deviceModel?.includes('iPhone')) {
+    icon = 'phone_iphone';
+    label = 'iPhone';
+  } else if (os === 'Android') {
+    icon = 'smartphone';
+    label = 'Android';
+  } else if (os === 'Mac') {
+    icon = 'laptop_mac';
+    label = 'MacBook';
+  } else if (os === 'Windows') {
+    icon = 'desktop_windows';
+    label = 'Windows PC';
+  } else if (deviceType === 'Mobile') {
+    icon = 'smartphone';
+    label = 'Mobile';
   }
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) {
-    return `last seen ${diffHours}h ago`;
-  }
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) {
-    return `last seen yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  return `last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+
+  if (browser) label += ` • ${browser}`;
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: '0.68rem',
+        color: '#8696a0',
+        backgroundColor: '#202c33',
+        padding: '2px 6px',
+        borderRadius: '4px',
+        marginTop: '3px',
+      }}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#00a884' }}>
+        {icon}
+      </span>
+      <span>{label}</span>
+    </span>
+  );
 }
 
 export default function ChatRoom() {
@@ -435,7 +531,15 @@ export default function ChatRoom() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('joinRoom', { nickname, passcode });
+      const clientDevice = detectClientDevice();
+      socket.emit('joinRoom', {
+        nickname,
+        passcode,
+        deviceType: clientDevice.deviceType,
+        deviceModel: clientDevice.deviceModel,
+        browser: clientDevice.browser,
+        os: clientDevice.os,
+      });
       socket.emit('getStatuses', { passcode });
     });
 
@@ -874,61 +978,72 @@ export default function ChatRoom() {
               Connecting to participants...
             </div>
           ) : (
-            users.map((u, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '10px 16px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease',
-                }}
-                className="hover:bg-[#202c33]"
-              >
+            users.map((u, idx) => {
+              const presence = formatUserPresence(u.isOnline, u.lastSeen);
+              return (
                 <div
+                  key={idx}
                   style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    backgroundColor: '#202c33',
-                    color: '#00a884',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                    position: 'relative',
-                    flexShrink: 0,
+                    gap: '12px',
+                    padding: '10px 16px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease',
                   }}
+                  className="hover:bg-[#202c33]"
                 >
-                  {u.nickname?.charAt(0).toUpperCase() || 'U'}
                   <div
                     style={{
-                      width: '9px',
-                      height: '9px',
+                      width: '38px',
+                      height: '38px',
                       borderRadius: '50%',
-                      backgroundColor: '#25d366',
-                      position: 'absolute',
-                      bottom: '1px',
-                      right: '1px',
-                      border: '2px solid #111b21',
+                      backgroundColor: '#202c33',
+                      color: u.isOnline ? '#00a884' : '#8696a0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '1rem',
+                      position: 'relative',
+                      flexShrink: 0,
                     }}
-                  />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
-                      {u.nickname} {u.nickname === nickname && '(You)'}
-                    </span>
+                  >
+                    {u.nickname?.charAt(0).toUpperCase() || 'U'}
+                    <div
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        backgroundColor: u.isOnline ? '#25d366' : '#8696a0',
+                        position: 'absolute',
+                        bottom: '1px',
+                        right: '1px',
+                        border: '2px solid #111b21',
+                      }}
+                    />
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#8696a0', marginTop: '2px' }}>
-                    {formatLastSeen(u.lastSeen)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
+                        {u.nickname} {u.nickname === nickname && '(You)'}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: u.isOnline ? '#00a884' : '#8696a0',
+                        fontWeight: u.isOnline ? 600 : 400,
+                        marginTop: '2px',
+                      }}
+                    >
+                      {presence.text}
+                    </div>
+                    <div>{renderDeviceBadge(u)}</div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </aside>
