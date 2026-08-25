@@ -437,12 +437,24 @@ export default function ChatRoom() {
       socket.emit('joinRoom', { nickname, passcode });
     });
 
+    socket.on('chatHistory', (history) => {
+      setMessages(history || []);
+    });
+
     socket.on('roomHistory', (history) => {
       setMessages(history || []);
     });
 
+    socket.on('newMessage', (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+
     socket.on('message', (msg) => {
       setMessages((prev) => [...prev, msg]);
+    });
+
+    socket.on('usersList', (userList) => {
+      setUsers(userList || []);
     });
 
     socket.on('roomUsers', (userList) => {
@@ -495,12 +507,16 @@ export default function ChatRoom() {
       });
     });
 
+    socket.on('userStoppedTyping', ({ nickname: stopNick }) => {
+      setTypingUsers((prev) => prev.filter((n) => n !== stopNick));
+    });
+
     socket.on('userStopTyping', ({ nickname: stopNick }) => {
       setTypingUsers((prev) => prev.filter((n) => n !== stopNick));
     });
 
     // WebRTC Signaling Handlers
-    socket.on('webrtcOffer', async ({ from, offer }) => {
+    const handleOffer = async ({ from, offer }) => {
       setShowVideoPanel(true);
       if (callStateRef.current === 'active' || callStateRef.current === 'calling') {
         const pc = createPeerConnection();
@@ -512,25 +528,34 @@ export default function ChatRoom() {
         return;
       }
 
-      setCallerName(from);
+      setCallerName(from || 'Space Member');
       updateCallState('incoming');
       window.latestOffer = offer;
-    });
+    };
 
-    socket.on('webrtcAnswer', async ({ answer }) => {
+    socket.on('webrtcOffer', handleOffer);
+    socket.on('webrtcOfferRelay', handleOffer);
+
+    const handleAnswer = async ({ answer }) => {
       const pc = peerConnectionRef.current;
       if (pc) {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
         processPendingIceCandidates();
         updateCallState('active');
       }
-    });
+    };
 
-    socket.on('webrtcCandidate', async ({ candidate }) => {
+    socket.on('webrtcAnswer', handleAnswer);
+    socket.on('webrtcAnswerRelay', handleAnswer);
+
+    const handleCandidate = async ({ candidate }) => {
       if (candidate) {
         addIceCandidateSafely(candidate);
       }
-    });
+    };
+
+    socket.on('webrtcCandidate', handleCandidate);
+    socket.on('webrtcCandidateRelay', handleCandidate);
 
     socket.on('callEnded', () => {
       cleanUpCall();
