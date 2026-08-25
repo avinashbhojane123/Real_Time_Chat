@@ -267,7 +267,9 @@ export default function ChatRoom() {
   const [remoteStream, setRemoteStream] = useState(null);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [videoFit, setVideoFit] = useState('contain'); // 'contain' (Fit Entire Frame) | 'cover' (Fill Screen)
   const [facingMode, setFacingMode] = useState('user'); // 'user' (front) | 'environment' (back)
+
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
@@ -2663,7 +2665,18 @@ export default function ChatRoom() {
                 </div>
 
                 {/* Remote Stream */}
-                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: videoFit,
+                    backgroundColor: '#0b141a',
+                    transition: 'all 0.3s ease',
+                  }}
+                />
 
                 {/* Floating PIP Local Stream with Motion Drag */}
                 <motion.div
@@ -2675,13 +2688,14 @@ export default function ChatRoom() {
                     position: 'absolute',
                     top: '16px',
                     right: '16px',
-                    width: '130px',
-                    height: '95px',
-                    borderRadius: '12px',
+                    width: '160px',
+                    height: '110px',
+                    borderRadius: '14px',
                     overflow: 'hidden',
                     border: '2px solid #00a884',
                     zIndex: 30,
                     backgroundColor: '#111b21',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
                     cursor: 'grab',
                     touchAction: 'none',
                   }}
@@ -2704,6 +2718,26 @@ export default function ChatRoom() {
                   <button onClick={toggleCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: cameraOff ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}>
                     <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
                   </button>
+                  <button
+                    onClick={() => setVideoFit((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: videoFit === 'contain' ? '#00a884' : '#202c33',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title={videoFit === 'contain' ? 'Mode: Fit Entire Frame (Click to Fill Screen)' : 'Mode: Fill Screen (Click to Fit Entire Frame)'}
+                  >
+                    <span className="material-symbols-outlined">
+                      {videoFit === 'contain' ? 'aspect_ratio' : 'fit_screen'}
+                    </span>
+                  </button>
                   <button onClick={flipCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={`Reverse Camera (Front/Back) - Current: ${facingMode === 'user' ? 'Front' : 'Back'}`}>
                     <span className="material-symbols-outlined">cameraswitch</span>
                   </button>
@@ -2714,6 +2748,7 @@ export default function ChatRoom() {
                     <span className="material-symbols-outlined">call_end</span>
                   </button>
                 </div>
+
               </div>
             )}
           </div>
