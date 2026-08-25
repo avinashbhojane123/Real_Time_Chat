@@ -179,8 +179,7 @@ export default function ChatRoom() {
   const isDraggingRef = useRef(false);
 
   // Message Edit State
-  const [editingMsgId, setEditingMsgId] = useState(null);
-  const [editingText, setEditingText] = useState('');
+  const [editingMsg, setEditingMsg] = useState(null);
 
   // Emoji & Reaction & Context Menu State
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -289,25 +288,15 @@ export default function ChatRoom() {
   };
 
   const startEditing = (msg) => {
-    setEditingMsgId(msg.id);
-    setEditingText(msg.message || '');
+    setEditingMsg(msg);
+    setInputText(msg.message || '');
+    setReplyingTo(null);
+    setActiveMenuMsgId(null);
   };
 
   const cancelEditing = () => {
-    setEditingMsgId(null);
-    setEditingText('');
-  };
-
-  const handleSaveEdit = (msgId, e) => {
-    if (e) e.preventDefault();
-    if (!editingText.trim()) return;
-    socketRef.current?.emit('editMessage', {
-      passcode,
-      messageId: msgId,
-      newMessage: editingText.trim(),
-    });
-    setEditingMsgId(null);
-    setEditingText('');
+    setEditingMsg(null);
+    setInputText('');
   };
 
   const handleDeleteMessage = (msgId) => {
@@ -741,22 +730,33 @@ export default function ChatRoom() {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
 
-  // Send Message Handler
+  // Send / Save Message Handler
   const handleSendMessage = (e) => {
     if (e) e.preventDefault();
     if (!inputText.trim()) return;
 
-    socketRef.current?.emit('sendMessage', {
-      passcode,
-      nickname,
-      message: inputText.trim(),
-      replyTo: replyingTo
-        ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
-        : null,
-    });
+    if (editingMsg) {
+      socketRef.current?.emit('editMessage', {
+        passcode,
+        messageId: editingMsg.id,
+        newMessage: inputText.trim(),
+      });
+      showToast('Message edited');
+      setEditingMsg(null);
+      setInputText('');
+    } else {
+      socketRef.current?.emit('sendMessage', {
+        passcode,
+        nickname,
+        message: inputText.trim(),
+        replyTo: replyingTo
+          ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
+          : null,
+      });
 
-    setInputText('');
-    setReplyingTo(null);
+      setInputText('');
+      setReplyingTo(null);
+    }
   };
 
   // Upload Attachment Handler
@@ -1440,50 +1440,24 @@ export default function ChatRoom() {
                         </div>
                       )}
 
-                      {/* Editing Form or Message Text */}
-                      {editingMsgId === msg.id ? (
-                        <form onSubmit={(e) => handleSaveEdit(msg.id, e)} style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                          <input
-                            type="text"
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            style={{
-                              flex: 1,
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#111b21',
-                              border: '1px solid #00a884',
-                              color: '#fff',
-                              fontSize: '0.85rem',
-                            }}
-                            autoFocus
+                      {/* Message Content */}
+                      <div>
+                        {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
+
+                        {/* Image Attachment Preview */}
+                        {msg.fileUrl && msg.fileType?.startsWith('image/') && (
+                          <img
+                            src={msg.fileUrl}
+                            alt="Attachment"
+                            style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
+                            onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName })}
                           />
-                          <button type="submit" style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontWeight: 600, fontSize: '0.75rem' }}>
-                            Save
-                          </button>
-                          <button type="button" onClick={cancelEditing} style={{ background: 'none', border: 'none', color: '#8696a0', fontSize: '0.75rem' }}>
-                            Cancel
-                          </button>
-                        </form>
-                      ) : (
-                        <div>
-                          {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
+                        )}
 
-                          {/* Image Attachment Preview */}
-                          {msg.fileUrl && msg.fileType?.startsWith('image/') && (
-                            <img
-                              src={msg.fileUrl}
-                              alt="Attachment"
-                              style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
-                              onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName })}
-                            />
-                          )}
-
-                          {/* YouTube & Instagram Previews */}
-                          {msg.message && <YouTubePreview messageText={msg.message} onCopySuccess={showToast} />}
-                          {msg.message && <InstagramPreview messageText={msg.message} onCopySuccess={showToast} />}
-                        </div>
-                      )}
+                        {/* YouTube & Instagram Previews */}
+                        {msg.message && <YouTubePreview messageText={msg.message} onCopySuccess={showToast} />}
+                        {msg.message && <InstagramPreview messageText={msg.message} onCopySuccess={showToast} />}
+                      </div>
 
                       {/* Timestamp & Cyan Double Tick */}
                       <div
@@ -1701,6 +1675,41 @@ export default function ChatRoom() {
           </div>
         )}
 
+        {/* Editing Message Banner Bar */}
+        {editingMsg && (
+          <div
+            style={{
+              backgroundColor: '#182229',
+              borderTop: '1px solid rgba(134, 150, 160, 0.15)',
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              zIndex: 10,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '20px' }}>
+                edit
+              </span>
+              <div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00a884' }}>Editing Message</div>
+                <div style={{ fontSize: '0.75rem', color: '#8696a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {editingMsg.message}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={cancelEditing}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}
+              title="Cancel editing"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        )}
+
         {/* Emoji Picker Container */}
         {showEmojiPicker && (
           <div className="emoji-picker-container">
@@ -1774,7 +1783,7 @@ export default function ChatRoom() {
           {/* Input Text Field */}
           <input
             type="text"
-            placeholder="Type a message"
+            placeholder={editingMsg ? 'Edit message...' : 'Type a message'}
             value={inputText}
             onChange={handleInputChange}
             style={{
@@ -1790,7 +1799,7 @@ export default function ChatRoom() {
             }}
           />
 
-          {/* WhatsApp Green Send Button */}
+          {/* WhatsApp Green Send / Save Button */}
           <button
             type="submit"
             disabled={!inputText.trim()}
@@ -1809,9 +1818,10 @@ export default function ChatRoom() {
               boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
               flexShrink: 0,
             }}
+            title={editingMsg ? 'Save edit' : 'Send message'}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: '2px' }}>
-              send
+            <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: editingMsg ? '0' : '2px' }}>
+              {editingMsg ? 'check' : 'send'}
             </span>
           </button>
         </form>
