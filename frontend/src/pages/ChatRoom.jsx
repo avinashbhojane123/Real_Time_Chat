@@ -537,15 +537,20 @@ export default function ChatRoom() {
 
     pc.ontrack = (e) => {
       console.log('[WebRTC] Remote track received:', e.track?.kind, e.streams);
-      if (e.streams && e.streams[0]) {
-        remoteStreamRef.current = e.streams[0];
-        setRemoteStream(e.streams[0]);
-      } else if (e.track) {
+      let stream = e.streams && e.streams[0] ? e.streams[0] : null;
+      if (!stream) {
         if (!remoteStreamRef.current) {
           remoteStreamRef.current = new MediaStream();
         }
         remoteStreamRef.current.addTrack(e.track);
-        setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
+        stream = remoteStreamRef.current;
+      }
+      remoteStreamRef.current = stream;
+      setRemoteStream(stream);
+
+      if (remoteVideoRef.current && stream) {
+        remoteVideoRef.current.srcObject = stream;
+        remoteVideoRef.current.play().catch(() => {});
       }
     };
 
@@ -565,48 +570,28 @@ export default function ChatRoom() {
     return pc;
   }, [passcode, triggerIceRestart]);
 
-  // Video element binding callbacks
-  const localVideoCallback = useCallback(
-    (node) => {
-      localVideoRef.current = node;
-      if (node && localStream) {
-        node.srcObject = localStream;
-        node.play().catch(() => {});
-      }
-    },
-    [localStream]
-  );
-
-  const remoteVideoCallback = useCallback(
-    (node) => {
-      remoteVideoRef.current = node;
-      if (node && remoteStream) {
-        node.srcObject = remoteStream;
-        node.play().catch(() => {});
-      }
-    },
-    [remoteStream]
-  );
-
   // Sync localStream to local video node
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-      localVideoRef.current.play().catch((err) => {
+    const videoNode = localVideoRef.current;
+    if (videoNode && localStream) {
+      videoNode.srcObject = localStream;
+      videoNode.play().catch((err) => {
         console.warn('[WebRTC] Local video play error:', err);
       });
     }
-  }, [localStream, callState]);
+  }, [localStream, callState, showVideoPanel]);
 
   // Sync remoteStream to remote video node
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play().catch((err) => {
+    const videoNode = remoteVideoRef.current;
+    if (videoNode && remoteStream) {
+      videoNode.srcObject = remoteStream;
+      videoNode.play().catch((err) => {
         console.warn('[WebRTC] Remote video play error:', err);
       });
     }
-  }, [remoteStream, callState]);
+  }, [remoteStream, callState, showVideoPanel]);
+
 
 
   // Active call duration timer & watchdog
@@ -2678,7 +2663,7 @@ export default function ChatRoom() {
                 </div>
 
                 {/* Remote Stream */}
-                <video ref={remoteVideoCallback} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
                 {/* Floating PIP Local Stream with Motion Drag */}
                 <motion.div
@@ -2701,7 +2686,8 @@ export default function ChatRoom() {
                     touchAction: 'none',
                   }}
                 >
-                  <video ref={localVideoCallback} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraOff ? 'none' : 'block' }} />
+                  <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraOff ? 'none' : 'block' }} />
+
                   {cameraOff && (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00a884', fontWeight: 700 }}>
                       {nickname.slice(0, 2).toUpperCase()}
