@@ -229,6 +229,11 @@ export default function ChatRoom() {
   const lastInboundBytesRef = useRef(0);
   const stalledCountRef = useRef(0);
 
+  // Derived Recipient & Online Call Check State
+  const otherUsers = users.filter((u) => u.nickname !== nickname);
+  const recipientUser = otherUsers.length > 0 ? otherUsers[0] : null;
+  const isRecipientOnline = otherUsers.some((u) => u.isOnline);
+
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInputText(val);
@@ -776,9 +781,14 @@ export default function ChatRoom() {
 
   // WebRTC Call Actions
   const startCall = async () => {
+    const otherOnlineUsers = users.filter((u) => u.nickname !== nickname && u.isOnline);
+    if (otherOnlineUsers.length === 0) {
+      alert('Cannot start call: Recipient is offline. Video calls can only be made when the person is online.');
+      return;
+    }
     setShowVideoPanel(true);
     updateCallState('calling');
-    setRemoteUserName('Space Members');
+    setRemoteUserName(otherOnlineUsers[0]?.nickname || 'User');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
@@ -947,7 +957,7 @@ export default function ChatRoom() {
                 {nickname}
               </h2>
               <span style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600 }}>
-                Online in Space #{passcode}
+                Online
               </span>
             </div>
           </div>
@@ -1080,7 +1090,7 @@ export default function ChatRoom() {
                 width: '40px',
                 height: '40px',
                 borderRadius: '50%',
-                backgroundColor: '#00a884',
+                backgroundColor: recipientUser ? '#00a884' : '#374045',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
@@ -1090,13 +1100,13 @@ export default function ChatRoom() {
                 position: 'relative',
               }}
             >
-              #
+              {recipientUser ? recipientUser.nickname.charAt(0).toUpperCase() : 'U'}
               <div
                 style={{
                   width: '10px',
                   height: '10px',
                   borderRadius: '50%',
-                  backgroundColor: '#25d366',
+                  backgroundColor: isRecipientOnline ? '#25d366' : '#8696a0',
                   position: 'absolute',
                   bottom: '1px',
                   right: '1px',
@@ -1107,12 +1117,16 @@ export default function ChatRoom() {
 
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
-                Nexus Space #{passcode}
+                {recipientUser ? recipientUser.nickname : 'Waiting for participant...'}
               </div>
-              <div style={{ fontSize: '0.74rem', color: '#8696a0', marginTop: '1px' }}>
+              <div style={{ fontSize: '0.74rem', color: isRecipientOnline ? '#00a884' : '#8696a0', marginTop: '1px' }}>
                 {typingUsers.length > 0
                   ? `${typingUsers.join(', ')} is typing...`
-                  : `online • ${users.length} participants`}
+                  : isRecipientOnline
+                  ? 'online'
+                  : recipientUser
+                  ? 'offline'
+                  : 'offline'}
               </div>
             </div>
           </div>
@@ -1122,24 +1136,37 @@ export default function ChatRoom() {
             {/* WhatsApp Video Call Button */}
             <button
               type="button"
+              disabled={!isRecipientOnline && callState === 'idle'}
               onClick={() => {
+                if (!isRecipientOnline && callState === 'idle') {
+                  alert('Cannot start video call: Recipient is offline. Video calls can only be made when the person is online.');
+                  return;
+                }
                 if (callState === 'idle') startCall();
                 else setShowVideoPanel(!showVideoPanel);
               }}
               style={{
                 backgroundColor: callState === 'active' ? '#25d366' : 'transparent',
-                color: callState === 'active' ? '#000000' : '#00a884',
+                color: callState === 'active' ? '#000000' : isRecipientOnline ? '#00a884' : '#8696a0',
                 border: 'none',
                 padding: '6px 12px',
                 borderRadius: '20px',
                 fontWeight: 700,
                 fontSize: '0.82rem',
-                cursor: 'pointer',
+                cursor: isRecipientOnline || callState !== 'idle' ? 'pointer' : 'not-allowed',
+                opacity: !isRecipientOnline && callState === 'idle' ? 0.5 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
+                transition: 'all 0.2s ease',
               }}
-              title="Start Video Call"
+              title={
+                callState === 'active'
+                  ? 'Toggle Video Panel'
+                  : isRecipientOnline
+                  ? 'Start Video Call'
+                  : 'User is offline - Video call unavailable'
+              }
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                 {callState === 'active' ? 'videocam' : 'video_call'}
@@ -1149,9 +1176,25 @@ export default function ChatRoom() {
             {/* Voice Call Button */}
             <button
               type="button"
-              onClick={startCall}
-              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-              title="Start Voice Call"
+              disabled={!isRecipientOnline && callState === 'idle'}
+              onClick={() => {
+                if (!isRecipientOnline && callState === 'idle') {
+                  alert('Cannot start call: Recipient is offline. Voice calls can only be made when the person is online.');
+                  return;
+                }
+                startCall();
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: isRecipientOnline ? '#00a884' : '#8696a0',
+                cursor: isRecipientOnline ? 'pointer' : 'not-allowed',
+                opacity: !isRecipientOnline ? 0.5 : 1,
+                padding: '6px',
+                borderRadius: '50%',
+                transition: 'all 0.2s ease',
+              }}
+              title={isRecipientOnline ? 'Start Voice Call' : 'User is offline - Voice call unavailable'}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>call</span>
             </button>
@@ -1260,7 +1303,7 @@ export default function ChatRoom() {
                 <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>forum</span>
               </div>
               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e9edef', marginBottom: '4px' }}>
-                Welcome to Nexus Space #{passcode}
+                Welcome to the Chat
               </div>
               <div style={{ fontSize: '0.8rem', color: '#8696a0', lineHeight: 1.4 }}>
                 No messages here yet. Type a message below to start real-time chatting with everyone online!
@@ -1663,7 +1706,7 @@ export default function ChatRoom() {
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#e9edef' }}>Clear All Messages?</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#8696a0', marginBottom: '20px', lineHeight: 1.4 }}>
-              Are you sure you want to clear all chat messages in Space #{passcode} for everyone?
+              Are you sure you want to clear all chat messages for everyone?
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button onClick={() => setShowClearConfirm(false)} style={{ background: 'none', border: 'none', color: '#8696a0', fontWeight: 600, cursor: 'pointer' }}>
