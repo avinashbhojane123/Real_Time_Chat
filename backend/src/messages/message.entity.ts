@@ -100,4 +100,24 @@ export class Message {
     default: null,
   })
   expiresAt!: Date | null;
+
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+    default: null,
+  })
+  pollData!: {
+    question: string;
+    options: Array<{ id: number; text: string; votes: string[] }>;
+  } | null;
+
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+    default: null,
+  })
+  locationData!: {
+    lat: number;
+    lng: number;
+  } | null;
 }

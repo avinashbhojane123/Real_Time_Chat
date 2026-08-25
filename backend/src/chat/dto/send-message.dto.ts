@@ -50,4 +50,10 @@ export class SendMessageDto {
 
   @IsOptional()
   expiresIn?: number | null;
+
+  @IsOptional()
+  pollData?: any | null;
+
+  @IsOptional()
+  locationData?: { lat: number; lng: number } | null;
 }

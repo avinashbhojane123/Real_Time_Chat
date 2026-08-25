@@ -522,17 +522,79 @@ textarea {
   will-change: transform, opacity;
 }
 
-@keyframes fadeIn {
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+/* ==========================================================================
+   Interactive Features Styles (Voice Notes, Polls, Maps, Document Lightbox)
+   ========================================================================== */
+
+/* Voice Recording Pulsing Red Badge */
+.rec-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #f44336;
+  animation: recPulse 1s infinite alternate ease-in-out;
+}
+
+@keyframes recPulse {
   from {
-    opacity: 0;
-    transform: scale(0.97);
+    transform: scale(0.8);
+    opacity: 0.6;
   }
   to {
+    transform: scale(1.3);
     opacity: 1;
-    transform: scale(1);
+    box-shadow: 0 0 10px rgba(244, 67, 54, 0.8);
   }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+/* Poll Option Buttons & Fill Bar */
+.poll-card {
+  min-width: 240px;
+  max-width: 320px;
+  padding: 6px 0;
+}
+
+.poll-option-btn {
+  position: relative;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(134, 150, 160, 0.2);
+  color: #e9edef;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.poll-option-btn:hover {
+  border-color: #00a884;
+}
+
+.poll-option-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background-color: rgba(0, 168, 132, 0.28);
+  transition: width 0.35s cubic-bezier(0.1, 0.9, 0.2, 1);
+  z-index: 1;
+}
+
+.poll-option-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }

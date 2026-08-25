@@ -454,6 +454,8 @@ export class ChatGateway
           ? parseInt(data.fileSize, 10)
           : (data.fileSize ?? null),
       expiresAt,
+      pollData: data.pollData ?? null,
+      locationData: data.locationData ?? null,
     });
 
     await this.messageRepo.save(savedMessage);
@@ -478,6 +480,8 @@ export class ChatGateway
       isDeleted: savedMessage.isDeleted,
       reactions: savedMessage.reactions,
       expiresAt: savedMessage.expiresAt,
+      pollData: savedMessage.pollData,
+      locationData: savedMessage.locationData,
     };
 
     this.server
@@ -488,6 +492,36 @@ export class ChatGateway
     return {
       success: true,
     };
+  }
+
+  @SubscribeMessage('votePoll')
+  async votePoll(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { passcode: string; messageId: number; optionId: number; nickname: string },
+  ) {
+    const message = await this.messageRepo.findOne({
+      where: { id: payload.messageId },
+    });
+
+    if (!message || !message.pollData) return { success: false };
+
+    const poll = message.pollData;
+    poll.options.forEach((opt) => {
+      opt.votes = (opt.votes || []).filter((nick) => nick !== payload.nickname);
+      if (opt.id === payload.optionId) {
+        opt.votes.push(payload.nickname);
+      }
+    });
+
+    message.pollData = poll;
+    await this.messageRepo.save(message);
+
+    this.server.to(payload.passcode).emit('messageUpdated', {
+      id: message.id,
+      pollData: message.pollData,
+    });
+
+    return { success: true };
   }
 
   @SubscribeMessage('getMessages')

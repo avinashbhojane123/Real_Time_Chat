@@ -248,6 +248,25 @@ export default function ChatRoom() {
     showToast(`Applied ${THEMES.find((t) => t.key === themeKey)?.name || themeKey} theme`);
   };
 
+  // 1. Voice Notes State
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recDuration, setRecDuration] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recTimerRef = useRef(null);
+
+  // 2. Disappearing Messages State
+  const [disappearingTimer, setDisappearingTimer] = useState(0); // 0 (Off), 10, 30, 60 seconds
+  const [showDisappearingMenu, setShowDisappearingMenu] = useState(false);
+
+  // 3. Live Polls Feature State
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+
+  // 4. Document Viewer Lightbox State
+  const [documentViewerFile, setDocumentViewerFile] = useState(null);
+
   const EMOJI_LIST = [
     '😀', '😂', '😍', '😎', '🙏', '👍', '🔥', '❤️', '🎉', '✨', 
     '🥳', '🙌', '😊', '🤔', '💩', '😭', '🤩', '👀', '💯', '👏', 
@@ -600,6 +619,12 @@ export default function ChatRoom() {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+    });
+
+    socket.on('messageUpdated', (updatedMsg) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
+      );
     });
 
     // Users List Event Listeners
@@ -1045,6 +1070,143 @@ export default function ChatRoom() {
     }
   };
 
+  // 1. Voice Notes Helper Functions
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+      setRecDuration(0);
+
+      recTimerRef.current = setInterval(() => {
+        setRecDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.warn('Could not access microphone:', err);
+      showToast('Microphone access denied or unavailable');
+    }
+  };
+
+  const stopAudioRecording = async (shouldSend = true) => {
+    if (!mediaRecorderRef.current) return;
+    clearInterval(recTimerRef.current);
+    const recorder = mediaRecorderRef.current;
+
+    recorder.onstop = async () => {
+      recorder.stream.getTracks().forEach((track) => track.stop());
+      setIsRecordingAudio(false);
+
+      if (shouldSend && audioChunksRef.current.length > 0) {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const file = new File([audioBlob], `Voice_Message_${Date.now()}.webm`, { type: 'audio/webm' });
+
+        setIsUploadingFile(true);
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const cleanApiUrl = baseUrl.replace(/\/+$/, '');
+          const res = await axios.post(`${cleanApiUrl}/upload`, formData);
+
+          if (res.data && res.data.fileUrl) {
+            const fullUrl = res.data.fileUrl.startsWith('http')
+              ? res.data.fileUrl
+              : `${cleanApiUrl.replace(/\/api\/?$/, '')}${res.data.fileUrl}`;
+
+            socketRef.current?.emit('sendMessage', {
+              passcode,
+              nickname,
+              message: '🎤 Voice message',
+              fileUrl: fullUrl,
+              fileName: file.name,
+              fileType: 'audio/webm',
+              fileSize: file.size,
+              expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+            });
+            showToast('Voice message sent');
+          }
+        } catch (err) {
+          console.error('Audio upload failed:', err);
+          showToast('Could not send voice message');
+        } finally {
+          setIsUploadingFile(false);
+        }
+      }
+      audioChunksRef.current = [];
+    };
+
+    recorder.stop();
+  };
+
+  // 2. Poll Functions
+  const handleCreatePoll = () => {
+    const validOpts = pollOptions.filter((opt) => opt.trim().length > 0);
+    if (!pollQuestion.trim() || validOpts.length < 2) {
+      showToast('Please enter a question and at least 2 options');
+      return;
+    }
+
+    const pollData = {
+      question: pollQuestion.trim(),
+      options: validOpts.map((opt, idx) => ({ id: idx + 1, text: opt.trim(), votes: [] })),
+    };
+
+    socketRef.current?.emit('sendMessage', {
+      passcode,
+      nickname,
+      message: `📊 Poll: ${pollQuestion.trim()}`,
+      pollData,
+      expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+    });
+
+    setShowPollModal(false);
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    showToast('Poll created');
+  };
+
+  const handleVotePoll = (messageId, optionId) => {
+    socketRef.current?.emit('votePoll', {
+      passcode,
+      messageId,
+      optionId,
+      nickname,
+    });
+  };
+
+  // 3. Location Sharing Function
+  const handleShareLocation = () => {
+    if (!navigator.geolocation) {
+      showToast('Geolocation is not supported by your browser');
+      return;
+    }
+    showToast('Fetching location...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        socketRef.current?.emit('sendMessage', {
+          passcode,
+          nickname,
+          message: '📍 Shared Location',
+          locationData: { lat: latitude, lng: longitude },
+          expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+        });
+        showToast('Location shared');
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        showToast('Could not fetch your location');
+      },
+    );
+  };
+
   // Group status updates by user nickname
   const groupedStatuses = statuses.reduce((acc, st) => {
     if (!acc[st.nickname]) {
@@ -1365,6 +1527,43 @@ export default function ChatRoom() {
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>call</span>
             </button>
 
+            {/* Disappearing Messages Timer Menu Toggle */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShowDisappearingMenu(!showDisappearingMenu)}
+                style={{ background: 'none', border: 'none', color: disappearingTimer > 0 ? '#ff9800' : '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+                title={`Disappearing Messages: ${disappearingTimer > 0 ? `${disappearingTimer}s` : 'Off'}`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>timer</span>
+              </button>
+              {showDisappearingMenu && (
+                <div style={{ position: 'absolute', top: '34px', right: '0px', backgroundColor: '#233138', borderRadius: '10px', boxShadow: '0 6px 20px rgba(0,0,0,0.7)', border: '1px solid rgba(134,150,160,0.2)', padding: '6px 0', zIndex: 60, minWidth: '160px' }}>
+                  <div style={{ padding: '6px 14px', fontSize: '0.72rem', fontWeight: 700, color: '#8696a0' }}>Self-Destruct Timer</div>
+                  {[
+                    { label: 'Off', val: 0 },
+                    { label: '10 Seconds', val: 10 },
+                    { label: '30 Seconds', val: 30 },
+                    { label: '60 Seconds', val: 60 },
+                  ].map((item) => (
+                    <button
+                      key={item.val}
+                      onClick={() => {
+                        setDisappearingTimer(item.val);
+                        setShowDisappearingMenu(false);
+                        showToast(`Self-destruct timer set to ${item.label}`);
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: disappearingTimer === item.val ? '#00a884' : '#e9edef', fontSize: '0.82rem', cursor: 'pointer' }}
+                      className="hover:bg-[#182229]"
+                    >
+                      <span>{item.label}</span>
+                      {disappearingTimer === item.val && <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Theme Selector Button */}
             <button
               type="button"
@@ -1592,6 +1791,89 @@ export default function ChatRoom() {
                           />
                         )}
 
+                        {/* Audio Voice Note Player */}
+                        {msg.fileUrl && msg.fileType?.startsWith('audio/') && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', borderRadius: '12px', minWidth: '220px' }}>
+                            <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '22px' }}>graphic_eq</span>
+                            <audio controls src={msg.fileUrl} style={{ height: '30px', flex: 1, outline: 'none' }} />
+                          </div>
+                        )}
+
+                        {/* Document & File Attachment Card */}
+                        {msg.fileUrl && !msg.fileType?.startsWith('image/') && !msg.fileType?.startsWith('audio/') && (
+                          <div
+                            onClick={() => setDocumentViewerFile({ url: msg.fileUrl, name: msg.fileName, type: msg.fileType })}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', borderRadius: '10px', cursor: 'pointer', border: '1px solid rgba(134,150,160,0.15)' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '24px' }}>description</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.fileName || 'Attachment Document'}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#8696a0' }}>Click to preview document</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Live Interactive Poll Card */}
+                        {msg.pollData && (
+                          <div className="poll-card" style={{ marginTop: '6px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#e9edef', marginBottom: '8px' }}>
+                              {msg.pollData.question}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {(() => {
+                                const totalVotes = msg.pollData.options.reduce((sum, opt) => sum + (opt.votes?.length || 0), 0);
+                                return msg.pollData.options.map((opt) => {
+                                  const voteCount = opt.votes?.length || 0;
+                                  const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                                  const hasVoted = opt.votes?.includes(nickname);
+                                  return (
+                                    <button
+                                      key={opt.id}
+                                      type="button"
+                                      className="poll-option-btn"
+                                      onClick={() => handleVotePoll(msg.id, opt.id)}
+                                    >
+                                      <div className="poll-option-fill" style={{ width: `${pct}%` }} />
+                                      <div className="poll-option-content">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          {hasVoted && <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '16px' }}>check_circle</span>}
+                                          <span>{opt.text}</span>
+                                        </div>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 700, opacity: 0.85 }}>{pct}% ({voteCount})</span>
+                                      </div>
+                                    </button>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Shared Location Card */}
+                        {msg.locationData && (
+                          <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(134,150,160,0.2)', backgroundColor: 'rgba(0,0,0,0.25)', maxWidth: '280px' }}>
+                            <a
+                              href={`https://www.google.com/maps?q=${msg.locationData.lat},${msg.locationData.lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ textDecoration: 'none', color: 'inherit' }}
+                            >
+                              <img
+                                src={`https://static-maps.yandex.ru/1.x/?lang=en-US&ll=${msg.locationData.lng},${msg.locationData.lat}&z=14&l=map&pt=${msg.locationData.lng},${msg.locationData.lat},pm2rdm`}
+                                alt="Map Location"
+                                style={{ width: '100%', height: '130px', objectFit: 'cover' }}
+                              />
+                              <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#182229' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#00a884', fontWeight: 700 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>location_on</span>
+                                  <span>View on Google Maps</span>
+                                </div>
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#8696a0' }}>open_in_new</span>
+                              </div>
+                            </a>
+                          </div>
+                        )}
+
                         {/* YouTube & Instagram Previews */}
                         {msg.message && <YouTubePreview messageText={msg.message} onCopySuccess={showToast} />}
                         {msg.message && <InstagramPreview messageText={msg.message} onCopySuccess={showToast} />}
@@ -1609,6 +1891,11 @@ export default function ChatRoom() {
                           marginLeft: '12px',
                         }}
                       >
+                        {msg.expiresAt && (
+                          <span style={{ fontSize: '0.65rem', color: '#ff9800', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Disappearing secret message">
+                            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>timer</span>
+                          </span>
+                        )}
                         {msg.isEdited && (
                           <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', italic: 'true' }}>edited</span>
                         )}
@@ -1943,90 +2230,174 @@ export default function ChatRoom() {
         )}
 
         {/* Bottom WhatsApp Input Bar */}
-        <form
-          onSubmit={handleSendMessage}
-          style={{
-            height: '62px',
-            backgroundColor: '#202c33',
-            padding: '10px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            borderTop: '1px solid rgba(134, 150, 160, 0.15)',
-            zIndex: 20,
-            position: 'relative',
-          }}
-        >
-          {/* Emoji Toggle Icon */}
-          <button
-            type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            style={{ background: 'none', border: 'none', color: showEmojiPicker ? '#00a884' : '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
-            title="Emoji Picker"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>mood</span>
-          </button>
-
-          {/* Attach Paperclip Icon */}
-          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#8696a0' }} title="Attach file or photo">
-            <input
-              type="file"
-              style={{ display: 'none' }}
-              onChange={(e) => handleUploadAttachment(e.target.files?.[0])}
-              disabled={isUploadingFile}
-            />
-            {isUploadingFile ? (
-              <span className="material-symbols-outlined animate-spin">refresh</span>
-            ) : (
-              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>attach_file</span>
-            )}
-          </label>
-
-          {/* Input Text Field */}
-          <input
-            type="text"
-            placeholder={editingMsg ? 'Edit message...' : 'Type a message'}
-            value={inputText}
-            onChange={handleInputChange}
+        {isRecordingAudio ? (
+          <div
             style={{
-              flex: 1,
-              height: '42px',
-              borderRadius: '8px',
-              backgroundColor: '#2a3942',
-              border: 'none',
-              color: '#e9edef',
-              padding: '0 16px',
-              fontSize: '0.9rem',
-              outline: 'none',
-            }}
-          />
-
-          {/* WhatsApp Green Send / Save Button */}
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              backgroundColor: '#00a884',
-              color: '#ffffff',
-              border: 'none',
-              cursor: inputText.trim() ? 'pointer' : 'default',
-              opacity: inputText.trim() ? 1 : 0.6,
+              height: '62px',
+              backgroundColor: '#202c33',
+              padding: '10px 16px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
-              flexShrink: 0,
+              justifyContent: 'space-between',
+              gap: '12px',
+              borderTop: '1px solid rgba(134, 150, 160, 0.15)',
+              zIndex: 20,
+              position: 'relative',
             }}
-            title={editingMsg ? 'Save edit' : 'Send message'}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: editingMsg ? '0' : '2px' }}>
-              {editingMsg ? 'check' : 'send'}
-            </span>
-          </button>
-        </form>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="rec-pulse-dot" />
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f44336' }}>
+                Recording Voice Note... ({Math.floor(recDuration / 60)}:{String(recDuration % 60).padStart(2, '0')})
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => stopAudioRecording(false)}
+                style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '6px' }}
+                title="Cancel Voice Recording"
+              >
+                <span className="material-symbols-outlined">delete</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => stopAudioRecording(true)}
+                style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Send Voice Note"
+              >
+                <span className="material-symbols-outlined">send</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSendMessage}
+            style={{
+              height: '62px',
+              backgroundColor: '#202c33',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              borderTop: '1px solid rgba(134, 150, 160, 0.15)',
+              zIndex: 20,
+              position: 'relative',
+            }}
+          >
+            {/* Emoji Toggle Icon */}
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              style={{ background: 'none', border: 'none', color: showEmojiPicker ? '#00a884' : '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+              title="Emoji Picker"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>mood</span>
+            </button>
+
+            {/* Attach Paperclip Icon */}
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#8696a0' }} title="Attach file or photo">
+              <input
+                type="file"
+                style={{ display: 'none' }}
+                onChange={(e) => handleUploadAttachment(e.target.files?.[0])}
+                disabled={isUploadingFile}
+              />
+              {isUploadingFile ? (
+                <span className="material-symbols-outlined animate-spin">refresh</span>
+              ) : (
+                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>attach_file</span>
+              )}
+            </label>
+
+            {/* Create Poll Button */}
+            <button
+              type="button"
+              onClick={() => setShowPollModal(true)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+              title="Create Poll"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>poll</span>
+            </button>
+
+            {/* Share Location Button */}
+            <button
+              type="button"
+              onClick={handleShareLocation}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+              title="Share Location"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>location_on</span>
+            </button>
+
+            {/* Input Text Field */}
+            <input
+              type="text"
+              placeholder={editingMsg ? 'Edit message...' : 'Type a message'}
+              value={inputText}
+              onChange={handleInputChange}
+              style={{
+                flex: 1,
+                height: '42px',
+                borderRadius: '8px',
+                backgroundColor: '#2a3942',
+                border: 'none',
+                color: '#e9edef',
+                padding: '0 16px',
+                fontSize: '0.9rem',
+                outline: 'none',
+              }}
+            />
+
+            {/* Send / Save or Voice Record Button */}
+            {inputText.trim() || editingMsg ? (
+              <button
+                type="submit"
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: '#00a884',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
+                  flexShrink: 0,
+                }}
+                title={editingMsg ? 'Save edit' : 'Send message'}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: editingMsg ? '0' : '2px' }}>
+                  {editingMsg ? 'check' : 'send'}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startAudioRecording}
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: '#00a884',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
+                  flexShrink: 0,
+                }}
+                title="Record Voice Note"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>mic</span>
+              </button>
+            )}
+          </form>
+        )}
       </main>
 
       {/* WebRTC Video Call Overlay Canvas */}
@@ -2249,6 +2620,101 @@ export default function ChatRoom() {
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Poll Modal */}
+      {showPollModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.85)', backdropFilter: 'blur(8px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#111b21', borderRadius: '18px', border: '1px solid rgba(134, 150, 160, 0.2)', padding: '24px', boxShadow: '0 16px 40px rgba(0,0,0,0.8)' }} className="animate-fade-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', color: '#e9edef' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1.1rem' }}>
+                <span className="material-symbols-outlined" style={{ color: '#00a884' }}>poll</span>
+                <span>Create Live Poll</span>
+              </div>
+              <button onClick={() => setShowPollModal(false)} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#8696a0', display: 'block', marginBottom: '6px' }}>
+                Poll Question:
+              </label>
+              <input
+                type="text"
+                placeholder="Ask a question..."
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#2a3942', border: 'none', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#8696a0', display: 'block', marginBottom: '6px' }}>
+                Options:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {pollOptions.map((opt, idx) => (
+                  <input
+                    key={idx}
+                    type="text"
+                    placeholder={`Option ${idx + 1}`}
+                    value={opt}
+                    onChange={(e) => {
+                      const newOpts = [...pollOptions];
+                      newOpts[idx] = e.target.value;
+                      setPollOptions(newOpts);
+                    }}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#2a3942', border: 'none', color: '#fff', fontSize: '0.82rem', outline: 'none' }}
+                  />
+                ))}
+              </div>
+              {pollOptions.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setPollOptions([...pollOptions, ''])}
+                  style={{ marginTop: '8px', background: 'none', border: 'none', color: '#00a884', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
+                  Add Option
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setShowPollModal(false)} style={{ background: 'none', border: 'none', color: '#8696a0', fontWeight: 600, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleCreatePoll} style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
+                Send Poll
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Viewer Lightbox Modal */}
+      {documentViewerFile && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.94)', backdropFilter: 'blur(12px)', zIndex: 99999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ height: '56px', backgroundColor: '#202c33', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#e9edef' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '0.95rem' }}>
+              <span className="material-symbols-outlined" style={{ color: '#00a884' }}>description</span>
+              <span>{documentViewerFile.name}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <a href={documentViewerFile.url} download target="_blank" rel="noreferrer" style={{ backgroundColor: '#00a884', color: '#fff', textDecoration: 'none', padding: '6px 16px', borderRadius: '18px', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
+                Download
+              </a>
+              <button onClick={() => setDocumentViewerFile(null)} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, backgroundColor: '#525659' }}>
+            <iframe src={documentViewerFile.url} title="Document Preview" style={{ width: '100%', height: '100%', border: 'none' }} />
           </div>
         </div>
       )}
