@@ -185,6 +185,7 @@ export default function ChatRoom() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
   const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
+  const [showCustomReactionForMsgId, setShowCustomReactionForMsgId] = useState(null);
 
   // Clear Confirmation Modal State
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -915,6 +916,7 @@ export default function ChatRoom() {
       emoji,
     });
     setActiveReactionMsgId(null);
+    setShowCustomReactionForMsgId(null);
   };
 
   // Group status updates by user nickname
@@ -1602,7 +1604,13 @@ export default function ChatRoom() {
 
                       {/* Emoji Reactions Popover */}
                       {activeReactionMsgId === msg.id && (
-                        <div className="reactions-popover">
+                        <div
+                          className="reactions-popover"
+                          style={{
+                            right: isMe ? '0px' : 'auto',
+                            left: !isMe ? '0px' : 'auto',
+                          }}
+                        >
                           {QUICK_REACTIONS.map((emoji, i) => (
                             <button
                               key={i}
@@ -1613,6 +1621,64 @@ export default function ChatRoom() {
                               {emoji}
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            className="reaction-item-btn"
+                            onClick={() => {
+                              setShowCustomReactionForMsgId(showCustomReactionForMsgId === msg.id ? null : msg.id);
+                              setActiveReactionMsgId(null);
+                            }}
+                            title="More Emojis"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8696a0', padding: '4px' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Custom Reaction Emoji Picker Grid */}
+                      {showCustomReactionForMsgId === msg.id && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '-200px',
+                            right: isMe ? '0px' : 'auto',
+                            left: !isMe ? '0px' : 'auto',
+                            width: '260px',
+                            maxHeight: '190px',
+                            backgroundColor: '#202c33',
+                            border: '1px solid rgba(134, 150, 160, 0.25)',
+                            borderRadius: '16px',
+                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
+                            zIndex: 80,
+                            padding: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.78rem', fontWeight: 700, color: '#8696a0', padding: '0 4px' }}>
+                            <span>Select Reaction</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowCustomReactionForMsgId(null)}
+                              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                            </button>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px', overflowY: 'auto', flex: 1, paddingRight: '2px' }}>
+                            {EMOJI_LIST.map((emoji, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                className="emoji-btn"
+                                style={{ fontSize: '1.2rem', padding: '4px' }}
+                                onClick={() => handleReactToMessage(msg.id, emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 
