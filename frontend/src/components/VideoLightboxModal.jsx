@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import AnimatedModal from './animated/AnimatedModal';
 
 export default function VideoLightboxModal({
   isOpen,
@@ -22,37 +23,25 @@ export default function VideoLightboxModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const isInstagram = type === 'instagram';
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
+    <AnimatedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth={isInstagram ? '460px' : '900px'}
+      enableDragDismiss={true}
+      zIndex={99999}
+      backdropStyle={{
         backgroundColor: 'rgba(11, 20, 26, 0.94)',
         backdropFilter: 'blur(12px)',
-        zIndex: 99999,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        boxSizing: 'border-box',
       }}
-      className="animate-fade-in"
-      onClick={onClose}
     >
       {/* Container */}
       <div
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: isInstagram ? '460px' : '900px',
           maxHeight: '90vh',
           backgroundColor: '#111b21',
           borderRadius: '16px',
@@ -62,8 +51,8 @@ export default function VideoLightboxModal({
           display: 'flex',
           flexDirection: 'column',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
+
         {/* Modal Top Bar */}
         <div
           style={{
@@ -212,6 +201,7 @@ export default function VideoLightboxModal({
           )}
         </div>
       </div>
-    </div>
+    </AnimatedModal>
   );
 }
+

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/apiConfig';
+import AnimatedModal from './animated/AnimatedModal';
+
 
 const GRADIENTS = [
   'linear-gradient(135deg, #0b141a, #005c4b, #00a884)',
@@ -71,24 +73,20 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
+    <AnimatedModal
+      isOpen={true}
+      onClose={onClose}
+      maxWidth="480px"
+      enableDragDismiss={true}
+      zIndex={99999}
+      backdropStyle={{
         backgroundColor: 'rgba(11, 20, 26, 0.92)',
         backdropFilter: 'blur(10px)',
-        zIndex: 99999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
       }}
     >
       <div
-        className="animate-fade-in"
         style={{
           width: '100%',
-          maxWidth: '480px',
           backgroundColor: '#111b21',
           borderRadius: '16px',
           border: '1px solid rgba(134, 150, 160, 0.2)',
@@ -98,6 +96,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
           flexDirection: 'column',
         }}
       >
+
         {/* Modal Header */}
         <div
           style={{
@@ -461,6 +460,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
           </button>
         </div>
       </div>
-    </div>
+    </AnimatedModal>
   );
 }
+

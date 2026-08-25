@@ -2,13 +2,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'motion/react';
 
 import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
 import YouTubePreview from '../components/YouTubePreview';
 import InstagramPreview from '../components/InstagramPreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
+import AnimatedMessageBubble from '../components/animated/AnimatedMessageBubble';
+import AnimatedTypingIndicator from '../components/animated/AnimatedTypingIndicator';
+import AnimatedReactionPicker from '../components/animated/AnimatedReactionPicker';
+import ScrollToBottomPill from '../components/animated/ScrollToBottomPill';
 import { animate, random } from 'animejs';
+
 
 function formatMessageTime(dateStr) {
   if (!dateStr) return '';
@@ -203,9 +209,12 @@ export default function ChatRoom() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
 
-  // Typing Feature State
+  // Typing & Scroll Pill Feature State
   const [typingUsers, setTypingUsers] = useState([]);
   const typingTimeoutRef = useRef(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
 
   // Search & Pinned Messages Feature State
   const [searchQuery, setSearchQuery] = useState('');
@@ -1641,15 +1650,22 @@ export default function ChatRoom() {
               </div>
             </div>
           ) : (
-            filteredMessages.map((msg, idx) => {
-              const isMe = msg.nickname === nickname;
-              const showDate =
-                idx === 0 ||
-                formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
+            <AnimatePresence initial={false}>
+              {filteredMessages.map((msg, idx) => {
+                const isMe = msg.nickname === nickname;
+                const showDate =
+                  idx === 0 ||
+                  formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
 
-              return (
-                <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {/* Date Header Pill */}
+                return (
+                  <AnimatedMessageBubble
+                    key={msg.id || idx}
+                    isOwn={isMe}
+                    onSwipeReply={() => setReplyingTo(msg)}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+                  >
+                    {/* Date Header Pill */}
+
                   {showDate && (
                     <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px 0' }}>
                       <div
@@ -2079,12 +2095,23 @@ export default function ChatRoom() {
                       )}
                     </div>
                   </div>
-                </div>
+                </AnimatedMessageBubble>
               );
-            })
+            })}
+            </AnimatePresence>
           )}
+
+          <AnimatePresence>
+            <AnimatedTypingIndicator typingUsers={typingUsers} />
+          </AnimatePresence>
           <div ref={chatBottomRef} />
+          <ScrollToBottomPill
+            visible={showScrollToBottom}
+            unreadCount={unreadCount}
+            onClick={() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          />
         </div>
+
 
         {/* Replying Banner Bar */}
         {replyingTo && (

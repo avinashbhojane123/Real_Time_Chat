@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { parseYouTubeUrl } from './YouTubePreview';
+import AnimatedModal from './animated/AnimatedModal';
+
 
 export default function StatusViewerModal({
   statuses = [],
@@ -102,35 +104,32 @@ export default function StatusViewerModal({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
+    <AnimatedModal
+      isOpen={!!currentStatus}
+      onClose={onClose}
+      maxWidth="460px"
+      enableDragDismiss={true}
+      zIndex={99999}
+      backdropStyle={{
         backgroundColor: '#0b141a',
-        zIndex: 99999,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
         userSelect: 'none',
       }}
-      onMouseDown={() => setIsPaused(true)}
-      onMouseUp={() => setIsPaused(false)}
-      onTouchStart={() => setIsPaused(true)}
-      onTouchEnd={() => setIsPaused(false)}
     >
       {/* Story Card Container */}
       <div
-        className="animate-fade-in"
+        onMouseDown={() => setIsPaused(true)}
+        onMouseUp={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: '460px',
           height: '100%',
           maxHeight: '840px',
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: currentStatus.bgColor || '#111b21',
+
           borderRadius: '16px',
           overflow: 'hidden',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)',
@@ -525,6 +524,7 @@ export default function StatusViewerModal({
           </div>
         )}
       </div>
-    </div>
+    </AnimatedModal>
   );
 }
+

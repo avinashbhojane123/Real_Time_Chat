@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { motion } from 'motion/react';
 import { getApiBaseUrl } from '../utils/apiConfig';
+import AnimatedModal from '../components/animated/AnimatedModal';
 
 export default function JoinRoom() {
   const navigate = useNavigate();
@@ -314,146 +316,134 @@ export default function JoinRoom() {
       </main>
 
       {/* Secret Room Passcode Modal */}
-      {showSecretModal && (
+      <AnimatedModal
+        isOpen={showSecretModal}
+        onClose={() => setShowSecretModal(false)}
+        maxWidth="460px"
+        enableDragDismiss={true}
+      >
         <div
+          className="m3-card"
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3000,
-            padding: '20px',
-            backdropFilter: 'blur(8px)',
+            backgroundColor: 'var(--m3-surface-container-highest)',
+            borderRadius: 'var(--m3-radius-xl)',
+            boxShadow: 'var(--m3-elevation-3)',
+            padding: '24px',
           }}
         >
-          <div
-            className="m3-card"
-            style={{
-              width: '100%',
-              maxWidth: '460px',
-              backgroundColor: 'var(--m3-surface-container-highest)',
-              borderRadius: 'var(--m3-radius-xl)',
-              boxShadow: 'var(--m3-elevation-3)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)' }}>vpn_key</span>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>Secret Space Portal</h3>
-              </div>
-              <button
-                className="m3-btn m3-btn-icon m3-btn-outlined"
-                onClick={() => setShowSecretModal(false)}
-                style={{ width: '36px', height: '36px' }}
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)' }}>vpn_key</span>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>Secret Space Portal</h3>
             </div>
-
-            {error && (
-              <div
-                style={{
-                  backgroundColor: 'var(--m3-error-container)',
-                  color: 'var(--m3-on-error)',
-                  padding: '10px 14px',
-                  borderRadius: 'var(--m3-radius-m)',
-                  marginBottom: '16px',
-                  fontSize: '0.85rem',
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            {roomVerified ? (
-              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#81c784' }}>
-                    check_circle
-                  </span>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--m3-on-surface)', margin: 0 }}>
-                    Room Passcode Verified
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--m3-on-surface-variant)', margin: 0 }}>
-                    Successfully authenticated for Room: <strong>{passcode}</strong> as <strong>{nickname}</strong>
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                  <button
-                    type="button"
-                    className="m3-btn m3-btn-outlined"
-                    style={{ flex: 1, padding: '10px' }}
-                    onClick={() => setRoomVerified(false)}
-                  >
-                    Edit Details
-                  </button>
-                  <button
-                    type="button"
-                    className="m3-btn m3-btn-filled"
-                    style={{ flex: 1, padding: '10px', backgroundColor: 'var(--m3-primary)', color: '#fff' }}
-                    onClick={() => navigate('/chat')}
-                  >
-                    <span className="material-symbols-outlined">meeting_room</span>
-                    Enter Chatroom Now
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSecretJoin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
-                    User Nickname
-                  </label>
-                  <input
-                    type="text"
-                    className="m3-text-field"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="Enter your nickname"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
-                    Room Passcode
-                  </label>
-                  <input
-                    type="password"
-                    className="m3-text-field"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                    placeholder="Enter passcode"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
-                    Avatar Image (Optional)
-                  </label>
-                  <input type="file" onChange={handleAvatarUpload} accept="image/*" id="secret-avatar-upload" style={{ display: 'none' }} />
-                  <label htmlFor="secret-avatar-upload" className="m3-btn m3-btn-outlined" style={{ width: '100%', justifyContent: 'center' }}>
-                    <span className="material-symbols-outlined">upload_file</span>
-                    {uploading ? 'Uploading...' : avatarUrl ? 'Change Avatar' : 'Upload Avatar'}
-                  </label>
-                </div>
-
-                <button type="submit" disabled={joining} className="m3-btn m3-btn-filled" style={{ marginTop: '8px', padding: '12px' }}>
-                  <span className="material-symbols-outlined">meeting_room</span>
-                  {joining ? 'Authenticating Passcode...' : 'Verify & Connect Room Space'}
-                </button>
-              </form>
-            )}
+            <button
+              className="m3-btn m3-btn-icon m3-btn-outlined"
+              onClick={() => setShowSecretModal(false)}
+              style={{ width: '36px', height: '36px' }}
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
           </div>
+
+          {error && (
+            <div
+              style={{
+                backgroundColor: 'var(--m3-error-container)',
+                color: 'var(--m3-on-error)',
+                padding: '10px 14px',
+                borderRadius: 'var(--m3-radius-m)',
+                marginBottom: '16px',
+                fontSize: '0.85rem',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {roomVerified ? (
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#81c784' }}>
+                  check_circle
+                </span>
+                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--m3-on-surface)', margin: 0 }}>
+                  Room Passcode Verified
+                </h4>
+                <p style={{ fontSize: '0.85rem', color: 'var(--m3-on-surface-variant)', margin: 0 }}>
+                  Successfully authenticated for Room: <strong>{passcode}</strong> as <strong>{nickname}</strong>
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="m3-btn m3-btn-outlined"
+                  style={{ flex: 1, padding: '10px' }}
+                  onClick={() => setRoomVerified(false)}
+                >
+                  Edit Details
+                </button>
+                <button
+                  type="button"
+                  className="m3-btn m3-btn-filled"
+                  style={{ flex: 1, padding: '10px', backgroundColor: 'var(--m3-primary)', color: '#fff' }}
+                  onClick={() => navigate('/chat')}
+                >
+                  <span className="material-symbols-outlined">meeting_room</span>
+                  Enter Chatroom Now
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSecretJoin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
+                  User Nickname
+                </label>
+                <input
+                  type="text"
+                  className="m3-text-field"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="Enter your nickname"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
+                  Room Passcode
+                </label>
+                <input
+                  type="password"
+                  className="m3-text-field"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="Enter passcode"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
+                  Avatar Image (Optional)
+                </label>
+                <input type="file" onChange={handleAvatarUpload} accept="image/*" id="secret-avatar-upload" style={{ display: 'none' }} />
+                <label htmlFor="secret-avatar-upload" className="m3-btn m3-btn-outlined" style={{ width: '100%', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined">upload_file</span>
+                  {uploading ? 'Uploading...' : avatarUrl ? 'Change Avatar' : 'Upload Avatar'}
+                </label>
+              </div>
+
+              <button type="submit" disabled={joining} className="m3-btn m3-btn-filled" style={{ marginTop: '8px', padding: '12px' }}>
+                <span className="material-symbols-outlined">meeting_room</span>
+                {joining ? 'Authenticating Passcode...' : 'Verify & Connect Room Space'}
+              </button>
+            </form>
+          )}
         </div>
-      )}
+      </AnimatedModal>
+
 
       {/* Footer */}
       <footer style={{ backgroundColor: 'var(--m3-surface-container-lowest)', borderTop: '1px solid var(--m3-outline-variant)', padding: '20px 32px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)' }}>
