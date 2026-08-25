@@ -690,10 +690,11 @@ export class ChatGateway
     if (!session || session.passcode !== data.passcode) return;
 
     console.log(
-      `[WebRTCOffer] Relaying WebRTC offer in room: ${data.passcode}`,
+      `[WebRTCOffer] Relaying WebRTC offer from ${session.nickname} in room: ${data.passcode}`,
     );
     client.to(data.passcode).emit('webrtcOfferRelay', {
       offer: data.offer,
+      from: session.nickname,
     });
   }
 
@@ -706,12 +707,14 @@ export class ChatGateway
     if (!session || session.passcode !== data.passcode) return;
 
     console.log(
-      `[WebRTCAnswer] Relaying WebRTC answer in room: ${data.passcode}`,
+      `[WebRTCAnswer] Relaying WebRTC answer from ${session.nickname} in room: ${data.passcode}`,
     );
     client.to(data.passcode).emit('webrtcAnswerRelay', {
       answer: data.answer,
+      from: session.nickname,
     });
   }
+
 
   @SubscribeMessage('webrtcCandidate')
   webrtcCandidate(

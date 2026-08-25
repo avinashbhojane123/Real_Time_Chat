@@ -499,9 +499,9 @@ export default function ChatRoom() {
         peerConnectionRef.current.close();
       } catch (e) {}
     }
-    pendingIceCandidatesRef.current = [];
 
     const pc = new RTCPeerConnection({
+
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
@@ -936,7 +936,9 @@ export default function ChatRoom() {
     setShowVideoPanel(true);
     updateCallState('calling');
     setRemoteUserName(otherOnlineUsers[0]?.nickname || 'User');
+    socketRef.current?.emit('callUser', { passcode });
     try {
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
       setLocalStream(stream);
