@@ -864,54 +864,6 @@ export default function ChatRoom() {
           </div>
         </div>
 
-        {/* Active Space Item Card */}
-        <div
-          style={{
-            padding: '12px 16px',
-            backgroundColor: '#2a3942',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            cursor: 'pointer',
-            borderLeft: '4px solid #00a884',
-          }}
-        >
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              backgroundColor: '#00a884',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '1.1rem',
-              flexShrink: 0,
-            }}
-          >
-            #
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#e9edef' }}>
-                Nexus Space #{passcode}
-              </span>
-              <span style={{ fontSize: '0.7rem', color: '#00a884', fontWeight: 600 }}>
-                {messages.length > 0 ? formatMessageTime(messages[messages.length - 1].createdAt) : 'now'}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.76rem', color: '#8696a0', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {typingUsers.length > 0
-                ? `${typingUsers.join(', ')} is typing...`
-                : messages.length > 0
-                ? `${messages[messages.length - 1].nickname}: ${messages[messages.length - 1].message}`
-                : 'Click to start real-time chat'}
-            </div>
-          </div>
-        </div>
-
         {/* Online Participants Roster List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           <div style={{ padding: '6px 16px', fontSize: '0.72rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px' }}>
