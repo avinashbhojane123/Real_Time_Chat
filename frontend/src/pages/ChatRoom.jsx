@@ -171,11 +171,12 @@ export default function ChatRoom() {
   const [inputText, setInputText] = useState('');
   const [users, setUsers] = useState([]);
 
-  // Drag to Reply State
+  // Drag to Reply State (Touch & Mouse Pointer support)
   const [replyingTo, setReplyingTo] = useState(null);
   const [activeDragId, setActiveDragId] = useState(null);
   const [dragTranslateX, setDragTranslateX] = useState(0);
-  const touchStartXRef = useRef(0);
+  const dragStartXRef = useRef(0);
+  const isDraggingRef = useRef(false);
 
   // Message Edit State
   const [editingMsgId, setEditingMsgId] = useState(null);
@@ -986,25 +987,31 @@ export default function ChatRoom() {
     );
   };
 
-  // Touch Swipe for Reply Gesture
-  const handleTouchStart = (e, msgId) => {
-    touchStartXRef.current = e.touches[0].clientX;
+  // Drag-to-Reply Gesture Handler (Mouse Drag & Touch Swipe)
+  const handlePointerDown = (e, msgId) => {
+    // Only primary mouse button (0) or touch/pen inputs
+    if (e.button !== undefined && e.button !== 0) return;
+    dragStartXRef.current = e.clientX;
+    isDraggingRef.current = true;
     setActiveDragId(msgId);
   };
 
-  const handleTouchMove = (e) => {
-    if (!activeDragId) return;
-    const currentX = e.touches[0].clientX;
-    const diffX = currentX - touchStartXRef.current;
-    if (diffX > 0 && diffX < 100) {
+  const handlePointerMove = (e, msgId) => {
+    if (!isDraggingRef.current || activeDragId !== msgId) return;
+    const currentX = e.clientX;
+    const diffX = currentX - dragStartXRef.current;
+    if (diffX > 0 && diffX <= 120) {
       setDragTranslateX(diffX);
     }
   };
 
-  const handleTouchEnd = (msg) => {
-    if (dragTranslateX > 50 && msg) {
+  const handlePointerUp = (msg) => {
+    if (!isDraggingRef.current) return;
+    if (dragTranslateX > 40 && msg) {
       setReplyingTo(msg);
+      showToast(`Replying to ${msg.nickname}`);
     }
+    isDraggingRef.current = false;
     setActiveDragId(null);
     setDragTranslateX(0);
   };
@@ -1369,16 +1376,52 @@ export default function ChatRoom() {
 
                   {/* Message Bubble Item */}
                   <div
-                    style={{ display: 'flex', width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}
-                    onTouchStart={(e) => handleTouchStart(e, msg.id)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={() => handleTouchEnd(msg)}
+                    style={{
+                      display: 'flex',
+                      width: '100%',
+                      justifyContent: isMe ? 'flex-end' : 'flex-start',
+                      position: 'relative',
+                      alignItems: 'center',
+                      userSelect: 'none',
+                    }}
+                    onPointerDown={(e) => handlePointerDown(e, msg.id)}
+                    onPointerMove={(e) => handlePointerMove(e, msg.id)}
+                    onPointerUp={() => handlePointerUp(msg)}
+                    onPointerCancel={() => handlePointerUp(msg)}
                   >
+                    {/* Animated Drag-to-Reply Visual Indicator */}
+                    {activeDragId === msg.id && dragTranslateX > 5 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: isMe ? 'auto' : '4px',
+                          right: isMe ? `${dragTranslateX + 16}px` : 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: '#202c33',
+                          border: '2px solid #00a884',
+                          color: '#00a884',
+                          opacity: Math.min(dragTranslateX / 40, 1),
+                          transform: `scale(${Math.min(dragTranslateX / 40, 1.2)})`,
+                          transition: 'transform 0.1s ease',
+                          zIndex: 10,
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                          reply
+                        </span>
+                      </div>
+                    )}
+
                     <div
                       className={`wa-bubble-box ${isMe ? 'wa-bubble-out' : 'wa-bubble-in'} group`}
                       style={{
                         transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
-                        transition: 'transform 0.1s ease',
+                        transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1)',
                       }}
                     >
                       {/* Sender Nickname Header for Incoming Messages */}
