@@ -1510,120 +1510,120 @@ export default function ChatRoom() {
                         )}
                       </div>
 
-                      {/* Message 3 Dots Button Trigger */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '2px',
-                          right: '2px',
-                          background: 'none',
-                          border: 'none',
-                          color: '#8696a0',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 15,
-                        }}
-                        className="group-hover:opacity-100 opacity-60 hover:opacity-100"
-                        title="Message options"
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
-                      </button>
-
-                      {/* 3 Dots Context Dropdown Menu */}
-                      {activeMenuMsgId === msg.id && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '26px',
-                            right: '6px',
-                            backgroundColor: '#233138',
-                            borderRadius: '10px',
-                            boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
-                            border: '1px solid rgba(134, 150, 160, 0.2)',
-                            padding: '4px 0',
-                            zIndex: 60,
-                            minWidth: '150px',
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                      {/* Message 3 Dots Button Trigger (Sender Only) */}
+                      {isMe && (
+                        <>
                           <button
                             type="button"
-                            onClick={() => {
-                              setActiveReactionMsgId(msg.id);
-                              setActiveMenuMsgId(null);
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
                             }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                            className="hover:bg-[#182229]"
+                            style={{
+                              position: 'absolute',
+                              top: '2px',
+                              right: '2px',
+                              background: 'none',
+                              border: 'none',
+                              color: '#8696a0',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              zIndex: 15,
+                            }}
+                            className="group-hover:opacity-100 opacity-60 hover:opacity-100"
+                            title="Message options"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>add_reaction</span>
-                            <span>React</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReplyingTo(msg);
-                              setActiveMenuMsgId(null);
-                            }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                            className="hover:bg-[#182229]"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>reply</span>
-                            <span>Reply</span>
-                          </button>
-
-                          {isMe && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                startEditing(msg);
-                                setActiveMenuMsgId(null);
+                          {/* 3 Dots Context Dropdown Menu */}
+                          {activeMenuMsgId === msg.id && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '26px',
+                                right: '6px',
+                                backgroundColor: '#233138',
+                                borderRadius: '10px',
+                                boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
+                                border: '1px solid rgba(134, 150, 160, 0.2)',
+                                padding: '4px 0',
+                                zIndex: 60,
+                                minWidth: '150px',
                               }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                              className="hover:bg-[#182229]"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>edit</span>
-                              <span>Edit</span>
-                            </button>
-                          )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveReactionMsgId(msg.id);
+                                  setActiveMenuMsgId(null);
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                                className="hover:bg-[#182229]"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>add_reaction</span>
+                                <span>React</span>
+                              </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleTogglePinMessage(msg);
-                              setActiveMenuMsgId(null);
-                            }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                            className="hover:bg-[#182229]"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>push_pin</span>
-                            <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
-                          </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReplyingTo(msg);
+                                  setActiveMenuMsgId(null);
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                                className="hover:bg-[#182229]"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>reply</span>
+                                <span>Reply</span>
+                              </button>
 
-                          {isMe && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleDeleteMessage(msg.id);
-                                setActiveMenuMsgId(null);
-                              }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                              className="hover:bg-[#182229]"
-                            >
-                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f44336' }}>delete</span>
-                              <span>Delete</span>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  startEditing(msg);
+                                  setActiveMenuMsgId(null);
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                                className="hover:bg-[#182229]"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>edit</span>
+                                <span>Edit</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleTogglePinMessage(msg);
+                                  setActiveMenuMsgId(null);
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                                className="hover:bg-[#182229]"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>push_pin</span>
+                                <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleDeleteMessage(msg.id);
+                                  setActiveMenuMsgId(null);
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                                className="hover:bg-[#182229]"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f44336' }}>delete</span>
+                                <span>Delete</span>
+                              </button>
+                            </div>
                           )}
-                        </div>
+                        </>
                       )}
 
                       {/* Emoji Reactions Popover */}
