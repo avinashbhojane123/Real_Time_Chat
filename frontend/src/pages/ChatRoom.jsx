@@ -45,7 +45,14 @@ function formatDateHeader(dateStr) {
   }
 }
 
+function formatTimer(totalSeconds = 0) {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
 function detectClientDevice() {
+
   const ua = navigator.userAgent;
   let deviceType = 'Desktop';
   let deviceModel = 'PC';
