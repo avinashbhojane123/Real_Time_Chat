@@ -181,6 +181,10 @@ export default function ChatRoom() {
   const [editingMsgId, setEditingMsgId] = useState(null);
   const [editingText, setEditingText] = useState('');
 
+  // Emoji & Reaction State
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+
   // Clear Confirmation Modal State
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -213,8 +217,17 @@ export default function ChatRoom() {
   const [remoteStream, setRemoteStream] = useState(null);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [facingMode, setFacingMode] = useState('user'); // 'user' (front) | 'environment' (back)
   const [callDuration, setCallDuration] = useState(0);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
+
+  const EMOJI_LIST = [
+    '😀', '😂', '😍', '😎', '🙏', '👍', '🔥', '❤️', '🎉', '✨', 
+    '🥳', '🙌', '😊', '🤔', '💩', '😭', '🤩', '👀', '💯', '👏', 
+    '💡', '🚀', '⭐', '👎', '👋', '💖', '💔', '🙈', '🎂', '🥰', '🤣', '🎉'
+  ];
+
+  const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
 
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -856,10 +869,50 @@ export default function ChatRoom() {
     }
   };
 
-  const formatTimer = (sec) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const flipCamera = async () => {
+    const nextFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: nextFacingMode },
+        audio: false,
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+
+      if (localStreamRef.current) {
+        const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldVideoTrack) {
+          localStreamRef.current.removeTrack(oldVideoTrack);
+          oldVideoTrack.stop();
+        }
+        localStreamRef.current.addTrack(newVideoTrack);
+      }
+
+      if (peerConnectionRef.current) {
+        const sender = peerConnectionRef.current
+          .getSenders()
+          .find((s) => s.track && s.track.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      setFacingMode(nextFacingMode);
+      setLocalStream(new MediaStream(localStreamRef.current ? localStreamRef.current.getTracks() : [newVideoTrack]));
+      showToast(`Switched camera to ${nextFacingMode === 'user' ? 'Front' : 'Back'}`);
+    } catch (err) {
+      console.warn('Could not switch camera:', err);
+      showToast('Camera switch not supported on this device');
+    }
+  };
+
+  const handleReactToMessage = (messageId, emoji) => {
+    socketRef.current?.emit('reactToMessage', {
+      passcode,
+      messageId,
+      emoji,
+    });
+    setActiveReactionMsgId(null);
   };
 
   // Group status updates by user nickname
@@ -876,6 +929,62 @@ export default function ChatRoom() {
     statuses: groupedStatuses[nick],
     hasUnseen: groupedStatuses[nick].some((s) => !s.viewers?.includes(nickname)),
   }));
+
+  const renderStatusAvatar = (nick, size = '38px', isOnline = false, extraStyle = {}, avatarUrl = null) => {
+    const userStatusObj = statusUserList.find((s) => s.nickname === nick);
+    const hasStatus = Boolean(userStatusObj && userStatusObj.statuses?.length > 0);
+    const hasUnseen = userStatusObj?.hasUnseen;
+
+    let ringClass = 'status-highlight-none';
+    if (hasStatus) {
+      ringClass = hasUnseen ? 'status-highlight-gradient-unseen' : 'status-highlight-gradient-seen';
+    }
+
+    return (
+      <div
+        className={`status-avatar-container ${ringClass}`}
+        style={{
+          width: size,
+          height: size,
+          flexShrink: 0,
+          ...extraStyle,
+        }}
+        onClick={(e) => {
+          if (hasStatus) {
+            e.stopPropagation();
+            setActiveStatusUser(userStatusObj);
+          } else if (nick === nickname) {
+            e.stopPropagation();
+            setShowStatusCreator(true);
+          }
+        }}
+        title={hasStatus ? `View ${nick}'s Status Story` : nick === nickname ? 'Create Status Update' : nick}
+      >
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            backgroundColor: '#202c33',
+            color: isOnline ? '#00a884' : '#8696a0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: `calc(${size} * 0.45)`,
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={nick} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            nick?.charAt(0).toUpperCase() || 'U'
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // Touch Swipe for Reply Gesture
   const handleTouchStart = (e, msgId) => {
@@ -936,29 +1045,11 @@ export default function ChatRoom() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                backgroundColor: '#00a884',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '1rem',
-              }}
-            >
-              {nickname.charAt(0).toUpperCase() || 'U'}
-            </div>
+            {renderStatusAvatar(nickname, '36px', true)}
             <div>
               <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>
                 {nickname}
               </h2>
-              <span style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600 }}>
-                Online
-              </span>
             </div>
           </div>
 
@@ -1003,36 +1094,7 @@ export default function ChatRoom() {
                   }}
                   className="hover:bg-[#202c33]"
                 >
-                  <div
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      backgroundColor: '#202c33',
-                      color: u.isOnline ? '#00a884' : '#8696a0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      position: 'relative',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {u.nickname?.charAt(0).toUpperCase() || 'U'}
-                    <div
-                      style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        backgroundColor: u.isOnline ? '#25d366' : '#8696a0',
-                        position: 'absolute',
-                        bottom: '1px',
-                        right: '1px',
-                        border: '2px solid #111b21',
-                      }}
-                    />
-                  </div>
+                  {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
@@ -1085,49 +1147,17 @@ export default function ChatRoom() {
               <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
             </button>
 
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                backgroundColor: recipientUser ? '#00a884' : '#374045',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '1.1rem',
-                position: 'relative',
-              }}
-            >
-              {recipientUser ? recipientUser.nickname.charAt(0).toUpperCase() : 'U'}
-              <div
-                style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: isRecipientOnline ? '#25d366' : '#8696a0',
-                  position: 'absolute',
-                  bottom: '1px',
-                  right: '1px',
-                  border: '2px solid #202c33',
-                }}
-              />
-            </div>
+            {renderStatusAvatar(recipientUser ? recipientUser.nickname : 'Participant', '40px', isRecipientOnline, {}, recipientUser?.avatarUrl)}
 
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
                 {recipientUser ? recipientUser.nickname : 'Waiting for participant...'}
               </div>
-              <div style={{ fontSize: '0.74rem', color: isRecipientOnline ? '#00a884' : '#8696a0', marginTop: '1px' }}>
-                {typingUsers.length > 0
-                  ? `${typingUsers.join(', ')} is typing...`
-                  : isRecipientOnline
-                  ? 'online'
-                  : recipientUser
-                  ? 'offline'
-                  : 'offline'}
-              </div>
+              {typingUsers.length > 0 && (
+                <div style={{ fontSize: '0.74rem', color: '#00a884', marginTop: '1px' }}>
+                  {typingUsers.join(', ')} is typing...
+                </div>
+              )}
             </div>
           </div>
 
@@ -1452,6 +1482,14 @@ export default function ChatRoom() {
                       >
                         <button
                           type="button"
+                          onClick={() => setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id)}
+                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
+                          title="React"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>add_reaction</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setReplyingTo(msg)}
                           style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
                           title="Reply"
@@ -1487,6 +1525,39 @@ export default function ChatRoom() {
                           </button>
                         )}
                       </div>
+
+                      {/* Emoji Reactions Popover */}
+                      {activeReactionMsgId === msg.id && (
+                        <div className="reactions-popover">
+                          {QUICK_REACTIONS.map((emoji, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className="reaction-item-btn"
+                              onClick={() => handleReactToMessage(msg.id, emoji)}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Displayed Emoji Reaction Badges */}
+                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px', clear: 'both' }}>
+                          {Object.entries(msg.reactions).map(([emoji, usersArr]) => (
+                            <span
+                              key={emoji}
+                              className="reaction-badge"
+                              onClick={() => handleReactToMessage(msg.id, emoji)}
+                              title={`Reacted by: ${usersArr.join(', ')}`}
+                            >
+                              <span>{emoji}</span>
+                              <span style={{ fontSize: '0.68rem', opacity: 0.85 }}>{usersArr.length}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1530,6 +1601,36 @@ export default function ChatRoom() {
           </div>
         )}
 
+        {/* Emoji Picker Container */}
+        {showEmojiPicker && (
+          <div className="emoji-picker-container">
+            <div className="emoji-picker-header">
+              <span>Choose Emoji</span>
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(false)}
+                style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>close</span>
+              </button>
+            </div>
+            <div className="emoji-grid">
+              {EMOJI_LIST.map((emoji, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="emoji-btn"
+                  onClick={() => {
+                    setInputText((prev) => prev + emoji);
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Bottom WhatsApp Input Bar */}
         <form
           onSubmit={handleSendMessage}
@@ -1539,11 +1640,22 @@ export default function ChatRoom() {
             padding: '10px 16px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '10px',
             borderTop: '1px solid rgba(134, 150, 160, 0.15)',
             zIndex: 20,
+            position: 'relative',
           }}
         >
+          {/* Emoji Toggle Icon */}
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            style={{ background: 'none', border: 'none', color: showEmojiPicker ? '#00a884' : '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+            title="Emoji Picker"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>mood</span>
+          </button>
+
           {/* Attach Paperclip Icon */}
           <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#8696a0' }} title="Attach file or photo">
             <input
@@ -1681,13 +1793,16 @@ export default function ChatRoom() {
 
                 {/* Controls Dock */}
                 <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '16px', zIndex: 20 }}>
-                  <button onClick={toggleMic} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: micMuted ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                  <button onClick={toggleMic} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: micMuted ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={micMuted ? 'Unmute Mic' : 'Mute Mic'}>
                     <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
                   </button>
-                  <button onClick={toggleCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: cameraOff ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                  <button onClick={toggleCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: cameraOff ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}>
                     <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
                   </button>
-                  <button onClick={endCall} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                  <button onClick={flipCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={`Reverse Camera (Front/Back) - Current: ${facingMode === 'user' ? 'Front' : 'Back'}`}>
+                    <span className="material-symbols-outlined">cameraswitch</span>
+                  </button>
+                  <button onClick={endCall} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer' }} title="End Call">
                     <span className="material-symbols-outlined">call_end</span>
                   </button>
                 </div>
