@@ -137,10 +137,10 @@ export default function ChatRoom() {
     const val = e.target.value;
     setInputText(val);
     if (socketRef.current) {
-      socketRef.current.emit('typing', { passcode });
+      socketRef.current.emit('typing', { passcode, nickname });
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        socketRef.current?.emit('stopTyping', { passcode });
+        socketRef.current?.emit('stopTyping', { passcode, nickname });
       }, 2000);
     }
   };
@@ -153,6 +153,7 @@ export default function ChatRoom() {
   const handleCreateStatus = (statusData) => {
     socketRef.current?.emit('createStatus', {
       passcode,
+      nickname,
       ...statusData,
     });
   };
@@ -422,7 +423,7 @@ export default function ChatRoom() {
     }
   }, [nickname, passcode, navigate]);
 
-  // Socket Connection setup
+  // Socket Connection setup & Complete Event Listeners
   useEffect(() => {
     if (!nickname || !passcode) return;
 
@@ -435,8 +436,10 @@ export default function ChatRoom() {
 
     socket.on('connect', () => {
       socket.emit('joinRoom', { nickname, passcode });
+      socket.emit('getStatuses', { passcode });
     });
 
+    // Chat History Event Listeners
     socket.on('chatHistory', (history) => {
       setMessages(history || []);
     });
@@ -445,14 +448,22 @@ export default function ChatRoom() {
       setMessages(history || []);
     });
 
+    // New Message Event Listeners
     socket.on('newMessage', (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
     });
 
     socket.on('message', (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
     });
 
+    // Users List Event Listeners
     socket.on('usersList', (userList) => {
       setUsers(userList || []);
     });
@@ -461,10 +472,30 @@ export default function ChatRoom() {
       setUsers(userList || []);
     });
 
+    // Status Story Event Listeners
+    socket.on('statusesList', (statusesList) => {
+      setStatuses(statusesList || []);
+    });
+
     socket.on('statusesUpdate', (statusesList) => {
       setStatuses(statusesList || []);
     });
 
+    socket.on('statusCreated', (statusPayload) => {
+      setStatuses((prev) => [...prev, statusPayload]);
+    });
+
+    socket.on('statusViewed', ({ statusId, viewers }) => {
+      setStatuses((prev) =>
+        prev.map((st) => (st.id === statusId ? { ...st, viewers } : st))
+      );
+    });
+
+    socket.on('statusDeleted', ({ statusId }) => {
+      setStatuses((prev) => prev.filter((st) => st.id !== statusId));
+    });
+
+    // Message Modification Event Listeners
     socket.on('messageEdited', ({ messageId, newMessage, editedAt }) => {
       setMessages((prev) =>
         prev.map((m) =>
@@ -474,7 +505,19 @@ export default function ChatRoom() {
     });
 
     socket.on('messageDeleted', ({ messageId }) => {
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, message: 'This message was deleted', isDeleted: true, fileUrl: null }
+            : m
+        )
+      );
+    });
+
+    socket.on('messageReactionsUpdated', ({ messageId, reactions }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+      );
     });
 
     socket.on('messageReacted', ({ messageId, reactions }) => {
@@ -500,11 +543,11 @@ export default function ChatRoom() {
       setPinnedMessage(null);
     });
 
+    // Typing Event Listeners
     socket.on('userTyping', ({ nickname: typingNick }) => {
-      setTypingUsers((prev) => {
-        if (!prev.includes(typingNick)) return [...prev, typingNick];
-        return prev;
-      });
+      if (typingNick && typingNick !== nickname) {
+        setTypingUsers((prev) => (prev.includes(typingNick) ? prev : [...prev, typingNick]));
+      }
     });
 
     socket.on('userStoppedTyping', ({ nickname: stopNick }) => {
@@ -515,7 +558,13 @@ export default function ChatRoom() {
       setTypingUsers((prev) => prev.filter((n) => n !== stopNick));
     });
 
-    // WebRTC Signaling Handlers
+    // WebRTC Signaling Event Handlers
+    const handleIncomingCall = ({ callerName: caller }) => {
+      setCallerName(caller || 'Space Member');
+      updateCallState('incoming');
+      setShowVideoPanel(true);
+    };
+
     const handleOffer = async ({ from, offer }) => {
       setShowVideoPanel(true);
       if (callStateRef.current === 'active' || callStateRef.current === 'calling') {
@@ -533,9 +582,6 @@ export default function ChatRoom() {
       window.latestOffer = offer;
     };
 
-    socket.on('webrtcOffer', handleOffer);
-    socket.on('webrtcOfferRelay', handleOffer);
-
     const handleAnswer = async ({ answer }) => {
       const pc = peerConnectionRef.current;
       if (pc) {
@@ -545,21 +591,20 @@ export default function ChatRoom() {
       }
     };
 
-    socket.on('webrtcAnswer', handleAnswer);
-    socket.on('webrtcAnswerRelay', handleAnswer);
-
     const handleCandidate = async ({ candidate }) => {
       if (candidate) {
         addIceCandidateSafely(candidate);
       }
     };
 
+    socket.on('userCalling', handleIncomingCall);
+    socket.on('webrtcOffer', handleOffer);
+    socket.on('webrtcOfferRelay', handleOffer);
+    socket.on('webrtcAnswer', handleAnswer);
+    socket.on('webrtcAnswerRelay', handleAnswer);
     socket.on('webrtcCandidate', handleCandidate);
     socket.on('webrtcCandidateRelay', handleCandidate);
-
-    socket.on('callEnded', () => {
-      cleanUpCall();
-    });
+    socket.on('callEnded', () => cleanUpCall());
 
     return () => {
       socket.disconnect();
@@ -579,6 +624,7 @@ export default function ChatRoom() {
 
     socketRef.current?.emit('sendMessage', {
       passcode,
+      nickname,
       message: inputText.trim(),
       replyTo: replyingTo
         ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
@@ -606,6 +652,7 @@ export default function ChatRoom() {
 
         socketRef.current?.emit('sendMessage', {
           passcode,
+          nickname,
           message: file.type.startsWith('image/') ? '📷 Photo' : `📎 ${file.name}`,
           fileUrl: fullUrl,
           fileType: file.type,
@@ -1551,7 +1598,7 @@ export default function ChatRoom() {
             <p style={{ fontSize: '0.85rem', color: '#8696a0', marginBottom: '20px', lineHeight: 1.4 }}>
               Are you sure you want to clear all chat messages in Space #{passcode} for everyone?
             </p>
-            <div style={{ display: 'flex', justifyEnd: 'flex-end', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button onClick={() => setShowClearConfirm(false)} style={{ background: 'none', border: 'none', color: '#8696a0', fontWeight: 600, cursor: 'pointer' }}>
                 Cancel
               </button>
