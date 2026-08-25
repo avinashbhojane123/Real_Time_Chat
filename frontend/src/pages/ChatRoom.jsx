@@ -320,9 +320,11 @@ export default function ChatRoom() {
 
   const socketRef = useRef(null);
   const localStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
+
   const chatBottomRef = useRef(null);
   const callStateRef = useRef('idle');
   const pendingIceCandidatesRef = useRef([]);
@@ -437,6 +439,10 @@ export default function ChatRoom() {
       localStreamRef.current = null;
       setLocalStream(null);
     }
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach((t) => t.stop());
+      remoteStreamRef.current = null;
+    }
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
@@ -446,6 +452,7 @@ export default function ChatRoom() {
       peerConnectionRef.current = null;
     }
     setRemoteStream(null);
+
     updateCallState('idle');
     setMicMuted(false);
     setCameraOff(false);
@@ -522,10 +529,16 @@ export default function ChatRoom() {
     };
 
     pc.ontrack = (e) => {
+      console.log('[WebRTC] Remote track received:', e.track?.kind, e.streams);
       if (e.streams && e.streams[0]) {
+        remoteStreamRef.current = e.streams[0];
         setRemoteStream(e.streams[0]);
       } else if (e.track) {
-        setRemoteStream(new MediaStream([e.track]));
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream();
+        }
+        remoteStreamRef.current.addTrack(e.track);
+        setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
       }
     };
 
@@ -567,6 +580,27 @@ export default function ChatRoom() {
     },
     [remoteStream]
   );
+
+  // Sync localStream to local video node
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch((err) => {
+        console.warn('[WebRTC] Local video play error:', err);
+      });
+    }
+  }, [localStream, callState]);
+
+  // Sync remoteStream to remote video node
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch((err) => {
+        console.warn('[WebRTC] Remote video play error:', err);
+      });
+    }
+  }, [remoteStream, callState]);
+
 
   // Active call duration timer & watchdog
   useEffect(() => {
