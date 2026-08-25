@@ -267,6 +267,9 @@ export default function ChatRoom() {
   // 4. Document Viewer Lightbox State
   const [documentViewerFile, setDocumentViewerFile] = useState(null);
 
+  // 5. Bottom Action Group Menu State (+ Button beside Emoji Picker)
+  const [showActionMenu, setShowActionMenu] = useState(false);
+
   const EMOJI_LIST = [
     '😀', '😂', '😍', '😎', '🙏', '👍', '🔥', '❤️', '🎉', '✨', 
     '🥳', '🙌', '😊', '🤔', '💩', '😭', '🤩', '👀', '💯', '👏', 
@@ -2288,47 +2291,157 @@ export default function ChatRoom() {
             {/* Emoji Toggle Icon */}
             <button
               type="button"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              onClick={() => {
+                setShowEmojiPicker(!showEmojiPicker);
+                setShowActionMenu(false);
+              }}
               style={{ background: 'none', border: 'none', color: showEmojiPicker ? '#00a884' : '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
               title="Emoji Picker"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>mood</span>
             </button>
 
-            {/* Attach Paperclip Icon */}
-            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#8696a0' }} title="Attach file or photo">
-              <input
-                type="file"
-                style={{ display: 'none' }}
-                onChange={(e) => handleUploadAttachment(e.target.files?.[0])}
-                disabled={isUploadingFile}
-              />
-              {isUploadingFile ? (
-                <span className="material-symbols-outlined animate-spin">refresh</span>
-              ) : (
-                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>attach_file</span>
+            {/* WhatsApp Plus (+) Attachment & Action Group Menu */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowActionMenu(!showActionMenu);
+                  setShowEmojiPicker(false);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: showActionMenu ? '#00a884' : '#8696a0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px',
+                  borderRadius: '50%',
+                  transform: showActionMenu ? 'rotate(45deg)' : 'none',
+                  transition: 'transform 0.2s ease, color 0.2s ease',
+                }}
+                title="Attachments & Actions Menu"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add</span>
+              </button>
+
+              {/* Action Popover Menu */}
+              {showActionMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '52px',
+                    left: '0px',
+                    backgroundColor: '#233138',
+                    borderRadius: '16px',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.8)',
+                    border: '1px solid rgba(134, 150, 160, 0.2)',
+                    padding: '8px 0',
+                    zIndex: 60,
+                    minWidth: '230px',
+                  }}
+                  className="animate-fade-in"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* 1. Attach File or Photo */}
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px 16px',
+                      color: '#e9edef',
+                      fontSize: '0.86rem',
+                      cursor: 'pointer',
+                    }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <input
+                      type="file"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        handleUploadAttachment(e.target.files?.[0]);
+                        setShowActionMenu(false);
+                      }}
+                      disabled={isUploadingFile}
+                    />
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#bf59cf' }}>attach_file</span>
+                    <span>Attach File or Photo</span>
+                  </label>
+
+                  {/* 2. Create Poll */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPollModal(true);
+                      setShowActionMenu(false);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#00a884' }}>poll</span>
+                    <span>Create Poll</span>
+                  </button>
+
+                  {/* 3. Share Location */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleShareLocation();
+                      setShowActionMenu(false);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff2e74' }}>location_on</span>
+                    <span>Share Location</span>
+                  </button>
+
+                  {/* 4. Disappearing Messages */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDisappearingMenu(!showDisappearingMenu);
+                      setShowActionMenu(false);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff9800' }}>timer</span>
+                    <span>Disappearing Messages {disappearingTimer > 0 ? `(${disappearingTimer}s)` : ''}</span>
+                  </button>
+
+                  {/* 5. Change Theme & Wallpaper */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowThemeModal(true);
+                      setShowActionMenu(false);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#0070f3' }}>palette</span>
+                    <span>Change Theme & Wallpaper</span>
+                  </button>
+
+                  {/* 6. Clear Room History */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowClearConfirm(true);
+                      setShowActionMenu(false);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#f44336' }}>delete_sweep</span>
+                    <span>Clear Room History</span>
+                  </button>
+                </div>
               )}
-            </label>
-
-            {/* Create Poll Button */}
-            <button
-              type="button"
-              onClick={() => setShowPollModal(true)}
-              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
-              title="Create Poll"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>poll</span>
-            </button>
-
-            {/* Share Location Button */}
-            <button
-              type="button"
-              onClick={handleShareLocation}
-              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
-              title="Share Location"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>location_on</span>
-            </button>
+            </div>
 
             {/* Input Text Field */}
             <input
