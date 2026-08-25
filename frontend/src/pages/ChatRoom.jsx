@@ -203,8 +203,9 @@ export default function ChatRoom() {
   const [showStatusCreator, setShowStatusCreator] = useState(false);
   const [activeStatusUser, setActiveStatusUser] = useState(null);
 
-  // Toast State
-  const [toastText, setToastText] = useState(null);
+  // Toast Stack State
+  const [toasts, setToasts] = useState([]);
+
 
   // File Uploading & Lightbox State
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -346,9 +347,13 @@ export default function ChatRoom() {
   };
 
   const showToast = (msg) => {
-    setToastText(msg);
-    setTimeout(() => setToastText(null), 2500);
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, text: msg }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 2800);
   };
+
 
   const handleCreateStatus = (statusData) => {
     socketRef.current?.emit('createStatus', {
@@ -2964,13 +2969,54 @@ export default function ChatRoom() {
         </div>
       )}
 
-      {/* Toast Feedback */}
-      {toastText && (
-        <div style={{ position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#182229', border: '1px solid #00a884', color: '#ffffff', padding: '8px 18px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 600, zIndex: 99999, display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}>
-          <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '18px' }}>check_circle</span>
-          <span>{toastText}</span>
-        </div>
-      )}
+      {/* Stackable Spring Motion Toast Container */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 999999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+          pointerEvents: 'none',
+        }}
+      >
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              layout
+              initial={{ y: -24, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -20, opacity: 0, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+              style={{
+                backgroundColor: '#182229',
+                border: '1px solid #00a884',
+                color: '#ffffff',
+                padding: '8px 18px',
+                borderRadius: '20px',
+                fontSize: '0.84rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                pointerEvents: 'auto',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '18px' }}>
+                check_circle
+              </span>
+              <span>{t.text}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
+
 }

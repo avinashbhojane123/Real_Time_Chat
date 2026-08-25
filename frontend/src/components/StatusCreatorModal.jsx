@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'motion/react';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import AnimatedModal from './animated/AnimatedModal';
+
 
 
 const GRADIENTS = [
@@ -20,6 +22,22 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
   const [uploading, setUploading] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFileName, setMediaFileName] = useState('');
+  const [stickers, setStickers] = useState([]);
+
+  const STICKER_LIST = ['✨', '🔥', '❤️', '🎉', '⭐', '🚀', '💯', '😎'];
+
+  const addSticker = (emoji) => {
+    setStickers((prev) => [
+      ...prev,
+      { id: Date.now() + Math.random(), emoji },
+    ]);
+  };
+
+  const removeSticker = (id) => {
+    setStickers((prev) => prev.filter((s) => s.id !== id));
+  };
+
+
 
   const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
 
@@ -248,8 +266,37 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
                   padding: '16px',
                   marginBottom: '16px',
                   boxShadow: 'inset 0 0 20px rgba(0,0,0,0.4)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
+                {/* Draggable Stickers Overlay */}
+                <AnimatePresence>
+                  {stickers.map((st) => (
+                    <motion.div
+                      key={st.id}
+                      drag
+                      dragConstraints={{ top: -70, left: -140, right: 140, bottom: 70 }}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      whileHover={{ scale: 1.3 }}
+                      whileTap={{ scale: 0.9 }}
+                      onDoubleClick={() => removeSticker(st.id)}
+                      title="Double click to remove sticker"
+                      style={{
+                        position: 'absolute',
+                        fontSize: '2.2rem',
+                        cursor: 'grab',
+                        userSelect: 'none',
+                        zIndex: 15,
+                      }}
+                    >
+                      {st.emoji}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
                 <textarea
                   placeholder="Type a status update..."
                   value={text}
@@ -268,6 +315,23 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
                     fontFamily: 'inherit',
                   }}
                 />
+              </div>
+
+              {/* Sticker Toolbar */}
+              <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', padding: '6px 10px', backgroundColor: '#202c33', borderRadius: '10px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8696a0' }}>Stickers:</span>
+                {STICKER_LIST.map((emoji) => (
+                  <motion.button
+                    key={emoji}
+                    type="button"
+                    whileHover={{ scale: 1.3, y: -2 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => addSticker(emoji)}
+                    style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '2px' }}
+                  >
+                    {emoji}
+                  </motion.button>
+                ))}
               </div>
 
               {/* Gradient Color Selector */}
