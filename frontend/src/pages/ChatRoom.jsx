@@ -67,11 +67,9 @@ export default function ChatRoom() {
   const baseUrl = sessionStorage.getItem('baseUrl') || localStorage.getItem('baseUrl') || getApiBaseUrl();
   const nickname = (sessionStorage.getItem('nickname') || '').trim();
   const passcode = (sessionStorage.getItem('passcode') || '').trim();
-  const avatarUrl = sessionStorage.getItem('avatarUrl') || localStorage.getItem('avatarUrl') || '';
 
-  // Left Sidebar Roster View Toggle State (Mobile Responsive)
+  // Responsive Roster Panel Toggle
   const [showRosterPanel, setShowRosterPanel] = useState(true);
-  const [rosterTabFilter, setRosterTabFilter] = useState('all'); // 'all' | 'unread' | 'favorites' | 'groups'
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -726,95 +724,10 @@ export default function ChatRoom() {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: '#111b21', overflow: 'hidden' }}>
       
-      {/* 1. Leftmost Navigation Rail (Icon Strip - WhatsApp Web 3-Column Layout) */}
-      <nav
-        style={{
-          width: '60px',
-          backgroundColor: '#111b21',
-          borderRight: '1px solid rgba(134, 150, 160, 0.15)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 0',
-          zIndex: 40,
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          {/* WhatsApp Web Logo / Primary Chat Rail Icon */}
-          <button
-            type="button"
-            style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-            title="Chats"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>chat</span>
-          </button>
-
-          {/* Status Stories Ring Rail Icon */}
-          <button
-            type="button"
-            onClick={() => {
-              if (statusUserList.length > 0) setActiveStatusUser(statusUserList[0]);
-              else setShowStatusCreator(true);
-            }}
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-            title="Status Stories"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>donut_large</span>
-          </button>
-
-          {/* Channels / Communities Rail Icon */}
-          <button
-            type="button"
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-            title="Channels & Space Roster"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>groups</span>
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          {/* Add Status Story Button */}
-          <button
-            type="button"
-            onClick={() => setShowStatusCreator(true)}
-            style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px' }}
-            title="Post New Status"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add_circle</span>
-          </button>
-
-          {/* Logged in User Avatar Icon */}
-          <div
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              backgroundColor: '#00a884',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-            }}
-            title={`Logged in as ${nickname}`}
-          >
-            {avatarUrl ? (
-              <img src={avatarUrl} alt={nickname} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-            ) : (
-              nickname.charAt(0).toUpperCase() || 'U'
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* 2. Chats Roster Panel (Middle Column) */}
+      {/* 1. Chats Roster Panel (Left Column) */}
       <aside
         style={{
-          width: '340px',
+          width: '320px',
           backgroundColor: '#111b21',
           borderRight: '1px solid rgba(134, 150, 160, 0.15)',
           display: showRosterPanel ? 'flex' : 'none',
@@ -837,16 +750,42 @@ export default function ChatRoom() {
             borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
           }}
         >
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>Chats</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: '#00a884',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '1rem',
+              }}
+            >
+              {nickname.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>
+              Chats
+            </h2>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Status Story Trigger Button */}
             <button
               type="button"
-              onClick={() => setShowStatusCreator(true)}
-              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-              title="New Status Story"
+              onClick={() => {
+                if (statusUserList.length > 0) setActiveStatusUser(statusUserList[0]);
+                else setShowStatusCreator(true);
+              }}
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="Status Story"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>edit_square</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>donut_large</span>
             </button>
+            
             <button
               type="button"
               onClick={() => setShowRosterPanel(false)}
@@ -858,64 +797,7 @@ export default function ChatRoom() {
           </div>
         </div>
 
-        {/* Search Field Box */}
-        <div style={{ padding: '8px 12px', backgroundColor: '#111b21' }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Search or start new chat"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '7px 12px 7px 36px',
-                borderRadius: '8px',
-                backgroundColor: '#202c33',
-                border: 'none',
-                color: '#e9edef',
-                fontSize: '0.82rem',
-                outline: 'none',
-              }}
-            />
-            <span className="material-symbols-outlined" style={{ position: 'absolute', left: '10px', color: '#8696a0', fontSize: '18px' }}>
-              search
-            </span>
-          </div>
-        </div>
-
-        {/* WhatsApp Roster Filter Pills */}
-        <div style={{ padding: '4px 12px 10px 12px', display: 'flex', gap: '6px', overflowX: 'auto' }}>
-          <button
-            type="button"
-            className={`wa-filter-pill ${rosterTabFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setRosterTabFilter('all')}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`wa-filter-pill ${rosterTabFilter === 'unread' ? 'active' : ''}`}
-            onClick={() => setRosterTabFilter('unread')}
-          >
-            Unread
-          </button>
-          <button
-            type="button"
-            className={`wa-filter-pill ${rosterTabFilter === 'favorites' ? 'active' : ''}`}
-            onClick={() => setRosterTabFilter('favorites')}
-          >
-            Favorites
-          </button>
-          <button
-            type="button"
-            className={`wa-filter-pill ${rosterTabFilter === 'groups' ? 'active' : ''}`}
-            onClick={() => setRosterTabFilter('groups')}
-          >
-            Groups
-          </button>
-        </div>
-
-        {/* Space Active Chat Item Card */}
+        {/* Active Space Item Card */}
         <div
           style={{
             padding: '12px 16px',
@@ -929,8 +811,8 @@ export default function ChatRoom() {
         >
           <div
             style={{
-              width: '46px',
-              height: '46px',
+              width: '42px',
+              height: '42px',
               borderRadius: '50%',
               backgroundColor: '#00a884',
               color: '#ffffff',
@@ -938,7 +820,7 @@ export default function ChatRoom() {
               alignItems: 'center',
               justifyContent: 'center',
               fontWeight: 700,
-              fontSize: '1.2rem',
+              fontSize: '1.1rem',
               flexShrink: 0,
             }}
           >
@@ -946,14 +828,14 @@ export default function ChatRoom() {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.92rem', color: '#e9edef' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#e9edef' }}>
                 Nexus Space #{passcode}
               </span>
               <span style={{ fontSize: '0.7rem', color: '#00a884', fontWeight: 600 }}>
                 {messages.length > 0 ? formatMessageTime(messages[messages.length - 1].createdAt) : 'now'}
               </span>
             </div>
-            <div style={{ fontSize: '0.78rem', color: '#8696a0', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '0.76rem', color: '#8696a0', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {typingUsers.length > 0
                 ? `${typingUsers.join(', ')} is typing...`
                 : messages.length > 0
@@ -963,7 +845,7 @@ export default function ChatRoom() {
           </div>
         </div>
 
-        {/* Space Participants Roster List */}
+        {/* Online Participants Roster List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           <div style={{ padding: '6px 16px', fontSize: '0.72rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px' }}>
             ONLINE PARTICIPANTS ({users.length})
@@ -983,8 +865,8 @@ export default function ChatRoom() {
             >
               <div
                 style={{
-                  width: '42px',
-                  height: '42px',
+                  width: '38px',
+                  height: '38px',
                   borderRadius: '50%',
                   backgroundColor: '#202c33',
                   color: '#00a884',
@@ -992,7 +874,7 @@ export default function ChatRoom() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
-                  fontSize: '1.1rem',
+                  fontSize: '1rem',
                   position: 'relative',
                   flexShrink: 0,
                 }}
@@ -1000,8 +882,8 @@ export default function ChatRoom() {
                 {u.nickname?.charAt(0).toUpperCase() || 'U'}
                 <div
                   style={{
-                    width: '10px',
-                    height: '10px',
+                    width: '9px',
+                    height: '9px',
                     borderRadius: '50%',
                     backgroundColor: '#25d366',
                     position: 'absolute',
@@ -1013,11 +895,11 @@ export default function ChatRoom() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#e9edef' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
                     {u.nickname} {u.nickname === nickname && '(You)'}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#8696a0', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.72rem', color: '#8696a0', marginTop: '2px' }}>
                   {formatLastSeen(u.lastSeen)}
                 </div>
               </div>
@@ -1026,7 +908,7 @@ export default function ChatRoom() {
         </div>
       </aside>
 
-      {/* 3. Main Chat Panel (Right Workspace Column) */}
+      {/* 2. Main Chat Panel (Right Workspace Column) */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0b141a', position: 'relative', overflow: 'hidden' }}>
         {/* WhatsApp Top Header Bar */}
         <header
@@ -1042,13 +924,13 @@ export default function ChatRoom() {
             boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
           }}
         >
-          {/* Active Space Avatar & Status Subtitle */}
+          {/* Header Info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               type="button"
               onClick={() => setShowRosterPanel(!showRosterPanel)}
               style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
-              title="Toggle Roster Panel"
+              title="Toggle Participants Panel"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
             </button>
@@ -1095,7 +977,7 @@ export default function ChatRoom() {
             </div>
           </div>
 
-          {/* Right Action Icons (Video Call, Audio Call, Search, Clear) */}
+          {/* Action Icons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* WhatsApp Video Call Button */}
             <button
@@ -1124,7 +1006,7 @@ export default function ChatRoom() {
               </span>
             </button>
 
-            {/* Audio Call Button */}
+            {/* Voice Call Button */}
             <button
               type="button"
               onClick={startCall}
@@ -1215,17 +1097,11 @@ export default function ChatRoom() {
           </div>
         )}
 
-        {/* Main WhatsApp Chat Feed Wallpaper Area */}
+        {/* Main Chat Feed Area */}
         <div
           className="wa-doodle-wallpaper"
           style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}
         >
-          {/* WhatsApp End-to-End Encryption Security Banner */}
-          <div className="wa-security-banner">
-            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>lock</span>
-            <span>Messages are end-to-end encrypted in Space #{passcode}. No one outside of this chat can read or listen to them.</span>
-          </div>
-
           {filteredMessages.map((msg, idx) => {
             const isMe = msg.nickname === nickname;
             const showDate =
@@ -1474,16 +1350,7 @@ export default function ChatRoom() {
             )}
           </label>
 
-          {/* Emoji Icon Button */}
-          <button
-            type="button"
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            title="Emoji"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>sentiment_satisfied</span>
-          </button>
-
-          {/* Rounded Input Field */}
+          {/* Input Text Field */}
           <input
             type="text"
             placeholder="Type a message"
