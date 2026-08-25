@@ -5,7 +5,7 @@
    ========================================================================== */
 
 :root {
-  /* M3 Color Roles (Dark / Dynamic Tonal Palettes) */
+  /* M3 Color Roles */
   --m3-primary: #D0BCFF;
   --m3-on-primary: #381E72;
   --m3-primary-container: #4F378B;
@@ -55,24 +55,32 @@
   --m3-elevation-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.30);
   --m3-elevation-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.15), 0px 1px 3px 0px rgba(0, 0, 0, 0.30);
 
-  /* Typography */
   --m3-font: 'Plus Jakarta Sans', 'Roboto', system-ui, -apple-system, sans-serif;
 
-  /* Authentic WhatsApp Color Tokens */
-  --wa-bg: #0b141a;
-  --wa-panel-bg: #111b21;
+  /* ==========================================================================
+     2026 Modern WhatsApp Web Color System
+     ========================================================================== */
+  --wa-rail-bg: #111b21;
+  --wa-roster-bg: #111b21;
   --wa-header-bg: #202c33;
   --wa-input-bg: #2a3942;
+  --wa-chat-bg: #0b141a;
+  
   --wa-incoming-bubble: #202c33;
   --wa-incoming-text: #e9edef;
   --wa-outgoing-bubble: #005c4b;
   --wa-outgoing-text: #e9edef;
   --wa-reply-quote-bg: #182229;
+  
   --wa-green: #00a884;
+  --wa-green-hover: #06cf9c;
   --wa-green-light: #25d366;
   --wa-blue-tick: #53bdeb;
+  
   --wa-text-primary: #e9edef;
   --wa-text-secondary: #8696a0;
+  --wa-border: rgba(134, 150, 160, 0.15);
+  --wa-hover: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -88,6 +96,7 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Material Icons Helper */
@@ -214,48 +223,59 @@ textarea {
 }
 
 /* ==========================================================================
-   WhatsApp Authentic Design System Component Utilities
+   2026 Modern WhatsApp Web Styling Utilities
    ========================================================================== */
 
-.wa-chat-wallpaper {
-  background-color: var(--wa-bg);
-  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0);
+/* Authentic WhatsApp Chat Wallpaper Pattern */
+.wa-doodle-wallpaper {
+  background-color: var(--wa-chat-bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1.2px, transparent 0);
   background-size: 24px 24px;
   background-position: -19px -19px;
   position: relative;
 }
 
-.wa-bubble {
+.wa-doodle-wallpaper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 168, 132, 0.03), transparent 75%);
+  pointer-events: none;
+}
+
+/* WhatsApp Chat Bubbles */
+.wa-bubble-box {
   position: relative;
-  max-width: 80%;
-  padding: 7px 10px 6px 12px;
+  max-width: 82%;
+  padding: 6px 10px 6px 12px;
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   word-break: break-word;
   font-size: 0.88rem;
   line-height: 1.45;
 }
 
-@media (min-width: 640px) {
-  .wa-bubble {
+@media (min-width: 768px) {
+  .wa-bubble-box {
     max-width: 65%;
   }
 }
 
-.wa-bubble-incoming {
+.wa-bubble-in {
   background-color: var(--wa-incoming-bubble);
   color: var(--wa-incoming-text);
   border-top-left-radius: 0px;
 }
 
-.wa-bubble-outgoing {
+.wa-bubble-out {
   background-color: var(--wa-outgoing-bubble);
   color: var(--wa-outgoing-text);
   border-top-right-radius: 0px;
   margin-left: auto;
 }
 
-.wa-bubble-incoming::before {
+/* Chat Corner Tails */
+.wa-bubble-in::before {
   content: '';
   position: absolute;
   top: 0;
@@ -266,7 +286,7 @@ textarea {
   border-left: 8px solid transparent;
 }
 
-.wa-bubble-outgoing::before {
+.wa-bubble-out::before {
   content: '';
   position: absolute;
   top: 0;
@@ -277,7 +297,8 @@ textarea {
   border-right: 8px solid transparent;
 }
 
-.wa-reply-quote {
+/* Inner Reply Quote Box */
+.wa-quote-box {
   background-color: var(--wa-reply-quote-bg);
   border-left: 4px solid var(--wa-green);
   padding: 6px 10px;
@@ -286,28 +307,53 @@ textarea {
   font-size: 0.78rem;
 }
 
-.wa-status-ring {
-  box-shadow: 0 0 0 2px var(--wa-panel-bg), 0 0 0 4px var(--wa-green);
+/* Filter Pills for Chat Roster */
+.wa-filter-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background-color: #202c33;
+  color: #8696a0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.wa-status-ring-seen {
-  box-shadow: 0 0 0 2px var(--wa-panel-bg), 0 0 0 4px var(--wa-text-secondary);
+.wa-filter-pill.active {
+  background-color: rgba(0, 168, 132, 0.2);
+  color: #00a884;
 }
 
-@keyframes waCallPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(0, 168, 132, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 14px rgba(0, 168, 132, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(0, 168, 132, 0);
-  }
+.wa-filter-pill:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.wa-call-pulse {
-  animation: waCallPulse 1.6s infinite;
+/* WhatsApp Encryption Security Banner */
+.wa-security-banner {
+  background-color: #182229;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 0.76rem;
+  text-align: center;
+  max-width: 520px;
+  margin: 12px auto;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* WhatsApp Status Ring */
+.wa-ring-unseen {
+  box-shadow: 0 0 0 2px var(--wa-roster-bg), 0 0 0 4px var(--wa-green);
+}
+
+.wa-ring-seen {
+  box-shadow: 0 0 0 2px var(--wa-roster-bg), 0 0 0 4px var(--wa-text-secondary);
 }
 
 @keyframes fadeIn {

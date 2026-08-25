@@ -36,9 +36,9 @@ function formatDateHeader(dateStr) {
 }
 
 function formatLastSeen(lastSeenDate) {
-  if (!lastSeenDate) return 'Offline';
+  if (!lastSeenDate) return 'offline';
   const date = new Date(lastSeenDate);
-  if (isNaN(date.getTime())) return 'Offline';
+  if (isNaN(date.getTime())) return 'offline';
 
   const now = new Date();
   const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -69,8 +69,9 @@ export default function ChatRoom() {
   const passcode = (sessionStorage.getItem('passcode') || '').trim();
   const avatarUrl = sessionStorage.getItem('avatarUrl') || localStorage.getItem('avatarUrl') || '';
 
-  // Responsive Left Sidebar Toggle State
-  const [showSidebar, setShowSidebar] = useState(false);
+  // Left Sidebar Roster View Toggle State (Mobile Responsive)
+  const [showRosterPanel, setShowRosterPanel] = useState(true);
+  const [rosterTabFilter, setRosterTabFilter] = useState('all'); // 'all' | 'unread' | 'favorites' | 'groups'
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -94,7 +95,7 @@ export default function ChatRoom() {
   const [showStatusCreator, setShowStatusCreator] = useState(false);
   const [activeStatusUser, setActiveStatusUser] = useState(null);
 
-  // Toast & Context Menu State
+  // Toast State
   const [toastText, setToastText] = useState(null);
 
   // File Uploading & Lightbox State
@@ -149,14 +150,6 @@ export default function ChatRoom() {
   const showToast = (msg) => {
     setToastText(msg);
     setTimeout(() => setToastText(null), 2500);
-  };
-
-  const handleReactToMessage = (msgId, emoji) => {
-    socketRef.current?.emit('reactToMessage', {
-      passcode,
-      messageId: msgId,
-      emoji,
-    });
   };
 
   const handleCreateStatus = (statusData) => {
@@ -723,7 +716,7 @@ export default function ChatRoom() {
     setDragTranslateX(0);
   };
 
-  // Filter messages
+  // Filter messages by search query
   const filteredMessages = messages.filter((m) => {
     if (!searchQuery.trim()) return true;
     return m.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -732,20 +725,107 @@ export default function ChatRoom() {
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: '#111b21', overflow: 'hidden' }}>
-      {/* Left Sidebar (WhatsApp Web Roster & Status Stories Panel) */}
-      <aside
+      
+      {/* 1. Leftmost Navigation Rail (Icon Strip - WhatsApp Web 3-Column Layout) */}
+      <nav
         style={{
-          width: '360px',
+          width: '60px',
           backgroundColor: '#111b21',
           borderRight: '1px solid rgba(134, 150, 160, 0.15)',
-          display: showSidebar ? 'flex' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 0',
+          zIndex: 40,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          {/* WhatsApp Web Logo / Primary Chat Rail Icon */}
+          <button
+            type="button"
+            style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+            title="Chats"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>chat</span>
+          </button>
+
+          {/* Status Stories Ring Rail Icon */}
+          <button
+            type="button"
+            onClick={() => {
+              if (statusUserList.length > 0) setActiveStatusUser(statusUserList[0]);
+              else setShowStatusCreator(true);
+            }}
+            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+            title="Status Stories"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>donut_large</span>
+          </button>
+
+          {/* Channels / Communities Rail Icon */}
+          <button
+            type="button"
+            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+            title="Channels & Space Roster"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>groups</span>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          {/* Add Status Story Button */}
+          <button
+            type="button"
+            onClick={() => setShowStatusCreator(true)}
+            style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px' }}
+            title="Post New Status"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add_circle</span>
+          </button>
+
+          {/* Logged in User Avatar Icon */}
+          <div
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              backgroundColor: '#00a884',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+            }}
+            title={`Logged in as ${nickname}`}
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={nickname} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              nickname.charAt(0).toUpperCase() || 'U'
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* 2. Chats Roster Panel (Middle Column) */}
+      <aside
+        style={{
+          width: '340px',
+          backgroundColor: '#111b21',
+          borderRight: '1px solid rgba(134, 150, 160, 0.15)',
+          display: showRosterPanel ? 'flex' : 'none',
           flexDirection: 'column',
           height: '100%',
           zIndex: 30,
+          flexShrink: 0,
         }}
-        className="wa-sidebar-desktop"
+        className="wa-roster-desktop"
       >
-        {/* Sidebar Header */}
+        {/* Roster Header */}
         <div
           style={{
             height: '60px',
@@ -757,104 +837,135 @@ export default function ChatRoom() {
             borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                backgroundColor: '#00a884',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '1.1rem',
-              }}
-            >
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={nickname} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                nickname.charAt(0).toUpperCase() || 'U'
-              )}
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#e9edef' }}>{nickname}</div>
-              <div style={{ fontSize: '0.75rem', color: '#00a884', fontWeight: 600 }}>Space #{passcode}</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>Chats</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
               onClick={() => setShowStatusCreator(true)}
-              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
-              title="Add Status Story"
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+              title="New Status Story"
             >
-              <span className="material-symbols-outlined">add_circle</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>edit_square</span>
             </button>
             <button
               type="button"
-              onClick={() => setShowSidebar(false)}
-              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              onClick={() => setShowRosterPanel(false)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px' }}
+              className="hidden-desktop"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
         </div>
 
-        {/* Status Stories Row */}
-        <div style={{ padding: '12px 16px', backgroundColor: '#111b21', borderBottom: '1px solid rgba(134, 150, 160, 0.1)' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8696a0', uppercase: 'true', marginBottom: '8px', letterSpacing: '0.5px' }}>
-            STATUS STORIES
-          </div>
-          <div style={{ display: 'flex', itemsCenter: 'center', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {/* My Add Story Pill */}
-            <div
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
-              onClick={() => setShowStatusCreator(true)}
-            >
-              <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#202c33', border: '2px dashed #00a884', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add</span>
-              </div>
-              <span style={{ fontSize: '0.68rem', color: '#8696a0', marginTop: '4px', fontWeight: 600 }}>My Status</span>
-            </div>
-
-            {/* Status Users */}
-            {statusUserList.map((stUser) => (
-              <div
-                key={stUser.nickname}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
-                onClick={() => setActiveStatusUser(stUser)}
-              >
-                <div
-                  className={stUser.hasUnseen ? 'wa-status-ring' : 'wa-status-ring-seen'}
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '50%',
-                    backgroundColor: '#202c33',
-                    color: '#e9edef',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                  }}
-                >
-                  {stUser.nickname.charAt(0).toUpperCase()}
-                </div>
-                <span style={{ fontSize: '0.68rem', color: '#e9edef', marginTop: '4px', maxWidth: '52px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {stUser.nickname}
-                </span>
-              </div>
-            ))}
+        {/* Search Field Box */}
+        <div style={{ padding: '8px 12px', backgroundColor: '#111b21' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Search or start new chat"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '7px 12px 7px 36px',
+                borderRadius: '8px',
+                backgroundColor: '#202c33',
+                border: 'none',
+                color: '#e9edef',
+                fontSize: '0.82rem',
+                outline: 'none',
+              }}
+            />
+            <span className="material-symbols-outlined" style={{ position: 'absolute', left: '10px', color: '#8696a0', fontSize: '18px' }}>
+              search
+            </span>
           </div>
         </div>
 
-        {/* Room Participants Roster List */}
+        {/* WhatsApp Roster Filter Pills */}
+        <div style={{ padding: '4px 12px 10px 12px', display: 'flex', gap: '6px', overflowX: 'auto' }}>
+          <button
+            type="button"
+            className={`wa-filter-pill ${rosterTabFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setRosterTabFilter('all')}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`wa-filter-pill ${rosterTabFilter === 'unread' ? 'active' : ''}`}
+            onClick={() => setRosterTabFilter('unread')}
+          >
+            Unread
+          </button>
+          <button
+            type="button"
+            className={`wa-filter-pill ${rosterTabFilter === 'favorites' ? 'active' : ''}`}
+            onClick={() => setRosterTabFilter('favorites')}
+          >
+            Favorites
+          </button>
+          <button
+            type="button"
+            className={`wa-filter-pill ${rosterTabFilter === 'groups' ? 'active' : ''}`}
+            onClick={() => setRosterTabFilter('groups')}
+          >
+            Groups
+          </button>
+        </div>
+
+        {/* Space Active Chat Item Card */}
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: '#2a3942',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            cursor: 'pointer',
+            borderLeft: '4px solid #00a884',
+          }}
+        >
+          <div
+            style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '50%',
+              backgroundColor: '#00a884',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '1.2rem',
+              flexShrink: 0,
+            }}
+          >
+            #
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.92rem', color: '#e9edef' }}>
+                Nexus Space #{passcode}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: '#00a884', fontWeight: 600 }}>
+                {messages.length > 0 ? formatMessageTime(messages[messages.length - 1].createdAt) : 'now'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#8696a0', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {typingUsers.length > 0
+                ? `${typingUsers.join(', ')} is typing...`
+                : messages.length > 0
+                ? `${messages[messages.length - 1].nickname}: ${messages[messages.length - 1].message}`
+                : 'Click to start real-time chat'}
+            </div>
+          </div>
+        </div>
+
+        {/* Space Participants Roster List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-          <div style={{ padding: '4px 16px 8px 16px', fontSize: '0.75rem', fontWeight: 700, color: '#8696a0' }}>
+          <div style={{ padding: '6px 16px', fontSize: '0.72rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px' }}>
             ONLINE PARTICIPANTS ({users.length})
           </div>
           {users.map((u, idx) => (
@@ -883,6 +994,7 @@ export default function ChatRoom() {
                   fontWeight: 700,
                   fontSize: '1.1rem',
                   position: 'relative',
+                  flexShrink: 0,
                 }}
               >
                 {u.nickname?.charAt(0).toUpperCase() || 'U'}
@@ -900,12 +1012,12 @@ export default function ChatRoom() {
                 />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#e9edef' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#e9edef' }}>
                     {u.nickname} {u.nickname === nickname && '(You)'}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#8696a0', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.74rem', color: '#8696a0', marginTop: '2px' }}>
                   {formatLastSeen(u.lastSeen)}
                 </div>
               </div>
@@ -914,7 +1026,7 @@ export default function ChatRoom() {
         </div>
       </aside>
 
-      {/* Main WhatsApp Chat Container */}
+      {/* 3. Main Chat Panel (Right Workspace Column) */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0b141a', position: 'relative', overflow: 'hidden' }}>
         {/* WhatsApp Top Header Bar */}
         <header
@@ -930,15 +1042,15 @@ export default function ChatRoom() {
             boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
           }}
         >
-          {/* Header Left Info */}
+          {/* Active Space Avatar & Status Subtitle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               type="button"
-              onClick={() => setShowSidebar(!showSidebar)}
-              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
-              title="Toggle Participants Sidebar"
+              onClick={() => setShowRosterPanel(!showRosterPanel)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
+              title="Toggle Roster Panel"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>menu</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
             </button>
 
             <div
@@ -953,27 +1065,38 @@ export default function ChatRoom() {
                 justifyContent: 'center',
                 fontWeight: 700,
                 fontSize: '1.1rem',
+                position: 'relative',
               }}
             >
               #
+              <div
+                style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: '#25d366',
+                  position: 'absolute',
+                  bottom: '1px',
+                  right: '1px',
+                  border: '2px solid #202c33',
+                }}
+              />
             </div>
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1 style={{ fontWeight: 700, fontSize: '1rem', color: '#e9edef', margin: 0 }}>
-                  Nexus Space #{passcode}
-                </h1>
+              <div style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
+                Nexus Space #{passcode}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#8696a0', marginTop: '1px' }}>
+              <div style={{ fontSize: '0.74rem', color: '#8696a0', marginTop: '1px' }}>
                 {typingUsers.length > 0
                   ? `${typingUsers.join(', ')} is typing...`
-                  : `${users.length} participants online`}
+                  : `online • ${users.length} participants`}
               </div>
             </div>
           </div>
 
-          {/* Header Right WhatsApp Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Right Action Icons (Video Call, Audio Call, Search, Clear) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* WhatsApp Video Call Button */}
             <button
               type="button"
@@ -982,10 +1105,10 @@ export default function ChatRoom() {
                 else setShowVideoPanel(!showVideoPanel);
               }}
               style={{
-                backgroundColor: callState === 'active' ? '#25d366' : 'rgba(0, 168, 132, 0.15)',
+                backgroundColor: callState === 'active' ? '#25d366' : 'transparent',
                 color: callState === 'active' ? '#000000' : '#00a884',
                 border: 'none',
-                padding: '6px 14px',
+                padding: '6px 12px',
                 borderRadius: '20px',
                 fontWeight: 700,
                 fontSize: '0.82rem',
@@ -999,29 +1122,36 @@ export default function ChatRoom() {
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                 {callState === 'active' ? 'videocam' : 'video_call'}
               </span>
-              <span className="hidden-mobile">
-                {callState === 'active' ? 'Call Active' : 'Video Call'}
-              </span>
             </button>
 
-            {/* Search Button */}
+            {/* Audio Call Button */}
+            <button
+              type="button"
+              onClick={startCall}
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+              title="Start Voice Call"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>call</span>
+            </button>
+
+            {/* Search Icon Button */}
             <button
               type="button"
               onClick={() => setShowSearch(!showSearch)}
-              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
               title="Search Messages"
             >
-              <span className="material-symbols-outlined">search</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>search</span>
             </button>
 
             {/* Clear History Button */}
             <button
               type="button"
               onClick={() => setShowClearConfirm(true)}
-              style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
               title="Clear Room History"
             >
-              <span className="material-symbols-outlined">delete_sweep</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete_sweep</span>
             </button>
           </div>
         </header>
@@ -1085,207 +1215,199 @@ export default function ChatRoom() {
           </div>
         )}
 
-        {/* Chat Feed Area with WhatsApp Wallpaper Pattern */}
+        {/* Main WhatsApp Chat Feed Wallpaper Area */}
         <div
-          className="wa-chat-wallpaper"
-          style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+          className="wa-doodle-wallpaper"
+          style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}
         >
-          {filteredMessages.length === 0 ? (
-            <div style={{ margin: 'auto', textAlign: 'center', color: '#8696a0', padding: '24px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#00a884', marginBottom: '8px' }}>
-                lock
-              </span>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                Messages are end-to-end encrypted in Space #{passcode}
-              </div>
-              <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>
-                No one outside of this room can read or listen to them.
-              </div>
-            </div>
-          ) : (
-            filteredMessages.map((msg, idx) => {
-              const isMe = msg.nickname === nickname;
-              const showDate =
-                idx === 0 ||
-                formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
+          {/* WhatsApp End-to-End Encryption Security Banner */}
+          <div className="wa-security-banner">
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>lock</span>
+            <span>Messages are end-to-end encrypted in Space #{passcode}. No one outside of this chat can read or listen to them.</span>
+          </div>
 
-              return (
-                <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {/* Date Badge Header */}
-                  {showDate && (
-                    <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px 0' }}>
-                      <div
-                        style={{
-                          backgroundColor: '#182229',
-                          color: '#8696a0',
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          padding: '4px 12px',
-                          borderRadius: '8px',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                        }}
-                      >
-                        {formatDateHeader(msg.createdAt)}
-                      </div>
-                    </div>
-                  )}
+          {filteredMessages.map((msg, idx) => {
+            const isMe = msg.nickname === nickname;
+            const showDate =
+              idx === 0 ||
+              formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
 
-                  {/* Message Bubble Container */}
-                  <div
-                    style={{ display: 'flex', width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}
-                    onTouchStart={(e) => handleTouchStart(e, msg.id)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={() => handleTouchEnd(msg)}
-                  >
+            return (
+              <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {/* Date Header Pill */}
+                {showDate && (
+                  <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px 0' }}>
                     <div
-                      className={`wa-bubble ${isMe ? 'wa-bubble-outgoing' : 'wa-bubble-incoming'} group`}
                       style={{
-                        transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
-                        transition: 'transform 0.1s ease',
+                        backgroundColor: '#182229',
+                        color: '#8696a0',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        padding: '4px 12px',
+                        borderRadius: '8px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
                       }}
                     >
-                      {/* Sender Nickname (for incoming messages) */}
-                      {!isMe && (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px' }}>
-                          {msg.nickname}
-                        </div>
-                      )}
+                      {formatDateHeader(msg.createdAt)}
+                    </div>
+                  </div>
+                )}
 
-                      {/* Reply Quote Block */}
-                      {msg.replyTo && (
-                        <div className="wa-reply-quote">
-                          <span style={{ fontWeight: 700, color: '#00a884' }}>{msg.replyTo.nickname}: </span>
-                          <span style={{ color: '#8696a0' }}>{msg.replyTo.message}</span>
-                        </div>
-                      )}
+                {/* Message Bubble Item */}
+                <div
+                  style={{ display: 'flex', width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}
+                  onTouchStart={(e) => handleTouchStart(e, msg.id)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={() => handleTouchEnd(msg)}
+                >
+                  <div
+                    className={`wa-bubble-box ${isMe ? 'wa-bubble-out' : 'wa-bubble-in'} group`}
+                    style={{
+                      transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
+                      transition: 'transform 0.1s ease',
+                    }}
+                  >
+                    {/* Sender Nickname Header for Incoming Messages */}
+                    {!isMe && (
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px' }}>
+                        {msg.nickname}
+                      </div>
+                    )}
 
-                      {/* Editing Input or Text Content */}
-                      {editingMsgId === msg.id ? (
-                        <form onSubmit={(e) => handleSaveEdit(msg.id, e)} style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                          <input
-                            type="text"
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            style={{
-                              flex: 1,
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: '#111b21',
-                              border: '1px solid #00a884',
-                              color: '#fff',
-                              fontSize: '0.85rem',
-                            }}
-                            autoFocus
+                    {/* Reply Quote Inner Box */}
+                    {msg.replyTo && (
+                      <div className="wa-quote-box">
+                        <span style={{ fontWeight: 700, color: '#00a884' }}>{msg.replyTo.nickname}: </span>
+                        <span style={{ color: '#8696a0' }}>{msg.replyTo.message}</span>
+                      </div>
+                    )}
+
+                    {/* Editing Form or Message Text */}
+                    {editingMsgId === msg.id ? (
+                      <form onSubmit={(e) => handleSaveEdit(msg.id, e)} style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                        <input
+                          type="text"
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          style={{
+                            flex: 1,
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            backgroundColor: '#111b21',
+                            border: '1px solid #00a884',
+                            color: '#fff',
+                            fontSize: '0.85rem',
+                          }}
+                          autoFocus
+                        />
+                        <button type="submit" style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontWeight: 600, fontSize: '0.75rem' }}>
+                          Save
+                        </button>
+                        <button type="button" onClick={cancelEditing} style={{ background: 'none', border: 'none', color: '#8696a0', fontSize: '0.75rem' }}>
+                          Cancel
+                        </button>
+                      </form>
+                    ) : (
+                      <div>
+                        {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
+
+                        {/* Image Attachment Preview */}
+                        {msg.fileUrl && msg.fileType?.startsWith('image/') && (
+                          <img
+                            src={msg.fileUrl}
+                            alt="Attachment"
+                            style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
+                            onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName })}
                           />
-                          <button type="submit" style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontWeight: 600, fontSize: '0.75rem' }}>
-                            Save
-                          </button>
-                          <button type="button" onClick={cancelEditing} style={{ background: 'none', border: 'none', color: '#8696a0', fontSize: '0.75rem' }}>
-                            Cancel
-                          </button>
-                        </form>
-                      ) : (
-                        <div>
-                          {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
+                        )}
 
-                          {/* Image Attachment Preview */}
-                          {msg.fileUrl && msg.fileType?.startsWith('image/') && (
-                            <img
-                              src={msg.fileUrl}
-                              alt="Attachment"
-                              style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
-                              onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName })}
-                            />
-                          )}
+                        {/* YouTube & Instagram Previews */}
+                        {msg.message && <YouTubePreview messageText={msg.message} onCopySuccess={showToast} />}
+                        {msg.message && <InstagramPreview messageText={msg.message} onCopySuccess={showToast} />}
+                      </div>
+                    )}
 
-                          {/* YouTube & Instagram Preview Cards */}
-                          {msg.message && <YouTubePreview messageText={msg.message} onCopySuccess={showToast} />}
-                          {msg.message && <InstagramPreview messageText={msg.message} onCopySuccess={showToast} />}
-                        </div>
+                    {/* Timestamp & Cyan Double Tick */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        gap: '4px',
+                        marginTop: '2px',
+                        float: 'right',
+                        marginLeft: '12px',
+                      }}
+                    >
+                      {msg.isEdited && (
+                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', italic: 'true' }}>edited</span>
                       )}
-
-                      {/* Bubble Timestamp & Read Receipt Double Tick */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'flex-end',
-                          gap: '4px',
-                          marginTop: '2px',
-                          float: 'right',
-                          marginLeft: '12px',
-                        }}
-                      >
-                        {msg.isEdited && (
-                          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', italic: 'true' }}>edited</span>
-                        )}
-                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
-                          {formatMessageTime(msg.createdAt)}
+                      <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
+                        {formatMessageTime(msg.createdAt)}
+                      </span>
+                      {isMe && (
+                        <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#53bdeb' }}>
+                          done_all
                         </span>
-                        {isMe && (
-                          <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#53bdeb' }}>
-                            done_all
-                          </span>
-                        )}
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Quick Hover Actions Menu */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '2px',
-                          right: '6px',
-                          display: 'none',
-                          backgroundColor: '#111b21',
-                          borderRadius: '12px',
-                          padding: '2px 4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                        }}
-                        className="group-hover:flex"
+                    {/* Quick Hover Options Toolbar */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '2px',
+                        right: '6px',
+                        display: 'none',
+                        backgroundColor: '#111b21',
+                        borderRadius: '12px',
+                        padding: '2px 4px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                      }}
+                      className="group-hover:flex"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setReplyingTo(msg)}
+                        style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
+                        title="Reply"
                       >
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>reply</span>
+                      </button>
+                      {isMe && (
                         <button
                           type="button"
-                          onClick={() => setReplyingTo(msg)}
+                          onClick={() => startEditing(msg)}
                           style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                          title="Reply"
+                          title="Edit"
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>reply</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
                         </button>
-                        {isMe && (
-                          <button
-                            type="button"
-                            onClick={() => startEditing(msg)}
-                            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                            title="Edit"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
-                          </button>
-                        )}
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePinMessage(msg)}
+                        style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
+                        title="Pin"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>push_pin</span>
+                      </button>
+                      {isMe && (
                         <button
                           type="button"
-                          onClick={() => handleTogglePinMessage(msg)}
-                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
-                          title="Pin"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '2px 4px' }}
+                          title="Delete"
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>push_pin</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
                         </button>
-                        {isMe && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(msg.id)}
-                            style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '2px 4px' }}
-                            title="Delete"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              );
-            })
-          )}
+              </div>
+            );
+          })}
           <div ref={chatBottomRef} />
         </div>
 
@@ -1323,7 +1445,7 @@ export default function ChatRoom() {
           </div>
         )}
 
-        {/* WhatsApp Bottom Input Bar */}
+        {/* Bottom WhatsApp Input Bar */}
         <form
           onSubmit={handleSendMessage}
           style={{
@@ -1337,7 +1459,7 @@ export default function ChatRoom() {
             zIndex: 20,
           }}
         >
-          {/* File Attachment Trigger */}
+          {/* Attach Paperclip Icon */}
           <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#8696a0' }} title="Attach file or photo">
             <input
               type="file"
@@ -1345,15 +1467,26 @@ export default function ChatRoom() {
               onChange={(e) => handleUploadAttachment(e.target.files?.[0])}
               disabled={isUploadingFile}
             />
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>
-              attach_file
-            </span>
+            {isUploadingFile ? (
+              <span className="material-symbols-outlined animate-spin">refresh</span>
+            ) : (
+              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>attach_file</span>
+            )}
           </label>
+
+          {/* Emoji Icon Button */}
+          <button
+            type="button"
+            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            title="Emoji"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>sentiment_satisfied</span>
+          </button>
 
           {/* Rounded Input Field */}
           <input
             type="text"
-            placeholder="Type a message..."
+            placeholder="Type a message"
             value={inputText}
             onChange={handleInputChange}
             style={{
@@ -1386,6 +1519,7 @@ export default function ChatRoom() {
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
+              flexShrink: 0,
             }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: '2px' }}>
@@ -1395,7 +1529,7 @@ export default function ChatRoom() {
         </form>
       </main>
 
-      {/* WebRTC Video Call Overlay */}
+      {/* WebRTC Video Call Overlay Canvas */}
       {showVideoPanel && (
         <div
           style={{
@@ -1487,7 +1621,7 @@ export default function ChatRoom() {
         </div>
       )}
 
-      {/* Clear Chat Modal */}
+      {/* Clear History Modal */}
       {showClearConfirm && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.85)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div style={{ width: '100%', maxWidth: '380px', backgroundColor: '#111b21', borderRadius: '16px', border: '1px solid rgba(134, 150, 160, 0.2)', padding: '20px', boxShadow: '0 12px 30px rgba(0,0,0,0.8)' }}>
