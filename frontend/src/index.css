@@ -447,6 +447,81 @@ textarea {
   background-color: #202c33;
 }
 
+/* ==========================================================================
+   Themes & Wallpapers System
+   ========================================================================== */
+
+/* 1. WhatsApp Dark Doodle Theme (Default) */
+.theme-wa-doodle {
+  --chat-wallpaper-bg: #0b141a;
+  --chat-wallpaper-img: radial-gradient(rgba(255, 255, 255, 0.04) 1.2px, transparent 0);
+  --chat-header-bg: #202c33;
+  --chat-roster-bg: #111b21;
+  --chat-bubble-in: #202c33;
+  --chat-bubble-out: #005c4b;
+  --chat-accent: #00a884;
+}
+
+/* 2. Cyber Neon Glass Theme */
+.theme-cyber-neon {
+  --chat-wallpaper-bg: #0d0614;
+  --chat-wallpaper-img: linear-gradient(135deg, rgba(121, 40, 202, 0.15), rgba(255, 0, 127, 0.15)), radial-gradient(rgba(0, 223, 216, 0.08) 1.5px, transparent 0);
+  --chat-header-bg: rgba(22, 13, 36, 0.85);
+  --chat-roster-bg: rgba(13, 6, 20, 0.95);
+  --chat-bubble-in: #1f1133;
+  --chat-bubble-out: #4c1d95;
+  --chat-accent: #ff007f;
+}
+
+.theme-cyber-neon .wa-bubble-out {
+  background: linear-gradient(135deg, #6d28d9, #9333ea);
+  box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3);
+}
+
+.theme-cyber-neon .wa-bubble-in {
+  background: #1f1133;
+  border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+/* 3. Midnight Deep Blue Theme */
+.theme-midnight {
+  --chat-wallpaper-bg: #030712;
+  --chat-wallpaper-img: radial-gradient(rgba(59, 130, 246, 0.06) 1.5px, transparent 0);
+  --chat-header-bg: #0f172a;
+  --chat-roster-bg: #0b0f19;
+  --chat-bubble-in: #1e293b;
+  --chat-bubble-out: #1d4ed8;
+  --chat-accent: #3b82f6;
+}
+
+.theme-midnight .wa-bubble-out {
+  background-color: #1d4ed8;
+}
+
+.theme-midnight .wa-bubble-in {
+  background-color: #1e293b;
+}
+
+/* 4. Custom Wallpaper Theme */
+.theme-custom {
+  --chat-wallpaper-bg: #0b141a;
+  --chat-header-bg: rgba(32, 44, 51, 0.88);
+  --chat-roster-bg: rgba(17, 27, 33, 0.92);
+  --chat-bubble-in: rgba(32, 44, 51, 0.9);
+  --chat-bubble-out: rgba(0, 92, 75, 0.9);
+  --chat-accent: #00a884;
+}
+
+/* Floating Particle Element for Anime.js */
+.anime-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  font-size: 1.6rem;
+  user-select: none;
+  will-change: transform, opacity;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

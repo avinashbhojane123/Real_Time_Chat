@@ -8,6 +8,7 @@ import YouTubePreview from '../components/YouTubePreview';
 import InstagramPreview from '../components/InstagramPreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
+import { animate, random } from 'animejs';
 
 function formatMessageTime(dateStr) {
   if (!dateStr) return '';
@@ -220,8 +221,32 @@ export default function ChatRoom() {
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [facingMode, setFacingMode] = useState('user'); // 'user' (front) | 'environment' (back)
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
+  const screenStreamRef = useRef(null);
+
+  // Themes & Wallpapers Feature State
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('chat_theme') || 'wa-doodle');
+  const [customWallpaper, setCustomWallpaper] = useState(() => localStorage.getItem('chat_custom_wallpaper') || '');
+  const [showThemeModal, setShowThemeModal] = useState(false);
+
+  const THEMES = [
+    { key: 'wa-doodle', name: 'WhatsApp Dark', previewColor: '#00a884', icon: 'chat' },
+    { key: 'cyber-neon', name: 'Cyber Neon', previewColor: '#ff007f', icon: 'auto_awesome' },
+    { key: 'midnight', name: 'Midnight Blue', previewColor: '#3b82f6', icon: 'dark_mode' },
+    { key: 'custom', name: 'Custom Wallpaper', previewColor: '#e9edef', icon: 'wallpaper' },
+  ];
+
+  const handleSelectTheme = (themeKey, customUrl = '') => {
+    setCurrentTheme(themeKey);
+    localStorage.setItem('chat_theme', themeKey);
+    if (customUrl) {
+      setCustomWallpaper(customUrl);
+      localStorage.setItem('chat_custom_wallpaper', customUrl);
+    }
+    showToast(`Applied ${THEMES.find((t) => t.key === themeKey)?.name || themeKey} theme`);
+  };
 
   const EMOJI_LIST = [
     '😀', '😂', '😍', '😎', '🙏', '👍', '🔥', '❤️', '🎉', '✨', 
@@ -909,7 +934,10 @@ export default function ChatRoom() {
     }
   };
 
-  const handleReactToMessage = (messageId, emoji) => {
+  const handleReactToMessage = (messageId, emoji, event) => {
+    if (event) {
+      triggerEmojiBurst(emoji, event);
+    }
     socketRef.current?.emit('reactToMessage', {
       passcode,
       messageId,
@@ -917,6 +945,104 @@ export default function ChatRoom() {
     });
     setActiveReactionMsgId(null);
     setShowCustomReactionForMsgId(null);
+  };
+
+  const triggerEmojiBurst = (emoji, event) => {
+    if (!event) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + rect.height / 2;
+
+    const particleCount = 14;
+    const particles = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      const el = document.createElement('div');
+      el.className = 'anime-particle';
+      el.innerText = emoji;
+      el.style.left = `${startX}px`;
+      el.style.top = `${startY}px`;
+      document.body.appendChild(el);
+      particles.push(el);
+    }
+
+    animate(particles, {
+      translateX: () => random(-100, 100),
+      translateY: () => random(-140, -40),
+      scale: () => [random(0.6, 1), random(1.2, 1.8)],
+      rotate: () => random(-45, 45),
+      opacity: [1, 0],
+      duration: () => random(800, 1400),
+      easing: 'easeOutExpo',
+      onComplete: () => {
+        particles.forEach((p) => p.remove());
+      },
+    });
+  };
+
+  const toggleScreenShare = async () => {
+    if (isScreenSharing) {
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+        screenStreamRef.current = null;
+      }
+      setIsScreenSharing(false);
+
+      try {
+        const cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false,
+        });
+        const newTrack = cameraStream.getVideoTracks()[0];
+        if (localStreamRef.current) {
+          const oldTrack = localStreamRef.current.getVideoTracks()[0];
+          if (oldTrack) {
+            localStreamRef.current.removeTrack(oldTrack);
+            oldTrack.stop();
+          }
+          localStreamRef.current.addTrack(newTrack);
+        }
+        if (peerConnectionRef.current) {
+          const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) await sender.replaceTrack(newTrack);
+        }
+        setLocalStream(new MediaStream(localStreamRef.current ? localStreamRef.current.getTracks() : [newTrack]));
+        showToast('Restored camera stream');
+      } catch (err) {
+        console.warn('Error restoring camera:', err);
+      }
+    } else {
+      try {
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        screenStreamRef.current = displayStream;
+        const screenTrack = displayStream.getVideoTracks()[0];
+
+        if (localStreamRef.current) {
+          const oldTrack = localStreamRef.current.getVideoTracks()[0];
+          if (oldTrack) {
+            localStreamRef.current.removeTrack(oldTrack);
+            oldTrack.stop();
+          }
+          localStreamRef.current.addTrack(screenTrack);
+        }
+
+        if (peerConnectionRef.current) {
+          const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) await sender.replaceTrack(screenTrack);
+        }
+
+        setIsScreenSharing(true);
+        setLocalStream(new MediaStream(localStreamRef.current ? localStreamRef.current.getTracks() : [screenTrack]));
+        showToast('Screen sharing started');
+
+        screenTrack.onended = () => {
+          toggleScreenShare();
+        };
+      } catch (err) {
+        console.warn('Could not start screen share:', err);
+        showToast('Screen share cancelled');
+      }
+    }
   };
 
   // Group status updates by user nickname
@@ -1027,13 +1153,13 @@ export default function ChatRoom() {
   });
 
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: '#111b21', overflow: 'hidden' }}>
+    <div className={`theme-${currentTheme}`} style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: 'var(--chat-wallpaper-bg, #111b21)', overflow: 'hidden' }}>
       
       {/* 1. Chats Roster Panel (Left Column) */}
       <aside
         style={{
           width: '320px',
-          backgroundColor: '#111b21',
+          backgroundColor: 'var(--chat-roster-bg, #111b21)',
           borderRight: '1px solid rgba(134, 150, 160, 0.15)',
           display: showRosterPanel ? 'flex' : 'none',
           flexDirection: 'column',
@@ -1046,7 +1172,7 @@ export default function ChatRoom() {
         <div
           style={{
             height: '60px',
-            backgroundColor: '#202c33',
+            backgroundColor: 'var(--chat-header-bg, #202c33)',
             padding: '10px 16px',
             display: 'flex',
             alignItems: 'center',
@@ -1131,7 +1257,7 @@ export default function ChatRoom() {
       </aside>
 
       {/* 2. Main Chat Panel (Right Workspace Column) */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0b141a', position: 'relative', overflow: 'hidden' }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--chat-wallpaper-bg, #0b141a)', backgroundImage: currentTheme === 'custom' && customWallpaper ? `url(${customWallpaper})` : 'var(--chat-wallpaper-img)', backgroundSize: currentTheme === 'custom' ? 'cover' : '24px 24px', backgroundPosition: 'center', position: 'relative', overflow: 'hidden' }}>
         {/* WhatsApp Top Header Bar */}
         <header
           style={{
@@ -1237,6 +1363,16 @@ export default function ChatRoom() {
               title={isRecipientOnline ? 'Start Voice Call' : 'User is offline - Voice call unavailable'}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>call</span>
+            </button>
+
+            {/* Theme Selector Button */}
+            <button
+              type="button"
+              onClick={() => setShowThemeModal(true)}
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+              title="Change Theme & Wallpaper"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>palette</span>
             </button>
 
             {/* Search Icon Button */}
@@ -1616,7 +1752,7 @@ export default function ChatRoom() {
                               key={i}
                               type="button"
                               className="reaction-item-btn"
-                              onClick={() => handleReactToMessage(msg.id, emoji)}
+                              onClick={(e) => handleReactToMessage(msg.id, emoji, e)}
                             >
                               {emoji}
                             </button>
@@ -1673,7 +1809,7 @@ export default function ChatRoom() {
                                 type="button"
                                 className="emoji-btn"
                                 style={{ fontSize: '1.2rem', padding: '4px' }}
-                                onClick={() => handleReactToMessage(msg.id, emoji)}
+                                onClick={(e) => handleReactToMessage(msg.id, emoji, e)}
                               >
                                 {emoji}
                               </button>
@@ -1689,7 +1825,7 @@ export default function ChatRoom() {
                             <span
                               key={emoji}
                               className="reaction-badge"
-                              onClick={() => handleReactToMessage(msg.id, emoji)}
+                              onClick={(e) => handleReactToMessage(msg.id, emoji, e)}
                               title={`Reacted by: ${usersArr.join(', ')}`}
                             >
                               <span>{emoji}</span>
@@ -1978,6 +2114,9 @@ export default function ChatRoom() {
                   <button onClick={flipCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={`Reverse Camera (Front/Back) - Current: ${facingMode === 'user' ? 'Front' : 'Back'}`}>
                     <span className="material-symbols-outlined">cameraswitch</span>
                   </button>
+                  <button onClick={toggleScreenShare} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: isScreenSharing ? '#00a884' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={isScreenSharing ? 'Stop Screen Sharing' : 'Share Screen'}>
+                    <span className="material-symbols-outlined">{isScreenSharing ? 'stop_screen_share' : 'screen_share'}</span>
+                  </button>
                   <button onClick={endCall} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer' }} title="End Call">
                     <span className="material-symbols-outlined">call_end</span>
                   </button>
@@ -2048,6 +2187,68 @@ export default function ChatRoom() {
               <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
               Download
             </a>
+          </div>
+        </div>
+      )}
+
+      {/* Theme Selector Modal */}
+      {showThemeModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.85)', backdropFilter: 'blur(8px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#111b21', borderRadius: '18px', border: '1px solid rgba(134, 150, 160, 0.2)', padding: '24px', boxShadow: '0 16px 40px rgba(0,0,0,0.8)' }} className="animate-fade-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', color: '#e9edef' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1.1rem' }}>
+                <span className="material-symbols-outlined" style={{ color: '#00a884' }}>palette</span>
+                <span>Chat Themes & Wallpapers</span>
+              </div>
+              <button onClick={() => setShowThemeModal(false)} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              {THEMES.map((theme) => (
+                <div
+                  key={theme.key}
+                  onClick={() => handleSelectTheme(theme.key)}
+                  style={{
+                    padding: '14px',
+                    borderRadius: '12px',
+                    backgroundColor: currentTheme === theme.key ? '#202c33' : '#182229',
+                    border: `2px solid ${currentTheme === theme.key ? '#00a884' : 'transparent'}`,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ color: theme.previewColor, fontSize: '28px' }}>{theme.icon}</span>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#e9edef' }}>{theme.name}</span>
+                </div>
+              ))}
+            </div>
+
+            {currentTheme === 'custom' && (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#8696a0', display: 'block', marginBottom: '6px' }}>
+                  Custom Image Wallpaper URL:
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://images.unsplash.com/photo-1518709268805-4e9042af9f23"
+                  value={customWallpaper}
+                  onChange={(e) => handleSelectTheme('custom', e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#2a3942', border: 'none', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowThemeModal(false)} style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', padding: '8px 22px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
