@@ -3,9 +3,9 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../utils/apiConfig';
 
 const GRADIENTS = [
-  'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
+  'linear-gradient(135deg, #0b141a, #005c4b, #00a884)',
   'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
-  'linear-gradient(135deg, #11998e, #38ef7d)',
+  'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
   'linear-gradient(135deg, #fc466b, #3f5efb)',
   'linear-gradient(135deg, #ee0979, #ff6a00)',
   'linear-gradient(135deg, #1f1c2c, #928dab)',
@@ -52,7 +52,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
 
   const handleSubmit = () => {
     if (activeTab === 'text' && !text.trim()) {
-      alert('Please enter text for your status.');
+      alert('Please enter text for your status update.');
       return;
     }
     if ((activeTab === 'image' || activeTab === 'video') && !mediaUrl) {
@@ -64,7 +64,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
       type: activeTab,
       content: text.trim(),
       mediaUrl: mediaUrl || null,
-      bgColor: activeTab === 'text' ? selectedGradient : '#0f0f13',
+      bgColor: activeTab === 'text' ? selectedGradient : '#0b141a',
     });
 
     onClose();
@@ -75,43 +75,45 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: 'rgba(11, 20, 26, 0.92)',
+        backdropFilter: 'blur(10px)',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '16px',
-        backdropFilter: 'blur(8px)',
       }}
     >
       <div
+        className="animate-fade-in"
         style={{
           width: '100%',
           maxWidth: '480px',
-          backgroundColor: '#16161e',
-          borderRadius: '20px',
-          border: '1px solid var(--m3-outline-variant)',
-          boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+          backgroundColor: '#111b21',
+          borderRadius: '16px',
+          border: '1px solid rgba(134, 150, 160, 0.2)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.8)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        {/* Header */}
+        {/* Modal Header */}
         <div
           style={{
             padding: '16px 20px',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            backgroundColor: '#202c33',
+            borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontWeight: 700, fontSize: '1.1rem' }}>
-            <span className="material-symbols-outlined" style={{ color: '#25d366' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#e9edef', fontWeight: 700, fontSize: '1.05rem' }}>
+            <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '24px' }}>
               auto_awesome
             </span>
-            <span>Create Status Update</span>
+            <span>Create Status Story</span>
           </div>
 
           <button
@@ -119,10 +121,13 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#a0a0b0',
+              color: '#8696a0',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '50%',
             }}
             onClick={onClose}
           >
@@ -130,14 +135,14 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
           </button>
         </div>
 
-        {/* Mode Selector Tabs */}
+        {/* Tab Selector */}
         <div
           style={{
             display: 'flex',
-            backgroundColor: 'rgba(0,0,0,0.3)',
+            backgroundColor: '#202c33',
             padding: '4px',
             margin: '16px 20px 0 20px',
-            borderRadius: '12px',
+            borderRadius: '10px',
           }}
         >
           <button
@@ -147,15 +152,16 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
               padding: '8px',
               border: 'none',
               borderRadius: '8px',
-              backgroundColor: activeTab === 'text' ? '#25d366' : 'transparent',
-              color: activeTab === 'text' ? '#000' : '#fff',
+              backgroundColor: activeTab === 'text' ? '#00a884' : 'transparent',
+              color: activeTab === 'text' ? '#ffffff' : '#8696a0',
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               setActiveTab('text');
@@ -175,15 +181,16 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
               padding: '8px',
               border: 'none',
               borderRadius: '8px',
-              backgroundColor: activeTab === 'image' ? '#25d366' : 'transparent',
-              color: activeTab === 'image' ? '#000' : '#fff',
+              backgroundColor: activeTab === 'image' ? '#00a884' : 'transparent',
+              color: activeTab === 'image' ? '#ffffff' : '#8696a0',
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               setActiveTab('image');
@@ -193,7 +200,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
             <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
               image
             </span>
-            Image
+            Photo
           </button>
 
           <button
@@ -203,15 +210,16 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
               padding: '8px',
               border: 'none',
               borderRadius: '8px',
-              backgroundColor: activeTab === 'video' ? '#25d366' : 'transparent',
-              color: activeTab === 'video' ? '#000' : '#fff',
+              backgroundColor: activeTab === 'video' ? '#00a884' : 'transparent',
+              color: activeTab === 'video' ? '#ffffff' : '#8696a0',
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               setActiveTab('video');
@@ -233,18 +241,18 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
               <div
                 style={{
                   height: '180px',
-                  borderRadius: '16px',
+                  borderRadius: '14px',
                   background: selectedGradient,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: '16px',
                   marginBottom: '16px',
-                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
+                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.4)',
                 }}
               >
                 <textarea
-                  placeholder="Type a status update or paste a URL..."
+                  placeholder="Type a status update..."
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   style={{
@@ -258,12 +266,13 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
                     textAlign: 'center',
                     resize: 'none',
                     outline: 'none',
+                    fontFamily: 'inherit',
                   }}
                 />
               </div>
 
-              {/* Gradient Palette */}
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '12px' }}>
+              {/* Gradient Color Selector */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '8px' }}>
                 {GRADIENTS.map((g, idx) => (
                   <button
                     key={idx}
@@ -276,6 +285,7 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
                       border: selectedGradient === g ? '3px solid #ffffff' : '2px solid transparent',
                       cursor: 'pointer',
                       boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                      transition: 'transform 0.15s ease',
                     }}
                     onClick={() => setSelectedGradient(g)}
                   />
@@ -286,55 +296,54 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
 
           {/* Image Mode */}
           {activeTab === 'image' && (
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {mediaUrl ? (
-                <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <div style={{ textAlign: 'center' }}>
                   <img
                     src={mediaUrl}
                     alt="Upload Preview"
                     style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '12px', objectFit: 'contain' }}
                   />
-                  <div style={{ fontSize: '0.75rem', color: '#81c784', marginTop: '6px' }}>
-                    ✓ Image Uploaded ({mediaFileName})
+                  <div style={{ fontSize: '0.75rem', color: '#00a884', marginTop: '6px', fontWeight: 600 }}>
+                    ✓ Photo Uploaded ({mediaFileName})
                   </div>
                 </div>
               ) : (
                 <label
                   style={{
                     height: '140px',
-                    border: '2px dashed rgba(255,255,255,0.2)',
-                    borderRadius: '16px',
+                    border: '2px dashed rgba(134, 150, 160, 0.3)',
+                    borderRadius: '14px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    marginBottom: '16px',
-                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    backgroundColor: '#202c33',
                   }}
                 >
                   <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#25d366' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#00a884' }}>
                     add_photo_alternate
                   </span>
-                  <span style={{ fontSize: '0.85rem', color: '#c7c5d0', marginTop: '8px' }}>
-                    {uploading ? 'Uploading Image...' : 'Click to Upload Image'}
+                  <span style={{ fontSize: '0.85rem', color: '#8696a0', marginTop: '8px', fontWeight: 500 }}>
+                    {uploading ? 'Uploading Photo...' : 'Click to Upload Photo'}
                   </span>
                 </label>
               )}
 
               <input
                 type="text"
-                placeholder="Add a caption or link..."
+                placeholder="Add a caption..."
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '12px 16px',
-                  borderRadius: '12px',
-                  backgroundColor: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: '#fff',
+                  borderRadius: '10px',
+                  backgroundColor: '#2a3942',
+                  border: '1px solid rgba(134, 150, 160, 0.2)',
+                  color: '#e9edef',
                   fontSize: '0.9rem',
                   outline: 'none',
                 }}
@@ -344,15 +353,15 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
 
           {/* Video Mode */}
           {activeTab === 'video' && (
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {mediaUrl ? (
-                <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <div style={{ textAlign: 'center' }}>
                   <video
                     src={mediaUrl}
                     controls
-                    style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '12px', objectFit: 'contain' }}
+                    style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '12px', objectFit: 'contain', backgroundColor: '#000' }}
                   />
-                  <div style={{ fontSize: '0.75rem', color: '#81c784', marginTop: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#00a884', marginTop: '6px', fontWeight: 600 }}>
                     ✓ Video Uploaded ({mediaFileName})
                   </div>
                 </div>
@@ -360,22 +369,21 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
                 <label
                   style={{
                     height: '140px',
-                    border: '2px dashed rgba(255,255,255,0.2)',
-                    borderRadius: '16px',
+                    border: '2px dashed rgba(134, 150, 160, 0.3)',
+                    borderRadius: '14px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    marginBottom: '16px',
-                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    backgroundColor: '#202c33',
                   }}
                 >
                   <input type="file" accept="video/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#ff4e4e' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#00a884' }}>
                     video_call
                   </span>
-                  <span style={{ fontSize: '0.85rem', color: '#c7c5d0', marginTop: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#8696a0', marginTop: '8px', fontWeight: 500 }}>
                     {uploading ? 'Uploading Video...' : 'Click to Upload Video (MP4/WebM)'}
                   </span>
                 </label>
@@ -383,16 +391,16 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
 
               <input
                 type="text"
-                placeholder="Add a caption or link..."
+                placeholder="Add a caption..."
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '12px 16px',
-                  borderRadius: '12px',
-                  backgroundColor: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  color: '#fff',
+                  borderRadius: '10px',
+                  backgroundColor: '#2a3942',
+                  border: '1px solid rgba(134, 150, 160, 0.2)',
+                  color: '#e9edef',
                   fontSize: '0.9rem',
                   outline: 'none',
                 }}
@@ -401,11 +409,12 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
           )}
         </div>
 
-        {/* Footer Actions */}
+        {/* Modal Footer Actions */}
         <div
           style={{
             padding: '16px 20px',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
+            backgroundColor: '#202c33',
+            borderTop: '1px solid rgba(134, 150, 160, 0.15)',
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '12px',
@@ -413,25 +422,41 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
         >
           <button
             type="button"
-            className="m3-btn m3-btn-text"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#8696a0',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              padding: '8px 16px',
+            }}
             onClick={onClose}
-            style={{ color: '#a0a0b0' }}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="m3-btn m3-btn-filled"
             onClick={handleSubmit}
             disabled={uploading}
             style={{
-              backgroundColor: '#25d366',
-              color: '#000',
+              backgroundColor: '#00a884',
+              color: '#ffffff',
               fontWeight: 700,
+              fontSize: '0.9rem',
               borderRadius: '24px',
-              padding: '8px 20px',
+              padding: '10px 24px',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0, 168, 132, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+              send
+            </span>
             Post Status
           </button>
         </div>

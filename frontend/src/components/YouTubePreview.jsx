@@ -50,178 +50,152 @@ export default function YouTubePreview({ messageText, onCopySuccess }) {
 
   if (!ytData) return null;
 
+  const embedUrl = `https://www.youtube.com/embed/${ytData.videoId}`;
+  const thumbnailUrl = `https://img.youtube.com/vi/${ytData.videoId}/hqdefault.jpg`;
 
+  const handleCopyLink = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(ytData.cleanUrl);
+    if (onCopySuccess) onCopySuccess('YouTube link copied!');
+  };
 
   return (
-    <div
-      className="yt-preview-card"
-      style={{
-        marginTop: '10px',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        border: '1px solid rgba(255, 0, 0, 0.25)',
-        backgroundColor: '#0f0f13',
-        maxWidth: '420px',
-        width: '100%',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
-        transition: 'all 0.3s ease',
-      }}
-    >
-
-
-      {/* Embedded Iframe Player or Click-to-Play Thumbnail Cover */}
+    <>
       <div
         style={{
-          position: 'relative',
-          width: '100%',
-          paddingTop: '56.25%',
-          backgroundColor: '#000',
-          cursor: isPlaying ? 'default' : 'pointer',
-        }}
-        onClick={() => {
-          if (!isPlaying) setIsPlaying(true);
+          marginTop: '8px',
+          borderRadius: '10px',
+          overflow: 'hidden',
+          backgroundColor: '#1f2c34',
+          border: '1px solid rgba(134, 150, 160, 0.15)',
+          maxWidth: '380px',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
         }}
       >
-        {/* Floating Pop-Out Lightbox Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsLightboxOpen(true);
-          }}
-          style={{
-            position: 'absolute',
-            top: '12px',
-            left: '12px',
-            padding: '6px 10px',
-            borderRadius: '20px',
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            color: '#fff',
-            fontSize: '0.72rem',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(6px)',
-            zIndex: 10,
-          }}
-          title="Expand in full-screen modal"
-        >
-          <span
-            className="material-symbols-outlined"
-            style={{ fontSize: '15px', color: '#ff6b6b' }}
-          >
-            open_in_full
-          </span>
-          <span>Pop-Out</span>
-        </button>
-
-        {isPlaying ? (
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${ytData.videoId}?autoplay=1&rel=0`}
-            title={meta?.title || 'YouTube Video Player'}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              border: 0,
-            }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        ) : (
-          /* Thumbnail Cover with Big Red Play Overlay */
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              backgroundImage: `url(https://img.youtube.com/vi/${ytData.videoId}/hqdefault.jpg)`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <div
-              style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(255, 0, 0, 0.88)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 20px rgba(255, 0, 0, 0.6)',
-                transition: 'transform 0.2s ease',
-              }}
-            >
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: '36px', color: '#fff', marginLeft: '3px' }}
-              >
-                play_arrow
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Meta Footer */}
-      {(meta?.title || meta?.author_name || loadingMeta) && (
+        {/* WhatsApp Card Header */}
         <div
           style={{
-            padding: '10px 12px',
-            backgroundColor: 'rgba(18, 18, 22, 0.95)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '6px 10px',
+            backgroundColor: '#182229',
+            borderBottom: '1px solid rgba(134, 150, 160, 0.1)',
           }}
         >
-          {meta?.title && (
-            <div
-              style={{
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: '#f0f0f5',
-                lineHeight: '1.3',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                marginBottom: '4px',
-              }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#ff4e4e', fontWeight: 700 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+              play_circle
+            </span>
+            <span>YouTube Video</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              style={{ background: 'none', border: 'none', color: '#8696a0', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+              title="Copy Link"
             >
-              {meta.title}
-            </div>
-          )}
-          {meta?.author_name && (
-            <div style={{ fontSize: '0.72rem', color: '#a0a0b0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#ff4e4e' }}>
-                account_circle
+              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                content_copy
               </span>
-              <span>{meta.author_name}</span>
+              <span>Copy</span>
+            </button>
+            <a
+              href={ytData.cleanUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: '#00a884', fontSize: '0.7rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                open_in_new
+              </span>
+            </a>
+          </div>
+        </div>
+
+        {/* Thumbnail / Embed Viewport */}
+        <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', backgroundColor: '#000' }}>
+          {isPlaying ? (
+            <iframe
+              src={`${embedUrl}?autoplay=1&rel=0`}
+              title={meta?.title || 'YouTube Player'}
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : (
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }} onClick={() => setIsPlaying(true)}>
+              <img
+                src={thumbnailUrl}
+                alt={meta?.title || 'YouTube Thumbnail'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#ff0000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '28px', marginLeft: '2px' }}>
+                    play_arrow
+                  </span>
+                </div>
+              </div>
+
+              {/* Lightbox Pop-Out Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLightboxOpen(true);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="Watch in Lightbox"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                  aspect_ratio
+                </span>
+              </button>
             </div>
           )}
         </div>
-      )}
+
+        {/* Video Info */}
+        {meta && (
+          <div style={{ padding: '8px 10px', backgroundColor: '#1f2c34' }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e9edef', lineHeight: '1.3' }}>
+              {meta.title}
+            </div>
+            {meta.author_name && (
+              <div style={{ fontSize: '0.72rem', color: '#8696a0', marginTop: '2px' }}>
+                {meta.author_name}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Lightbox Modal */}
       <VideoLightboxModal
         isOpen={isLightboxOpen}
         onClose={() => setIsLightboxOpen(false)}
         type="youtube"
-        embedUrl={`https://www.youtube-nocookie.com/embed/${ytData.videoId}`}
-        title={meta?.title || 'YouTube Video'}
+        embedUrl={embedUrl}
         cleanUrl={ytData.cleanUrl}
+        title={meta?.title}
       />
-    </div>
+    </>
   );
 }

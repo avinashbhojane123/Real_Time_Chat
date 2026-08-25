@@ -4,8 +4,8 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 
 import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
-import YouTubePreview, { parseYouTubeUrl } from '../components/YouTubePreview';
-import InstagramPreview, { parseInstagramUrl } from '../components/InstagramPreview';
+import YouTubePreview from '../components/YouTubePreview';
+import InstagramPreview from '../components/InstagramPreview';
 import StatusViewerModal from '../components/StatusViewerModal';
 import StatusCreatorModal from '../components/StatusCreatorModal';
 
@@ -44,24 +44,21 @@ function formatLastSeen(lastSeenDate) {
   const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffSec < 60) {
-    return 'Last seen just now';
+    return 'online';
   }
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) {
-    return `Last seen ${diffMin}m ago`;
+    return `last seen ${diffMin}m ago`;
   }
   const diffHours = Math.floor(diffMin / 60);
   if (diffHours < 24) {
-    return `Last seen ${diffHours}h ago`;
+    return `last seen ${diffHours}h ago`;
   }
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays === 1) {
-    return `Last seen yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return `last seen yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
-  if (diffDays < 7) {
-    return `Last seen ${diffDays}d ago`;
-  }
-  return `Last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+  return `last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
 }
 
 export default function ChatRoom() {
@@ -72,9 +69,8 @@ export default function ChatRoom() {
   const passcode = (sessionStorage.getItem('passcode') || '').trim();
   const avatarUrl = sessionStorage.getItem('avatarUrl') || localStorage.getItem('avatarUrl') || '';
 
-  // Side-by-side Video Panel Toggle State
-  const [showVideoPanel, setShowVideoPanel] = useState(false);
-  const [sideDrawerOpen, setSideDrawerOpen] = useState(false);
+  // Responsive Left Sidebar Toggle State
+  const [showSidebar, setShowSidebar] = useState(false);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -98,18 +94,45 @@ export default function ChatRoom() {
   const [showStatusCreator, setShowStatusCreator] = useState(false);
   const [activeStatusUser, setActiveStatusUser] = useState(null);
 
-  // Reaction Picker & Toast State
-  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+  // Toast & Context Menu State
   const [toastText, setToastText] = useState(null);
 
-  // File Uploading, Drag-and-Drop & Lightbox State
+  // File Uploading & Lightbox State
   const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
 
   // Typing Feature State
   const [typingUsers, setTypingUsers] = useState([]);
   const typingTimeoutRef = useRef(null);
+
+  // Search & Pinned Messages Feature State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [pinnedMessage, setPinnedMessage] = useState(null);
+
+  // Call States & Controls
+  const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
+  const [callerName, setCallerName] = useState('');
+  const [remoteUserName, setRemoteUserName] = useState('');
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [micMuted, setMicMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [showVideoPanel, setShowVideoPanel] = useState(false);
+
+  const socketRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const chatBottomRef = useRef(null);
+  const callStateRef = useRef('idle');
+  const pendingIceCandidatesRef = useRef([]);
+  const callTimerRef = useRef(null);
+  const watchDogTimerRef = useRef(null);
+  const lastInboundBytesRef = useRef(0);
+  const stalledCountRef = useRef(0);
 
   const handleInputChange = (e) => {
     const val = e.target.value;
@@ -134,7 +157,6 @@ export default function ChatRoom() {
       messageId: msgId,
       emoji,
     });
-    setActiveReactionMsgId(null);
   };
 
   const handleCreateStatus = (statusData) => {
@@ -157,8 +179,6 @@ export default function ChatRoom() {
       statusId,
     });
   };
-
-
 
   const startEditing = (msg) => {
     setEditingMsgId(msg.id);
@@ -196,35 +216,13 @@ export default function ChatRoom() {
     setShowClearConfirm(false);
   };
 
-
-
-
-  // Call States & Controls
-  const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
-  const [callerName, setCallerName] = useState('');
-  const [remoteUserName, setRemoteUserName] = useState('');
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-  const [micMuted, setMicMuted] = useState(false);
-  const [cameraOff, setCameraOff] = useState(false);
-  const [isPipMode, setIsPipMode] = useState(false);
-  const [remoteIsPip, setRemoteIsPip] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
-  const [isFullscreenCall, setIsFullscreenCall] = useState(false);
-  const [videoFitMode, setVideoFitMode] = useState('cover');
-
-  const socketRef = useRef(null);
-  const localStreamRef = useRef(null);
-  const peerConnectionRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const localVideoRef = useRef(null);
-  const chatBottomRef = useRef(null);
-  const callStateRef = useRef('idle');
-  const pendingIceCandidatesRef = useRef([]);
-  const callTimerRef = useRef(null);
-  const watchDogTimerRef = useRef(null);
-  const lastInboundBytesRef = useRef(0);
-  const stalledCountRef = useRef(0);
+  const handleTogglePinMessage = (msg) => {
+    if (pinnedMessage && pinnedMessage.id === msg.id) {
+      socketRef.current?.emit('pinMessage', { passcode, messageId: null });
+    } else {
+      socketRef.current?.emit('pinMessage', { passcode, messageId: msg.id });
+    }
+  };
 
   const updateCallState = (state) => {
     setCallState(state);
@@ -262,23 +260,12 @@ export default function ChatRoom() {
     updateCallState('idle');
     setMicMuted(false);
     setCameraOff(false);
-    setIsPipMode(false);
-    setRemoteIsPip(false);
-    setIsFullscreenCall(false);
-    if (typeof document !== 'undefined') {
-      if (document.pictureInPictureElement) {
-        document.exitPictureInPicture().catch(() => { });
-      }
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => { });
-      }
-    }
+    setShowVideoPanel(false);
   }, []);
 
   const triggerIceRestart = useCallback(() => {
     const pc = peerConnectionRef.current;
     if (!pc || pc.signalingState === 'closed') return;
-    console.log('[WebRTC] Connection stalled or degraded. Initiating ICE restart...');
     pc.createOffer({ iceRestart: true })
       .then((offer) => pc.setLocalDescription(offer))
       .then(() => {
@@ -314,7 +301,7 @@ export default function ChatRoom() {
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
-      } catch (e) { }
+      } catch (e) {}
     }
     pendingIceCandidatesRef.current = [];
 
@@ -354,9 +341,7 @@ export default function ChatRoom() {
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC ICE State]:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-        console.warn('[WebRTC] ICE connection state degraded, attempting automatic recovery...');
         triggerIceRestart();
       }
     };
@@ -371,22 +356,30 @@ export default function ChatRoom() {
     return pc;
   }, [passcode, triggerIceRestart]);
 
-  // Video element binding effect
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-      localVideoRef.current.play().catch(() => { });
-    }
-  }, [localStream, callState]);
+  // Video element binding callbacks
+  const localVideoCallback = useCallback(
+    (node) => {
+      localVideoRef.current = node;
+      if (node && localStream) {
+        node.srcObject = localStream;
+        node.play().catch(() => {});
+      }
+    },
+    [localStream]
+  );
 
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play().catch(() => { });
-    }
-  }, [remoteStream, callState]);
+  const remoteVideoCallback = useCallback(
+    (node) => {
+      remoteVideoRef.current = node;
+      if (node && remoteStream) {
+        node.srcObject = remoteStream;
+        node.play().catch(() => {});
+      }
+    },
+    [remoteStream]
+  );
 
-  // Active call duration timer & media stream health watchdog
+  // Active call duration timer & watchdog
   useEffect(() => {
     if (callState === 'active') {
       setCallDuration(0);
@@ -399,311 +392,238 @@ export default function ChatRoom() {
       watchDogTimerRef.current = setInterval(async () => {
         const pc = peerConnectionRef.current;
         if (!pc || pc.connectionState === 'closed') return;
-
         try {
           const stats = await pc.getStats();
-          let currentInboundBytes = 0;
+          let currentBytes = 0;
           stats.forEach((report) => {
-            if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.kind === 'audio')) {
-              currentInboundBytes += report.bytesReceived || 0;
+            if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video')) {
+              currentBytes += report.bytesReceived || 0;
             }
           });
 
-          if (currentInboundBytes > 0 && currentInboundBytes === lastInboundBytesRef.current) {
+          if (currentBytes > 0 && currentBytes === lastInboundBytesRef.current) {
             stalledCountRef.current += 1;
-            console.warn(`[WebRTC Watchdog] Inbound bytes unchanged for ${stalledCountRef.current * 5}s`);
-            if (stalledCountRef.current >= 2) {
+            if (stalledCountRef.current >= 3) {
               stalledCountRef.current = 0;
               triggerIceRestart();
             }
           } else {
             stalledCountRef.current = 0;
-            lastInboundBytesRef.current = currentInboundBytes;
           }
-        } catch (e) {
-          console.warn('[WebRTC Watchdog] Error checking stats:', e);
-        }
-      }, 5000);
+          lastInboundBytesRef.current = currentBytes;
+        } catch (e) {}
+      }, 4000);
     } else {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-        callTimerRef.current = null;
-      }
-      if (watchDogTimerRef.current) {
-        clearInterval(watchDogTimerRef.current);
-        watchDogTimerRef.current = null;
-      }
+      if (callTimerRef.current) clearInterval(callTimerRef.current);
+      if (watchDogTimerRef.current) clearInterval(watchDogTimerRef.current);
     }
+
     return () => {
       if (callTimerRef.current) clearInterval(callTimerRef.current);
       if (watchDogTimerRef.current) clearInterval(watchDogTimerRef.current);
     };
   }, [callState, triggerIceRestart]);
 
-  const formatTimer = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Auto scroll chat
-  useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Socket setup
+  // Auth verification check on mount
   useEffect(() => {
     if (!nickname || !passcode) {
-      navigate('/');
-      return;
+      navigate('/', { replace: true });
     }
+  }, [nickname, passcode, navigate]);
 
-    const socketUrl = getSocketBaseUrl(baseUrl);
+  // Socket Connection setup
+  useEffect(() => {
+    if (!nickname || !passcode) return;
+
+    const socketUrl = getSocketBaseUrl();
     const socket = io(socketUrl, {
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      reconnectionAttempts: 15,
-      reconnectionDelay: 1000,
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 10,
     });
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('joinRoom', { passcode, nickname, avatarUrl });
+      socket.emit('joinRoom', { nickname, passcode });
     });
 
-    if (socket.connected) {
-      socket.emit('joinRoom', { passcode, nickname, avatarUrl });
-    }
+    socket.on('roomHistory', (history) => {
+      setMessages(history || []);
+    });
 
-    socket.on('usersList', (userList) => {
+    socket.on('message', (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+
+    socket.on('roomUsers', (userList) => {
       setUsers(userList || []);
     });
 
-    socket.on('chatHistory', (history) => {
-      setMessages(history || []);
+    socket.on('statusesUpdate', (statusesList) => {
+      setStatuses(statusesList || []);
     });
 
-    socket.on('messageHistory', (history) => {
-      setMessages(history || []);
-    });
-
-    socket.on('newMessage', (msg) => {
-      if (!msg) return;
-      setMessages((prev) => {
-        if (msg.id && prev.some((m) => m.id === msg.id)) {
-          return prev;
-        }
-        return [...prev, msg];
-      });
-    });
-
-    socket.on('userCalling', ({ callerName: cName }) => {
-      setCallerName(cName);
-      setRemoteUserName(cName);
-      updateCallState('incoming');
-      setShowVideoPanel(true);
-    });
-
-    socket.on('callAccepted', ({ receiverName: rName }) => {
-      if (callStateRef.current === 'calling') {
-        setRemoteUserName(rName);
-        updateCallState('active');
-        const pc = createPeerConnection();
-        pc.createOffer()
-          .then((offer) => pc.setLocalDescription(offer))
-          .then(() => socket.emit('webrtcOffer', { passcode, offer: pc.localDescription }))
-          .catch(console.error);
-      }
-    });
-
-    socket.on('callDeclined', () => {
-      setToastText('Call was declined');
-      setTimeout(() => setToastText(''), 3500);
-      cleanUpCall();
-    });
-
-    socket.on('webrtcOfferRelay', ({ offer }) => {
-      if (callStateRef.current === 'active' || callStateRef.current === 'incoming') {
-        updateCallState('active');
-        const pc = peerConnectionRef.current || createPeerConnection();
-        pc.setRemoteDescription(new RTCSessionDescription(offer))
-          .then(() => {
-            processPendingIceCandidates();
-            return pc.createAnswer();
-          })
-          .then((answer) => pc.setLocalDescription(answer))
-          .then(() => socket.emit('webrtcAnswer', { passcode, answer: pc.localDescription }))
-          .catch(console.error);
-      }
-    });
-
-    socket.on('webrtcAnswerRelay', ({ answer }) => {
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current
-          .setRemoteDescription(new RTCSessionDescription(answer))
-          .then(() => {
-            processPendingIceCandidates();
-          })
-          .catch(console.error);
-      }
-    });
-
-    socket.on('webrtcCandidateRelay', ({ candidate }) => {
-      addIceCandidateSafely(candidate);
-    });
-
-    socket.on('callEnded', () => {
-      setToastText('Call ended');
-      setTimeout(() => setToastText(''), 3500);
-      cleanUpCall();
-    });
-
-    socket.on('pipStateChanged', ({ nickname: n, isPip }) => {
-      if (n !== nickname) {
-        setRemoteIsPip(isPip);
-      }
-    });
-
-    socket.on('messageEdited', ({ messageId, newMessage, fileUrl }) => {
+    socket.on('messageEdited', ({ messageId, newMessage, editedAt }) => {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? {
-              ...msg,
-              message: newMessage ?? msg.message,
-              fileUrl: fileUrl !== undefined ? fileUrl : msg.fileUrl,
-              isEdited: true,
-            }
-            : msg
+        prev.map((m) =>
+          m.id === messageId ? { ...m, message: newMessage, editedAt, isEdited: true } : m
         )
       );
     });
 
     socket.on('messageDeleted', ({ messageId }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    });
+
+    socket.on('messageReacted', ({ messageId, reactions }) => {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId
-            ? {
-              ...msg,
-              isDeleted: true,
-              message: 'This message was deleted',
-              fileUrl: null,
-              fileName: null,
-              fileType: null,
-              fileSize: null,
-            }
-            : msg
-        )
+        prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
       );
+    });
+
+    socket.on('messagePinned', ({ messageId }) => {
+      if (!messageId) {
+        setPinnedMessage(null);
+      } else {
+        setMessages((prev) => {
+          const found = prev.find((m) => m.id === messageId);
+          if (found) setPinnedMessage(found);
+          return prev;
+        });
+      }
     });
 
     socket.on('historyCleared', () => {
       setMessages([]);
+      setPinnedMessage(null);
     });
 
-    socket.on('userOffline', ({ nickname: offlineNick, lastSeen }) => {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.nickname === offlineNick
-            ? { ...u, isOnline: false, lastSeen: lastSeen || new Date() }
-            : u
-        )
-      );
-    });
-
-    socket.on('userOnline', ({ nickname: onlineNick }) => {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.nickname === onlineNick
-            ? { ...u, isOnline: true, lastSeen: null }
-            : u
-        )
-      );
-    });
-
-    socket.on('messageReactionsUpdated', ({ messageId, reactions }) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === messageId ? { ...msg, reactions } : msg))
-      );
-    });
-
-    // Typing status listeners
     socket.on('userTyping', ({ nickname: typingNick }) => {
-      if (typingNick && typingNick !== nickname) {
-        setTypingUsers((prev) => Array.from(new Set([...prev, typingNick])));
+      setTypingUsers((prev) => {
+        if (!prev.includes(typingNick)) return [...prev, typingNick];
+        return prev;
+      });
+    });
+
+    socket.on('userStopTyping', ({ nickname: stopNick }) => {
+      setTypingUsers((prev) => prev.filter((n) => n !== stopNick));
+    });
+
+    // WebRTC Signaling Handlers
+    socket.on('webrtcOffer', async ({ from, offer }) => {
+      setShowVideoPanel(true);
+      if (callStateRef.current === 'active' || callStateRef.current === 'calling') {
+        const pc = createPeerConnection();
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        processPendingIceCandidates();
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('webrtcAnswer', { passcode, answer });
+        return;
+      }
+
+      setCallerName(from);
+      updateCallState('incoming');
+      window.latestOffer = offer;
+    });
+
+    socket.on('webrtcAnswer', async ({ answer }) => {
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        processPendingIceCandidates();
+        updateCallState('active');
       }
     });
 
-    socket.on('userStoppedTyping', ({ nickname: typingNick }) => {
-      setTypingUsers((prev) => prev.filter((n) => n !== typingNick));
-    });
-
-    // Request initial statuses
-    socket.emit('getStatuses', { passcode }, (statusList) => {
-      if (Array.isArray(statusList)) {
-        setStatuses(statusList);
+    socket.on('webrtcCandidate', async ({ candidate }) => {
+      if (candidate) {
+        addIceCandidateSafely(candidate);
       }
     });
 
-    socket.on('statusesList', (statusList) => {
-      if (Array.isArray(statusList)) {
-        setStatuses(statusList);
-      }
-    });
-
-    socket.on('statusCreated', (newStatus) => {
-      if (!newStatus) return;
-      setStatuses((prev) => [...prev.filter((s) => s.id !== newStatus.id), newStatus]);
-    });
-
-    socket.on('statusViewed', ({ statusId, viewers }) => {
-      setStatuses((prev) =>
-        prev.map((s) => (s.id === statusId ? { ...s, viewers } : s))
-      );
-    });
-
-    socket.on('statusDeleted', ({ statusId }) => {
-      setStatuses((prev) => prev.filter((s) => s.id !== statusId));
-    });
-
-    socket.on('exception', (err) => {
-      console.warn('Socket exception:', err);
+    socket.on('callEnded', () => {
+      cleanUpCall();
     });
 
     return () => {
       socket.disconnect();
       cleanUpCall();
     };
-  }, [baseUrl, nickname, passcode, avatarUrl, navigate, cleanUpCall, createPeerConnection]);
+  }, [nickname, passcode, createPeerConnection, cleanUpCall, addIceCandidateSafely, processPendingIceCandidates]);
 
-  // Video refs
-  const localVideoCallback = useCallback((el) => {
-    if (el && localStream) el.srcObject = localStream;
-  }, [localStream]);
+  // Auto scroll chat to bottom
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, typingUsers]);
 
-  const remoteVideoCallback = useCallback((el) => {
-    remoteVideoRef.current = el;
-    if (el && remoteStream) el.srcObject = remoteStream;
-  }, [remoteStream]);
+  // Send Message Handler
+  const handleSendMessage = (e) => {
+    if (e) e.preventDefault();
+    if (!inputText.trim()) return;
 
-  // Call Handlers
-  const startCall = async () => {
-    const target = users.find((u) => u.nickname !== nickname) || users[0];
-    if (!target) {
-      alert('No other users in room');
-      return;
+    socketRef.current?.emit('sendMessage', {
+      passcode,
+      message: inputText.trim(),
+      replyTo: replyingTo
+        ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
+        : null,
+    });
+
+    setInputText('');
+    setReplyingTo(null);
+  };
+
+  // Upload Attachment Handler
+  const handleUploadAttachment = async (file) => {
+    if (!file) return;
+    setIsUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const cleanApiUrl = baseUrl.replace(/\/+$/, '');
+      const res = await axios.post(`${cleanApiUrl}/upload`, formData);
+
+      if (res.data && res.data.fileUrl) {
+        const fullUrl = res.data.fileUrl.startsWith('http')
+          ? res.data.fileUrl
+          : `${cleanApiUrl.replace(/\/api\/?$/, '')}${res.data.fileUrl}`;
+
+        socketRef.current?.emit('sendMessage', {
+          passcode,
+          message: file.type.startsWith('image/') ? '📷 Photo' : `📎 ${file.name}`,
+          fileUrl: fullUrl,
+          fileType: file.type,
+          fileName: file.name,
+          replyTo: replyingTo
+            ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
+            : null,
+        });
+        setReplyingTo(null);
+      }
+    } catch (err) {
+      alert('Upload failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setIsUploadingFile(false);
     }
-    setRemoteUserName(target.nickname);
-    updateCallState('calling');
-    setShowVideoPanel(true);
+  };
 
+  // WebRTC Call Actions
+  const startCall = async () => {
+    setShowVideoPanel(true);
+    updateCallState('calling');
+    setRemoteUserName('Space Members');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setLocalStream(stream);
       localStreamRef.current = stream;
-      socketRef.current?.emit('callUser', { passcode, callerName: nickname });
-    } catch {
-      alert('Camera & microphone permissions required');
+      setLocalStream(stream);
+
+      const pc = createPeerConnection();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      socketRef.current?.emit('webrtcOffer', { passcode, offer });
+    } catch (err) {
+      alert('Could not access camera/microphone: ' + err.message);
       cleanUpCall();
     }
   };
@@ -712,1520 +632,877 @@ export default function ChatRoom() {
     updateCallState('active');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setLocalStream(stream);
       localStreamRef.current = stream;
-      socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
-    } catch {
-      alert('Camera & microphone permissions required');
-      socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
+      setLocalStream(stream);
+
+      const pc = createPeerConnection();
+      if (window.latestOffer) {
+        await pc.setRemoteDescription(new RTCSessionDescription(window.latestOffer));
+        processPendingIceCandidates();
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socketRef.current?.emit('webrtcAnswer', { passcode, answer });
+      }
+    } catch (err) {
+      alert('Could not access media devices: ' + err.message);
       cleanUpCall();
     }
   };
 
   const declineCall = () => {
-    socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
+    socketRef.current?.emit('callEnded', { passcode });
     cleanUpCall();
   };
 
   const endCall = () => {
-    socketRef.current?.emit('endCall', { passcode });
+    socketRef.current?.emit('callEnded', { passcode });
     cleanUpCall();
   };
 
   const toggleMic = () => {
-    const track = localStreamRef.current?.getAudioTracks()[0];
-    if (track) {
-      track.enabled = !track.enabled;
-      setMicMuted(!track.enabled);
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setMicMuted(!audioTrack.enabled);
+      }
     }
   };
 
   const toggleCamera = () => {
-    const track = localStreamRef.current?.getVideoTracks()[0];
-    if (track) {
-      track.enabled = !track.enabled;
-      setCameraOff(!track.enabled);
-    }
-  };
-
-  const togglePipMode = async () => {
-    const nextPip = !isPipMode;
-    if (nextPip && isFullscreenCall) {
-      setIsFullscreenCall(false);
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setCameraOff(!videoTrack.enabled);
       }
     }
-    setIsPipMode(nextPip);
-    socketRef.current?.emit('togglePip', { passcode, isPip: nextPip });
-
-    try {
-      if (nextPip) {
-        if (
-          document.pictureInPictureEnabled &&
-          remoteVideoRef.current &&
-          remoteVideoRef.current.readyState >= 1 &&
-          document.pictureInPictureElement !== remoteVideoRef.current
-        ) {
-          await remoteVideoRef.current.requestPictureInPicture();
-        }
-      } else {
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        }
-      }
-    } catch (err) {
-      console.log('Native PiP fallback to floating layout', err);
-    }
   };
 
-  const toggleFullscreenCall = useCallback(async () => {
-    const nextFs = !isFullscreenCall;
-    setIsFullscreenCall(nextFs);
-    if (nextFs) {
-      setIsPipMode(false);
-      setShowVideoPanel(true);
-      try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-    } else {
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen().catch(() => {});
-        }
-      } catch (e) {}
-    }
-  }, [isFullscreenCall]);
-
-  const toggleVideoFit = () => {
-    setVideoFitMode((prev) => (prev === 'cover' ? 'contain' : 'cover'));
+  const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreenCall(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
+  // Group status updates by user nickname
+  const groupedStatuses = statuses.reduce((acc, st) => {
+    if (!acc[st.nickname]) {
+      acc[st.nickname] = [];
+    }
+    acc[st.nickname].push(st);
+    return acc;
+  }, {});
 
-  // Drag Gesture Handlers
-  const handleTouchStart = (msg, e) => {
+  const statusUserList = Object.keys(groupedStatuses).map((nick) => ({
+    nickname: nick,
+    statuses: groupedStatuses[nick],
+    hasUnseen: groupedStatuses[nick].some((s) => !s.viewers?.includes(nickname)),
+  }));
+
+  // Touch Swipe for Reply Gesture
+  const handleTouchStart = (e, msgId) => {
     touchStartXRef.current = e.touches[0].clientX;
-    setActiveDragId(msg.id || msg.createdAt);
-    setDragTranslateX(0);
+    setActiveDragId(msgId);
   };
 
   const handleTouchMove = (e) => {
     if (!activeDragId) return;
-    const deltaX = e.touches[0].clientX - touchStartXRef.current;
-    if (deltaX > 0 && deltaX < 140) {
-      setDragTranslateX(deltaX);
+    const currentX = e.touches[0].clientX;
+    const diffX = currentX - touchStartXRef.current;
+    if (diffX > 0 && diffX < 100) {
+      setDragTranslateX(diffX);
     }
   };
 
   const handleTouchEnd = (msg) => {
-    if (dragTranslateX > 40) {
-      setReplyingTo({ id: msg.id, nickname: msg.nickname, message: msg.message });
+    if (dragTranslateX > 50 && msg) {
+      setReplyingTo(msg);
     }
     setActiveDragId(null);
     setDragTranslateX(0);
   };
 
-  const handleMouseDown = (msg, e) => {
-    touchStartXRef.current = e.clientX;
-    setActiveDragId(msg.id || msg.createdAt);
-    setDragTranslateX(0);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!activeDragId) return;
-    const deltaX = e.clientX - touchStartXRef.current;
-    if (deltaX > 0 && deltaX < 140) {
-      setDragTranslateX(deltaX);
-    }
-  };
-
-  const handleMouseUp = (msg) => {
-    if (dragTranslateX > 40) {
-      setReplyingTo({ id: msg.id, nickname: msg.nickname, message: msg.message });
-    }
-    setActiveDragId(null);
-    setDragTranslateX(0);
-  };
-
-  // Messaging & File Upload
-  const sendMessage = (e) => {
-    e.preventDefault();
-    const msgText = inputText.trim();
-    if (!msgText) return;
-    setInputText('');
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    socketRef.current?.emit('stopTyping', { passcode });
-
-    socketRef.current?.emit('sendMessage', {
-      passcode,
-      nickname,
-      message: msgText,
-      replyTo: replyingTo
-        ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
-        : null,
-    });
-    setReplyingTo(null);
-  };
-
-  const uploadAndSendFile = async (file) => {
-    if (!file) return;
-    setIsUploadingFile(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const cleanApiUrl = baseUrl.replace(/\/+$/, '');
-      const res = await axios.post(`${cleanApiUrl}/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      if (res.data && res.data.fileUrl) {
-        socketRef.current?.emit('sendMessage', {
-          passcode,
-          nickname,
-          message: `[File Attachment] ${res.data.fileName || file.name}`,
-          fileUrl: res.data.fileUrl,
-          fileName: res.data.fileName || file.name,
-          fileType: res.data.fileType || file.type,
-          fileSize: res.data.fileSize || file.size,
-          replyTo: replyingTo
-            ? { id: replyingTo.id, nickname: replyingTo.nickname, message: replyingTo.message }
-            : null,
-        });
-        setReplyingTo(null);
-        showToast(`Uploaded "${res.data.fileName || file.name}"`);
-      }
-    } catch (err) {
-      console.error('File upload error', err);
-      alert('File upload failed: ' + (err.response?.data?.message || err.message));
-    } finally {
-      setIsUploadingFile(false);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadAndSendFile(file);
-    e.target.value = '';
-  };
-
-  const handleInputPaste = async (e) => {
-    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
-      const file = e.clipboardData.files[0];
-      if (file) {
-        e.preventDefault();
-        await uploadAndSendFile(file);
-      }
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDraggingFile) setIsDraggingFile(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.currentTarget.contains(e.relatedTarget)) return;
-    setIsDraggingFile(false);
-  };
-
-  const handleDrop = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingFile(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      await uploadAndSendFile(file);
-    }
-  };
-
-
+  // Filter messages
+  const filteredMessages = messages.filter((m) => {
+    if (!searchQuery.trim()) return true;
+    return m.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.nickname?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
-    <div className="m3-app-container">
-      {/* Floating Top Incoming Call Banner */}
-      {callState === 'incoming' && (
-        <div className="m3-incoming-call-banner">
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--m3-tertiary-container)',
-              color: 'var(--m3-tertiary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '1.1rem',
-              border: '2px solid var(--m3-tertiary)',
-            }}
-          >
-            {(callerName || 'U').slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>
-              {callerName || 'Someone'} is calling...
-            </h4>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)' }}>
-              Incoming Video Call
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginLeft: '12px' }}>
-            <button
-              type="button"
-              className="m3-btn m3-btn-filled pulse-accept-btn"
-              style={{ backgroundColor: '#81c784', color: '#000', padding: '8px 18px' }}
-              onClick={acceptCall}
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: '#111b21', overflow: 'hidden' }}>
+      {/* Left Sidebar (WhatsApp Web Roster & Status Stories Panel) */}
+      <aside
+        style={{
+          width: '360px',
+          backgroundColor: '#111b21',
+          borderRight: '1px solid rgba(134, 150, 160, 0.15)',
+          display: showSidebar ? 'flex' : 'none',
+          flexDirection: 'column',
+          height: '100%',
+          zIndex: 30,
+        }}
+        className="wa-sidebar-desktop"
+      >
+        {/* Sidebar Header */}
+        <div
+          style={{
+            height: '60px',
+            backgroundColor: '#202c33',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: '#00a884',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '1.1rem',
+              }}
             >
-              <span className="material-symbols-outlined">call</span>
-              Accept
-            </button>
-            <button
-              type="button"
-              className="m3-btn m3-btn-danger"
-              style={{ padding: '8px 18px' }}
-              onClick={declineCall}
-            >
-              <span className="material-symbols-outlined">call_end</span>
-              Decline
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* M3 Top App Bar */}
-      <header className="m3-top-app-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            className="m3-btn m3-btn-icon m3-btn-outlined"
-            onClick={() => setSideDrawerOpen(!sideDrawerOpen)}
-            title="Toggle Members Side Sheet"
-          >
-            <span className="material-symbols-outlined">menu</span>
-          </button>
-          <div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>
-              Space #{passcode}
-            </h2>
-            <p style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)' }}>
-              Signed in as <strong>{nickname}</strong>
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            className="m3-btn m3-btn-tonal"
-            onClick={() => setShowClearConfirm(true)}
-            title="Clear All Messages in Space"
-          >
-            <span className="material-symbols-outlined" style={{ color: 'var(--m3-error)' }}>delete_sweep</span>
-            <span className="m3-btn-label" style={{ color: 'var(--m3-error)' }}>Clear Chat</span>
-          </button>
-          <button
-            className={`m3-btn ${showVideoPanel || callState !== 'idle' ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
-            onClick={() => setShowVideoPanel((prev) => !prev)}
-            title="Toggle Side-by-Side Video Call Panel"
-          >
-            <span className="material-symbols-outlined">videocam</span>
-            <span className="m3-btn-label">{showVideoPanel || callState !== 'idle' ? 'Hide Video' : 'Video Call'}</span>
-          </button>
-          <button
-            className="m3-btn m3-btn-tonal"
-            onClick={() => {
-              sessionStorage.clear();
-              localStorage.removeItem('passcode');
-              localStorage.removeItem('nickname');
-              navigate('/', { replace: true });
-            }}
-          >
-            <span className="material-symbols-outlined">logout</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <div className="m3-content-layout">
-        {/* M3 Side Sheet Drawer (Members List & Status Updates) */}
-        <aside className={`m3-side-sheet ${sideDrawerOpen ? 'open' : ''}`}>
-          {/* Status Updates Bar (WhatsApp Style) */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--m3-outline-variant)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--m3-primary)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#25d366' }}>auto_awesome</span>
-                Status Updates
-              </h3>
-              <button
-                type="button"
-                className="m3-btn m3-btn-icon"
-                onClick={() => setShowStatusCreator(true)}
-                title="Create Status"
-                style={{ width: '32px', height: '32px', minWidth: 0, padding: 0 }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#25d366' }}>add_circle</span>
-              </button>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={nickname} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                nickname.charAt(0).toUpperCase() || 'U'
+              )}
             </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#e9edef' }}>{nickname}</div>
+              <div style={{ fontSize: '0.75rem', color: '#00a884', fontWeight: 600 }}>Space #{passcode}</div>
+            </div>
+          </div>
 
-            {/* Status Avatar Strip */}
-            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-              {/* My Status */}
-              <div
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
-                onClick={() => {
-                  const mySts = statuses.filter((s) => s.nickname === nickname);
-                  if (mySts.length > 0) {
-                    setActiveStatusUser({ nickname, statuses: mySts });
-                  } else {
-                    setShowStatusCreator(true);
-                  }
-                }}
-              >
-                <div style={{ position: 'relative' }}>
-                  <div
-                    style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--m3-secondary-container)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      border: statuses.some((s) => s.nickname === nickname) ? '2.5px solid #25d366' : '2px solid rgba(255,255,255,0.2)',
-                    }}
-                  >
-                    {nickname.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '-2px',
-                      right: '-2px',
-                      backgroundColor: '#25d366',
-                      color: '#000',
-                      borderRadius: '50%',
-                      width: '18px',
-                      height: '18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '2px solid #16161e',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    +
-                  </div>
-                </div>
-                <span style={{ fontSize: '0.7rem', color: '#c7c5d0', marginTop: '4px', maxWidth: '50px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  My Status
-                </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setShowStatusCreator(true)}
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="Add Status Story"
+            >
+              <span className="material-symbols-outlined">add_circle</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSidebar(false)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Stories Row */}
+        <div style={{ padding: '12px 16px', backgroundColor: '#111b21', borderBottom: '1px solid rgba(134, 150, 160, 0.1)' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8696a0', uppercase: 'true', marginBottom: '8px', letterSpacing: '0.5px' }}>
+            STATUS STORIES
+          </div>
+          <div style={{ display: 'flex', itemsCenter: 'center', gap: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {/* My Add Story Pill */}
+            <div
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+              onClick={() => setShowStatusCreator(true)}
+            >
+              <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#202c33', border: '2px dashed #00a884', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add</span>
               </div>
-
-              {/* Other Members Statuses */}
-              {users
-                .filter((u) => u.nickname !== nickname)
-                .map((u) => {
-                  const userStatuses = statuses.filter((s) => s.nickname === u.nickname);
-                  if (userStatuses.length === 0) return null;
-                  const hasUnviewed = userStatuses.some(
-                    (s) => !s.viewers || !s.viewers.includes(nickname)
-                  );
-                  return (
-                    <div
-                      key={u.id || u.nickname}
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
-                      onClick={() => setActiveStatusUser({ nickname: u.nickname, statuses: userStatuses })}
-                    >
-                      <div
-                        style={{
-                          width: '44px',
-                          height: '44px',
-                          borderRadius: '50%',
-                          backgroundColor: 'var(--m3-secondary-container)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: '1rem',
-                          border: hasUnviewed ? '3px solid #25d366' : '2px solid rgba(255,255,255,0.2)',
-                          boxShadow: hasUnviewed ? '0 0 8px rgba(37, 211, 102, 0.5)' : 'none',
-                        }}
-                      >
-                        {u.nickname.slice(0, 2).toUpperCase()}
-                      </div>
-                      <span style={{ fontSize: '0.7rem', color: '#c7c5d0', marginTop: '4px', maxWidth: '54px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {u.nickname}
-                      </span>
-                    </div>
-                  );
-                })}
+              <span style={{ fontSize: '0.68rem', color: '#8696a0', marginTop: '4px', fontWeight: 600 }}>My Status</span>
             </div>
-          </div>
 
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--m3-outline-variant)' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--m3-primary)' }}>
-              Active Space Members ({users.length})
-            </h3>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-            {users.map((u) => (
+            {/* Status Users */}
+            {statusUserList.map((stUser) => (
               <div
-                key={u.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '10px 14px',
-                  borderRadius: 'var(--m3-radius-m)',
-                  backgroundColor: u.nickname === nickname ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
-                  marginBottom: '8px',
-                }}
+                key={stUser.nickname}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+                onClick={() => setActiveStatusUser(stUser)}
               >
                 <div
+                  className={stUser.hasUnseen ? 'wa-status-ring' : 'wa-status-ring-seen'}
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--m3-radius-full)',
-                    backgroundColor: 'var(--m3-secondary-container)',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: '#202c33',
+                    color: '#e9edef',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 700,
-                    fontSize: '0.875rem',
+                    fontSize: '1rem',
                   }}
                 >
-                  {u.nickname.slice(0, 2).toUpperCase()}
+                  {stUser.nickname.charAt(0).toUpperCase()}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {u.nickname} {u.nickname === nickname ? '(You)' : ''}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: u.isOnline ? '#81c784' : 'var(--m3-outline)' }}>
-                    {u.isOnline ? 'Active Now' : formatLastSeen(u.lastSeen)}
-                  </div>
-                </div>
+                <span style={{ fontSize: '0.68rem', color: '#e9edef', marginTop: '4px', maxWidth: '52px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {stUser.nickname}
+                </span>
               </div>
             ))}
           </div>
-        </aside>
+        </div>
 
-        {/* Dynamic View Sections based on Active Tab */}
-        {/* Main Side-by-Side Workspace */}
-        <main className="m3-main-chat" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          <div
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: '280px', position: 'relative' }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {/* Drag and Drop File Upload Overlay */}
-            {isDraggingFile && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundColor: 'rgba(37, 211, 102, 0.25)',
-                  backdropFilter: 'blur(6px)',
-                  border: '3px dashed #25d366',
-                  borderRadius: '16px',
-                  zIndex: 9999,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  pointerEvents: 'none',
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '56px', color: '#25d366' }}>
-                  cloud_upload
-                </span>
-                <h3 style={{ margin: '12px 0 4px 0', fontSize: '1.3rem', fontWeight: 700 }}>Drop File to Upload</h3>
-                <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>Release file to send to space</p>
-              </div>
-            )}
-            {/* Always Visible Top WhatsApp Status Header Bar */}
+        {/* Room Participants Roster List */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+          <div style={{ padding: '4px 16px 8px 16px', fontSize: '0.75rem', fontWeight: 700, color: '#8696a0' }}>
+            ONLINE PARTICIPANTS ({users.length})
+          </div>
+          {users.map((u, idx) => (
             <div
+              key={idx}
               style={{
-                padding: '10px 16px',
-                backgroundColor: 'var(--m3-surface-container-lowest)',
-                borderBottom: '1px solid var(--m3-outline-variant)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                overflowX: 'auto',
+                padding: '10px 16px',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
               }}
+              className="hover:bg-[#202c33]"
             >
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#25d366', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span>
-                Status:
-              </div>
-
-              {/* My Status Item */}
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0, padding: '2px 8px', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.05)' }}
-                onClick={() => {
-                  const mySts = statuses.filter((s) => s.nickname === nickname);
-                  if (mySts.length > 0) {
-                    setActiveStatusUser({ nickname, statuses: mySts });
-                  } else {
-                    setShowStatusCreator(true);
-                  }
-                }}
-              >
-                <div style={{ position: 'relative' }}>
-                  <div
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--m3-secondary-container)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      border: statuses.some((s) => s.nickname === nickname) ? '2.5px solid #25d366' : '1.5px solid rgba(255,255,255,0.2)',
-                    }}
-                  >
-                    {nickname.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '-2px',
-                      right: '-2px',
-                      backgroundColor: '#25d366',
-                      color: '#000',
-                      borderRadius: '50%',
-                      width: '14px',
-                      height: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    +
-                  </div>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 600 }}>My Status</span>
-              </div>
-
-              {/* Other Members Status Items */}
-              {Array.from(new Set(statuses.map((s) => s.nickname)))
-                .filter((n) => n !== nickname)
-                .map((userNick) => {
-                  const userStatuses = statuses.filter((s) => s.nickname === userNick);
-                  if (userStatuses.length === 0) return null;
-                  const hasUnviewed = userStatuses.some((s) => !s.viewers || !s.viewers.includes(nickname));
-
-                  return (
-                    <div
-                      key={userNick}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flexShrink: 0, padding: '2px 8px', borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.05)' }}
-                      onClick={() => setActiveStatusUser({ nickname: userNick, statuses: userStatuses })}
-                    >
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: 'var(--m3-secondary-container)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          border: hasUnviewed ? '2.5px solid #25d366' : '1.5px solid rgba(255,255,255,0.2)',
-                          boxShadow: hasUnviewed ? '0 0 6px rgba(37, 211, 102, 0.5)' : 'none',
-                        }}
-                      >
-                        {userNick.slice(0, 2).toUpperCase()}
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: hasUnviewed ? '#25d366' : '#c7c5d0', fontWeight: hasUnviewed ? 700 : 500 }}>
-                        {userNick}
-                      </span>
-                    </div>
-                  );
-                })}
-
-              <button
-                type="button"
-                className="m3-btn m3-btn-outlined"
-                style={{ padding: '2px 10px', fontSize: '0.72rem', borderRadius: '14px', marginLeft: 'auto', flexShrink: 0, borderColor: '#25d366', color: '#25d366' }}
-                onClick={() => setShowStatusCreator(true)}
-              >
-                + Add Status
-              </button>
-            </div>
-
-            {/* Chat Messages Area */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {messages.length === 0 && (
-                <div style={{ textAlign: 'center', color: 'var(--m3-on-surface-variant)', padding: '40px 20px' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '48px', opacity: 0.5 }}>forum</span>
-                  <p style={{ marginTop: '8px' }}>No messages in this space yet. Drag a message to reply!</p>
-                </div>
-              )}
-
-              {(() => {
-                let lastDateHeader = '';
-                return messages.map((m, idx) => {
-                  const isSelf = m.nickname === nickname;
-                  const msgId = m.id || idx;
-                  const isDragging = activeDragId === msgId;
-                  const currentTranslate = isDragging ? dragTranslateX : 0;
-                  const ytData = parseYouTubeUrl(m.message);
-                  const igData = parseInstagramUrl(m.message);
-                  const currentDateHeader = formatDateHeader(m.createdAt);
-                  let renderDateHeader = false;
-                  if (currentDateHeader && currentDateHeader !== lastDateHeader) {
-                    renderDateHeader = true;
-                    lastDateHeader = currentDateHeader;
-                  }
-
-                  return (
-                    <div key={msgId} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                      {/* Date Separator Badge */}
-                      {renderDateHeader && (
-                        <div
-                          style={{
-                            alignSelf: 'center',
-                            margin: '16px 0 8px 0',
-                            padding: '4px 14px',
-                            borderRadius: '16px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                            color: 'var(--m3-on-surface-variant)',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            letterSpacing: '0.5px',
-                            border: '1px solid rgba(255, 255, 255, 0.06)',
-                          }}
-                        >
-                          {currentDateHeader}
-                        </div>
-                      )}
-
-                      <div
-                        style={{
-                          alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                          maxWidth: '85%',
-                          position: 'relative',
-                          transform: `translateX(${currentTranslate}px)`,
-                          transition: isDragging ? 'none' : 'transform 0.2s ease',
-                          userSelect: 'none',
-                          cursor: 'grab',
-                        }}
-                        onTouchStart={(e) => handleTouchStart(m, e)}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={() => handleTouchEnd(m)}
-                        onMouseDown={(e) => handleMouseDown(m, e)}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={() => handleMouseUp(m)}
-                      >
-                        {/* Drag to Reply Indicator Icon */}
-                        {currentTranslate > 20 && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: '-32px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              color: 'var(--m3-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <span className="material-symbols-outlined">reply</span>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px', paddingLeft: '4px' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--m3-on-surface-variant)', fontWeight: 600 }}>
-                            {m.nickname}
-                          </span>
-
-                          {!m.isDeleted && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                              {/* Emoji Reaction Action Button */}
-                              <button
-                                type="button"
-                                className="m3-action-btn"
-                                onClick={() => setActiveReactionMsgId(activeReactionMsgId === msgId ? null : msgId)}
-                                title="React with Emoji"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>add_reaction</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                className="m3-action-btn"
-                                onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, message: m.message })}
-                                title="Reply"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>reply</span>
-                              </button>
-                              {isSelf && m.id && (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="m3-action-btn"
-                                    onClick={() => startEditing(m)}
-                                    title="Edit message"
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>edit</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="m3-action-btn m3-action-btn-danger"
-                                    onClick={() => handleDeleteMessage(m.id)}
-                                    title="Delete message"
-                                  >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>delete</span>
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Floating Emoji Picker Popover */}
-                        {activeReactionMsgId === msgId && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '-38px',
-                              right: isSelf ? '0' : 'auto',
-                              left: isSelf ? 'auto' : '0',
-                              zIndex: 100,
-                              backgroundColor: 'rgba(20, 20, 26, 0.95)',
-                              border: '1px solid rgba(255, 255, 255, 0.15)',
-                              borderRadius: '20px',
-                              padding: '4px 8px',
-                              display: 'flex',
-                              gap: '6px',
-                              boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
-                              backdropFilter: 'blur(8px)',
-                            }}
-                          >
-                            {['👍', '❤️', '😂', '😮', '😢', '🔥', '🙏'].map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  fontSize: '1.1rem',
-                                  cursor: 'pointer',
-                                  padding: '2px',
-                                  transition: 'transform 0.15s ease',
-                                }}
-                                onClick={() => handleReactToMessage(m.id, emoji)}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        <div
-                          style={{
-                            padding: '12px 16px',
-                            borderRadius: isSelf ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                            backgroundColor: isSelf ? 'var(--m3-primary-container)' : 'var(--m3-surface-container-high)',
-                            color: isSelf ? 'var(--m3-on-primary-container)' : 'var(--m3-on-surface)',
-                            boxShadow: 'var(--m3-elevation-1)',
-                          }}
-                        >
-                          {m.isDeleted ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontStyle: 'italic', opacity: 0.8 }}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>block</span>
-                              <span>This message was deleted</span>
-                            </div>
-                          ) : editingMsgId === m.id ? (
-                            <form onSubmit={(e) => handleSaveEdit(m.id, e)} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <input
-                                type="text"
-                                className="m3-text-field"
-                                value={editingText}
-                                onChange={(e) => setEditingText(e.target.value)}
-                                autoFocus
-                                style={{ fontSize: '0.875rem', padding: '6px 10px', borderRadius: 'var(--m3-radius-s)', color: '#fff', backgroundColor: 'rgba(0,0,0,0.3)' }}
-                              />
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                <button
-                                  type="button"
-                                  className="m3-btn m3-btn-tonal"
-                                  style={{ padding: '2px 10px', fontSize: '0.72rem' }}
-                                  onClick={cancelEditing}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="submit"
-                                  className="m3-btn m3-btn-filled"
-                                  style={{ padding: '2px 10px', fontSize: '0.72rem' }}
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </form>
-                          ) : (
-                            <>
-                              {/* Quoted Reply Card */}
-                              {m.replyTo && (
-                                <div
-                                  style={{
-                                    padding: '8px 12px',
-                                    borderRadius: 'var(--m3-radius-s)',
-                                    backgroundColor: 'rgba(0,0,0,0.25)',
-                                    borderLeft: '4px solid var(--m3-primary)',
-                                    marginBottom: '8px',
-                                    fontSize: '0.8rem',
-                                  }}
-                                >
-                                  <div style={{ fontWeight: 700, color: 'var(--m3-primary)' }}>{m.replyTo.nickname}</div>
-                                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.9 }}>
-                                    {m.replyTo.message}
-                                  </div>
-                                </div>
-                              )}
-
-                              <p style={{ margin: 0, wordBreak: 'break-word', lineHeight: '1.45' }}>
-                                {m.message}
-                                {m.isEdited && (
-                                  <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '6px', fontStyle: 'italic' }}>
-                                    (edited)
-                                  </span>
-                                )}
-                              </p>
-
-                              {/* YouTube Interactive Video Preview Card */}
-                              {ytData && <YouTubePreview messageText={m.message} onCopySuccess={showToast} />}
-
-                              {/* Instagram Interactive Video/Reel Preview Card */}
-                              {igData && <InstagramPreview messageText={m.message} onCopySuccess={showToast} />}
-
-                              {/* File Attachment Preview */}
-                              {m.fileUrl && (
-                                <div style={{ marginTop: '8px' }}>
-                                  <a
-                                    href={`${baseUrl.replace(/\/api\/?$/, '')}${m.fileUrl}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="m3-btn m3-btn-outlined"
-                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                                  >
-                                    <span className="material-symbols-outlined">attachment</span>
-                                    Attachment
-                                  </a>
-                                </div>
-                              )}
-
-                              {/* Emoji Reactions Display Pills */}
-                              {m.reactions && Object.keys(m.reactions).length > 0 && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                                  {Object.entries(m.reactions).map(([emoji, userList]) => {
-                                    const hasMyReaction = Array.isArray(userList) && userList.includes(nickname);
-                                    return (
-                                      <button
-                                        key={emoji}
-                                        type="button"
-                                        onClick={() => handleReactToMessage(m.id, emoji)}
-                                        title={`Reacted by: ${Array.isArray(userList) ? userList.join(', ') : ''}`}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          padding: '2px 8px',
-                                          borderRadius: '12px',
-                                          backgroundColor: hasMyReaction ? 'rgba(37, 211, 102, 0.25)' : 'rgba(0, 0, 0, 0.3)',
-                                          border: hasMyReaction ? '1px solid #25d366' : '1px solid rgba(255, 255, 255, 0.1)',
-                                          fontSize: '0.78rem',
-                                          color: '#fff',
-                                          cursor: 'pointer',
-                                        }}
-                                      >
-                                        <span>{emoji}</span>
-                                        <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{userList.length}</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
-
-                              {/* Visible Chat Message Timestamp */}
-                              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                                <span style={{ fontSize: '0.68rem', color: isSelf ? 'rgba(255,255,255,0.7)' : 'var(--m3-outline)', fontWeight: 500 }}>
-                                  {formatMessageTime(m.createdAt)}
-                                </span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-              <div ref={chatBottomRef} />
-            </div>
-
-            {/* Replying-To Active Banner */}
-            {replyingTo && (
               <div
                 style={{
-                  padding: '8px 20px',
-                  backgroundColor: 'var(--m3-surface-container-highest)',
-                  borderTop: '1px solid var(--m3-outline-variant)',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: '#202c33',
+                  color: '#00a884',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '0.85rem',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  position: 'relative',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--m3-primary)' }}>reply</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Replying to <strong>{replyingTo.nickname}</strong>: <em>"{replyingTo.message}"</em>
+                {u.nickname?.charAt(0).toUpperCase() || 'U'}
+                <div
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: '#25d366',
+                    position: 'absolute',
+                    bottom: '1px',
+                    right: '1px',
+                    border: '2px solid #111b21',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#e9edef' }}>
+                    {u.nickname} {u.nickname === nickname && '(You)'}
                   </span>
                 </div>
-                <button
-                  className="m3-btn m3-btn-icon m3-btn-outlined"
-                  style={{ width: '28px', height: '28px', flexShrink: 0 }}
-                  onClick={() => setReplyingTo(null)}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
-                </button>
+                <div style={{ fontSize: '0.75rem', color: '#8696a0', marginTop: '2px' }}>
+                  {formatLastSeen(u.lastSeen)}
+                </div>
               </div>
-            )}
+            </div>
+          ))}
+        </div>
+      </aside>
 
-            {/* Active Typing Indicator Bar */}
-            {typingUsers.length > 0 && (
-              <div
-                style={{
-                  padding: '6px 20px',
-                  backgroundColor: 'rgba(37, 211, 102, 0.08)',
-                  borderTop: '1px solid rgba(37, 211, 102, 0.2)',
-                  color: '#25d366',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#25d366' }}>
-                  edit
-                </span>
-                <span>
-                  <strong>{typingUsers.join(', ')}</strong> {typingUsers.length === 1 ? 'is' : 'are'} typing...
-                </span>
+      {/* Main WhatsApp Chat Container */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0b141a', position: 'relative', overflow: 'hidden' }}>
+        {/* WhatsApp Top Header Bar */}
+        <header
+          style={{
+            height: '60px',
+            backgroundColor: '#202c33',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
+            zIndex: 20,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }}
+        >
+          {/* Header Left Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => setShowSidebar(!showSidebar)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+              title="Toggle Participants Sidebar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>menu</span>
+            </button>
+
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: '#00a884',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '1.1rem',
+              }}
+            >
+              #
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 style={{ fontWeight: 700, fontSize: '1rem', color: '#e9edef', margin: 0 }}>
+                  Nexus Space #{passcode}
+                </h1>
               </div>
-            )}
-
-            {/* Active File Uploading Indicator Bar */}
-            {isUploadingFile && (
-              <div
-                style={{
-                  padding: '8px 20px',
-                  backgroundColor: 'rgba(37, 211, 102, 0.15)',
-                  borderTop: '1px solid rgba(37, 211, 102, 0.3)',
-                  color: '#81c784',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '18px', animation: 'spin 1.5s linear infinite' }}>
-                  sync
-                </span>
-                <span>Uploading file attachment to space...</span>
+              <div style={{ fontSize: '0.75rem', color: '#8696a0', marginTop: '1px' }}>
+                {typingUsers.length > 0
+                  ? `${typingUsers.join(', ')} is typing...`
+                  : `${users.length} participants online`}
               </div>
-            )}
-
-            {/* Chat Input Bar */}
-            <div style={{ padding: '16px 20px', backgroundColor: 'var(--m3-surface-container)', borderTop: '1px solid var(--m3-outline-variant)' }}>
-              <form onSubmit={sendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <label className="m3-btn m3-btn-icon m3-btn-tonal" style={{ cursor: 'pointer', flexShrink: 0 }}>
-                  <span className="material-symbols-outlined">attach_file</span>
-                  <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
-
-                <input
-                  type="text"
-                  className="m3-text-field"
-                  style={{ borderRadius: 'var(--m3-radius-full)' }}
-                  value={inputText}
-                  onChange={handleInputChange}
-                  onPaste={handleInputPaste}
-                  placeholder={replyingTo ? `Reply to ${replyingTo.nickname}...` : 'Type a message (or drag message to reply)...'}
-                />
-
-                <button type="submit" className="m3-btn m3-btn-filled m3-btn-icon" style={{ flexShrink: 0 }}>
-                  <span className="material-symbols-outlined">send</span>
-                </button>
-              </form>
             </div>
           </div>
 
-          {/* Side-by-Side Video Call Panel / Floating Overlay / Fullscreen */}
-          {(showVideoPanel || callState !== 'idle') && (
-            <div
-              className={`m3-video-panel ${isFullscreenCall ? 'fullscreen' : ''}`}
-              style={
-                isFullscreenCall
-                  ? {
-                    position: 'fixed',
-                    inset: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    maxWidth: '100vw',
-                    minWidth: '100vw',
-                    zIndex: 999999,
-                    backgroundColor: '#07060a',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                  }
-                  : isPipMode
-                    ? {
-                      position: 'fixed',
-                      bottom: '24px',
-                      right: '24px',
-                      width: '360px',
-                      height: '270px',
-                      zIndex: 1000,
-                      borderRadius: 'var(--m3-radius-l)',
-                      border: '1px solid var(--m3-primary)',
-                      backgroundColor: 'var(--m3-surface-container-high)',
-                      boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                      transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
-                    }
-                    : {
-                      width: '420px',
-                      maxWidth: '45%',
-                      minWidth: '300px',
-                      borderLeft: '1px solid var(--m3-outline-variant)',
-                      backgroundColor: 'var(--m3-surface-container-lowest)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      position: 'relative',
-                      transition: 'all 0.3s ease',
-                      height: '100%',
-                    }
-              }
+          {/* Header Right WhatsApp Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* WhatsApp Video Call Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (callState === 'idle') startCall();
+                else setShowVideoPanel(!showVideoPanel);
+              }}
+              style={{
+                backgroundColor: callState === 'active' ? '#25d366' : 'rgba(0, 168, 132, 0.15)',
+                color: callState === 'active' ? '#000000' : '#00a884',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              title="Start Video Call"
             >
-              {/* Video Panel Header */}
-              <div
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                {callState === 'active' ? 'videocam' : 'video_call'}
+              </span>
+              <span className="hidden-mobile">
+                {callState === 'active' ? 'Call Active' : 'Video Call'}
+              </span>
+            </button>
+
+            {/* Search Button */}
+            <button
+              type="button"
+              onClick={() => setShowSearch(!showSearch)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="Search Messages"
+            >
+              <span className="material-symbols-outlined">search</span>
+            </button>
+
+            {/* Clear History Button */}
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(true)}
+              style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="Clear Room History"
+            >
+              <span className="material-symbols-outlined">delete_sweep</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Optional Search Filter Banner */}
+        {showSearch && (
+          <div style={{ backgroundColor: '#202c33', padding: '8px 16px', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10 }}>
+            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Search in space..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
-                  padding: '10px 14px',
-                  borderBottom: '1px solid var(--m3-outline-variant)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  backgroundColor: 'var(--m3-surface-container)',
-                  flexShrink: 0,
+                  width: '100%',
+                  padding: '8px 12px 8px 36px',
+                  borderRadius: '8px',
+                  backgroundColor: '#2a3942',
+                  border: 'none',
+                  color: '#e9edef',
+                  fontSize: '0.85rem',
+                  outline: 'none',
                 }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)', fontSize: '20px' }}>
-                    videocam
-                  </span>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--m3-on-surface)' }}>
-                    {remoteUserName ? `Call with ${remoteUserName}` : 'Video Call Space'}
-                  </h3>
-                </div>
+              />
+              <span className="material-symbols-outlined" style={{ position: 'absolute', left: '10px', color: '#8696a0', fontSize: '18px' }}>
+                search
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSearch(false);
+                setSearchQuery('');
+              }}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        )}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
-                    type="button"
-                    className="m3-btn m3-btn-icon m3-btn-outlined"
-                    style={{ width: '28px', height: '28px' }}
-                    onClick={toggleFullscreenCall}
-                    title="Full Screen Video Call"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                      {isFullscreenCall ? 'fullscreen_exit' : 'fullscreen'}
-                    </span>
-                  </button>
+        {/* Pinned Message Banner */}
+        {pinnedMessage && (
+          <div style={{ backgroundColor: '#182229', borderBottom: '1px solid #00a884', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '18px' }}>
+                push_pin
+              </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00a884' }}>{pinnedMessage.nickname}:</span>
+              <span style={{ fontSize: '0.8rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {pinnedMessage.message}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleTogglePinMessage(pinnedMessage)}
+              style={{ background: 'none', border: 'none', color: '#00a884', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Unpin
+            </button>
+          </div>
+        )}
 
-                  <button
-                    type="button"
-                    className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-outlined'}`}
-                    style={{ width: '28px', height: '28px' }}
-                    onClick={togglePipMode}
-                    title={isPipMode ? 'Dock to Side Panel' : 'Float over Chat'}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                      {isPipMode ? 'dock' : 'picture_in_picture_alt'}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="m3-btn m3-btn-icon m3-btn-outlined"
-                    style={{ width: '28px', height: '28px' }}
-                    onClick={() => {
-                      setShowVideoPanel(false);
-                      if (isFullscreenCall) setIsFullscreenCall(false);
-                    }}
-                    title="Hide Video Panel"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                      close
-                    </span>
-                  </button>
-                </div>
+        {/* Chat Feed Area with WhatsApp Wallpaper Pattern */}
+        <div
+          className="wa-chat-wallpaper"
+          style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+        >
+          {filteredMessages.length === 0 ? (
+            <div style={{ margin: 'auto', textAlign: 'center', color: '#8696a0', padding: '24px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#00a884', marginBottom: '8px' }}>
+                lock
+              </span>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                Messages are end-to-end encrypted in Space #{passcode}
               </div>
-
-              {/* Video Panel Body */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', backgroundColor: '#0c0a0f' }}>
-                {callState === 'idle' && (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: '72px',
-                        height: '72px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--m3-primary-container)',
-                        color: 'var(--m3-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '16px',
-                      }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>
-                        videocam
-                      </span>
-                    </div>
-                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '6px', color: 'var(--m3-on-surface)' }}>
-                      Ready to Connect
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px', maxWidth: '240px', lineHeight: 1.4 }}>
-                      Start an instant peer-to-peer video call with members in Space #{passcode}.
-                    </p>
-                    <button
-                      className="m3-btn m3-btn-filled"
-                      onClick={startCall}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px', borderRadius: 'var(--m3-radius-full)' }}
-                    >
-                      <span className="material-symbols-outlined">call</span>
-                      <span>Start Video Call</span>
-                    </button>
-                  </div>
-                )}
-
-                {callState === 'calling' && (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: '80px',
-                        height: '80px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--m3-secondary-container)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.8rem',
-                        fontWeight: 700,
-                        color: 'var(--m3-primary)',
-                        marginBottom: '16px',
-                        border: '3px solid var(--m3-primary)',
-                        animation: 'storyPulse 2s infinite',
-                      }}
-                    >
-                      {(remoteUserName || 'S').slice(0, 2).toUpperCase()}
-                    </div>
-                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--m3-on-surface)' }}>
-                      Calling {remoteUserName || 'Space Members'}...
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px' }}>
-                      Ringing space members
-                    </p>
-                    <button className="m3-btn m3-btn-danger" onClick={endCall} style={{ padding: '8px 20px' }}>
-                      <span className="material-symbols-outlined">call_end</span>
-                      Cancel Call
-                    </button>
-                  </div>
-                )}
-
-                {callState === 'incoming' && (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', textAlign: 'center' }}>
-                    <div
-                      style={{
-                        width: '80px',
-                        height: '80px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--m3-tertiary-container)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.8rem',
-                        fontWeight: 700,
-                        color: 'var(--m3-tertiary)',
-                        marginBottom: '16px',
-                        border: '3px solid var(--m3-tertiary)',
-                        animation: 'pulseRinging 1.5s infinite',
-                      }}
-                    >
-                      {(callerName || 'C').slice(0, 2).toUpperCase()}
-                    </div>
-                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--m3-on-surface)' }}>
-                      {callerName} is calling...
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px' }}>
-                      Incoming Video Call
-                    </p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <button className="m3-btn m3-btn-filled pulse-accept-btn" style={{ backgroundColor: '#81c784', color: '#000', padding: '8px 20px' }} onClick={acceptCall}>
-                        <span className="material-symbols-outlined">call</span>
-                        Accept
-                      </button>
-                      <button className="m3-btn m3-btn-danger" onClick={declineCall} style={{ padding: '8px 20px' }}>
-                        <span className="material-symbols-outlined">call_end</span>
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {callState === 'active' && (
-                  <div
-                    style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#000', flex: 1, overflow: 'hidden' }}
-                    onDoubleClick={toggleFullscreenCall}
-                  >
-                    {/* Live Duration Timer Badge */}
-                    <div className="m3-call-timer">
-                      <div className="m3-call-timer-dot" />
-                      <span>{formatTimer(callDuration)}</span>
-                    </div>
-
-                    {/* Remote Video Feed */}
-                    <video
-                      ref={remoteVideoCallback}
-                      autoPlay
-                      playsInline
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: videoFitMode,
-                        display: remoteStream ? 'block' : 'none',
-                        cursor: 'pointer',
-                      }}
-                    />
-
-                    {/* Fallback Remote User Avatar when camera off or stream connecting */}
-                    {!remoteStream && (
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: '#17151c',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: isFullscreenCall ? '120px' : '88px',
-                            height: isFullscreenCall ? '120px' : '88px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--m3-primary-container)',
-                            color: 'var(--m3-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: isFullscreenCall ? '3rem' : '2rem',
-                            fontWeight: 700,
-                            marginBottom: '12px',
-                            border: '3px solid var(--m3-primary)',
-                          }}
-                        >
-                          {(remoteUserName || 'U').slice(0, 2).toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: isFullscreenCall ? '1.2rem' : '0.9rem', fontWeight: 600, color: 'var(--m3-on-surface)' }}>
-                          {remoteUserName || 'Remote User'}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#81c784', marginTop: '4px' }}>Connected</span>
-                      </div>
-                    )}
-
-                    {/* Self Local Video Overlay (PIP) */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '14px',
-                        right: '14px',
-                        width: isFullscreenCall ? '180px' : isPipMode ? '80px' : '120px',
-                        height: isFullscreenCall ? '120px' : isPipMode ? '56px' : '85px',
-                        borderRadius: 'var(--m3-radius-m)',
-                        overflow: 'hidden',
-                        border: '2px solid var(--m3-primary)',
-                        backgroundColor: '#121116',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                        zIndex: 30,
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <video
-                        ref={localVideoCallback}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          display: cameraOff ? 'none' : 'block',
-                        }}
-                      />
-                      {cameraOff && (
-                        <div
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: '#2b2833',
-                            color: 'var(--m3-primary)',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {nickname.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* M3 Glassmorphism Control Dock */}
-                    <div className="m3-video-dock">
-                      <button
-                        type="button"
-                        className={`m3-btn m3-btn-icon ${micMuted ? 'm3-btn-danger' : 'm3-btn-tonal'}`}
-                        onClick={toggleMic}
-                        title={micMuted ? 'Unmute Mic' : 'Mute Mic'}
-                      >
-                        <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`m3-btn m3-btn-icon ${cameraOff ? 'm3-btn-danger' : 'm3-btn-tonal'}`}
-                        onClick={toggleCamera}
-                        title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
-                      >
-                        <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="m3-btn m3-btn-icon m3-btn-tonal"
-                        onClick={toggleVideoFit}
-                        title={`Fit: ${videoFitMode}`}
-                      >
-                        <span className="material-symbols-outlined">{videoFitMode === 'cover' ? 'fit_screen' : 'crop_free'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="m3-btn m3-btn-icon m3-btn-tonal"
-                        onClick={toggleFullscreenCall}
-                        title="Toggle Fullscreen"
-                      >
-                        <span className="material-symbols-outlined">{isFullscreenCall ? 'fullscreen_exit' : 'fullscreen'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`m3-btn m3-btn-icon ${isPipMode ? 'm3-btn-filled' : 'm3-btn-tonal'}`}
-                        onClick={togglePipMode}
-                        title={isPipMode ? 'Dock to Side' : 'Float Window'}
-                      >
-                        <span className="material-symbols-outlined">{isPipMode ? 'dock' : 'picture_in_picture_alt'}</span>
-                      </button>
-                      <button type="button" className="m3-btn m3-btn-icon m3-btn-danger" onClick={endCall} title="End Call">
-                        <span className="material-symbols-outlined">call_end</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>
+                No one outside of this room can read or listen to them.
               </div>
             </div>
-          )}
-        </main>
-      </div>
+          ) : (
+            filteredMessages.map((msg, idx) => {
+              const isMe = msg.nickname === nickname;
+              const showDate =
+                idx === 0 ||
+                formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
 
-      {/* Clear Chat Confirmation Modal */}
-      {showClearConfirm && (
+              return (
+                <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {/* Date Badge Header */}
+                  {showDate && (
+                    <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px 0' }}>
+                      <div
+                        style={{
+                          backgroundColor: '#182229',
+                          color: '#8696a0',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          padding: '4px 12px',
+                          borderRadius: '8px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        {formatDateHeader(msg.createdAt)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Message Bubble Container */}
+                  <div
+                    style={{ display: 'flex', width: '100%', justifyContent: isMe ? 'flex-end' : 'flex-start' }}
+                    onTouchStart={(e) => handleTouchStart(e, msg.id)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={() => handleTouchEnd(msg)}
+                  >
+                    <div
+                      className={`wa-bubble ${isMe ? 'wa-bubble-outgoing' : 'wa-bubble-incoming'} group`}
+                      style={{
+                        transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
+                        transition: 'transform 0.1s ease',
+                      }}
+                    >
+                      {/* Sender Nickname (for incoming messages) */}
+                      {!isMe && (
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px' }}>
+                          {msg.nickname}
+                        </div>
+                      )}
+
+                      {/* Reply Quote Block */}
+                      {msg.replyTo && (
+                        <div className="wa-reply-quote">
+                          <span style={{ fontWeight: 700, color: '#00a884' }}>{msg.replyTo.nickname}: </span>
+                          <span style={{ color: '#8696a0' }}>{msg.replyTo.message}</span>
+                        </div>
+                      )}
+
+                      {/* Editing Input or Text Content */}
+                      {editingMsgId === msg.id ? (
+                        <form onSubmit={(e) => handleSaveEdit(msg.id, e)} style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                          <input
+                            type="text"
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: '#111b21',
+                              border: '1px solid #00a884',
+                              color: '#fff',
+                              fontSize: '0.85rem',
+                            }}
+                            autoFocus
+                          />
+                          <button type="submit" style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '6px', padding: '4px 10px', fontWeight: 600, fontSize: '0.75rem' }}>
+                            Save
+                          </button>
+                          <button type="button" onClick={cancelEditing} style={{ background: 'none', border: 'none', color: '#8696a0', fontSize: '0.75rem' }}>
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        <div>
+                          {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
+
+                          {/* Image Attachment Preview */}
+                          {msg.fileUrl && msg.fileType?.startsWith('image/') && (
+                            <img
+                              src={msg.fileUrl}
+                              alt="Attachment"
+                              style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
+                              onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName })}
+                            />
+                          )}
+
+                          {/* YouTube & Instagram Preview Cards */}
+                          {msg.message && <YouTubePreview messageText={msg.message} onCopySuccess={showToast} />}
+                          {msg.message && <InstagramPreview messageText={msg.message} onCopySuccess={showToast} />}
+                        </div>
+                      )}
+
+                      {/* Bubble Timestamp & Read Receipt Double Tick */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                          gap: '4px',
+                          marginTop: '2px',
+                          float: 'right',
+                          marginLeft: '12px',
+                        }}
+                      >
+                        {msg.isEdited && (
+                          <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', italic: 'true' }}>edited</span>
+                        )}
+                        <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
+                          {formatMessageTime(msg.createdAt)}
+                        </span>
+                        {isMe && (
+                          <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#53bdeb' }}>
+                            done_all
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick Hover Actions Menu */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '6px',
+                          display: 'none',
+                          backgroundColor: '#111b21',
+                          borderRadius: '12px',
+                          padding: '2px 4px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                        }}
+                        className="group-hover:flex"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setReplyingTo(msg)}
+                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
+                          title="Reply"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>reply</span>
+                        </button>
+                        {isMe && (
+                          <button
+                            type="button"
+                            onClick={() => startEditing(msg)}
+                            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
+                            title="Edit"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePinMessage(msg)}
+                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '2px 4px' }}
+                          title="Pin"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>push_pin</span>
+                        </button>
+                        {isMe && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '2px 4px' }}
+                            title="Delete"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={chatBottomRef} />
+        </div>
+
+        {/* Replying Banner Bar */}
+        {replyingTo && (
+          <div
+            style={{
+              backgroundColor: '#182229',
+              borderTop: '1px solid rgba(134, 150, 160, 0.15)',
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              zIndex: 10,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '20px' }}>
+                reply
+              </span>
+              <div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#00a884' }}>Replying to {replyingTo.nickname}</div>
+                <div style={{ fontSize: '0.75rem', color: '#8696a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {replyingTo.message}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        )}
+
+        {/* WhatsApp Bottom Input Bar */}
+        <form
+          onSubmit={handleSendMessage}
+          style={{
+            height: '62px',
+            backgroundColor: '#202c33',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            borderTop: '1px solid rgba(134, 150, 160, 0.15)',
+            zIndex: 20,
+          }}
+        >
+          {/* File Attachment Trigger */}
+          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#8696a0' }} title="Attach file or photo">
+            <input
+              type="file"
+              style={{ display: 'none' }}
+              onChange={(e) => handleUploadAttachment(e.target.files?.[0])}
+              disabled={isUploadingFile}
+            />
+            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>
+              attach_file
+            </span>
+          </label>
+
+          {/* Rounded Input Field */}
+          <input
+            type="text"
+            placeholder="Type a message..."
+            value={inputText}
+            onChange={handleInputChange}
+            style={{
+              flex: 1,
+              height: '42px',
+              borderRadius: '8px',
+              backgroundColor: '#2a3942',
+              border: 'none',
+              color: '#e9edef',
+              padding: '0 16px',
+              fontSize: '0.9rem',
+              outline: 'none',
+            }}
+          />
+
+          {/* WhatsApp Green Send Button */}
+          <button
+            type="submit"
+            disabled={!inputText.trim()}
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: '#00a884',
+              color: '#ffffff',
+              border: 'none',
+              cursor: inputText.trim() ? 'pointer' : 'default',
+              opacity: inputText.trim() ? 1 : 0.6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '20px', marginLeft: '2px' }}>
+              send
+            </span>
+          </button>
+        </form>
+      </main>
+
+      {/* WebRTC Video Call Overlay */}
+      {showVideoPanel && (
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.65)',
+            inset: 0,
+            backgroundColor: 'rgba(11, 20, 26, 0.95)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 9999,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(4px)',
+            flexDirection: 'column',
           }}
+          className="animate-fade-in"
         >
-          <div
-            className="m3-card"
-            style={{
-              maxWidth: '420px',
-              width: '90%',
-              backgroundColor: 'var(--m3-surface-container-high)',
-              borderRadius: 'var(--m3-radius-l)',
-              padding: '24px',
-              boxShadow: 'var(--m3-elevation-3)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '32px', color: 'var(--m3-error)' }}>delete_sweep</span>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>Clear All Messages?</h3>
+          <div style={{ height: '56px', backgroundColor: '#202c33', padding: '0 20px', display: 'flex', alignItems: 'center', justifyBetween: 'space-between', color: '#e9edef' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1rem' }}>
+              <span className="material-symbols-outlined" style={{ color: '#00a884' }}>videocam</span>
+              <span>WhatsApp Video Call</span>
             </div>
-            <p style={{ fontSize: '0.875rem', color: 'var(--m3-on-surface-variant)', marginBottom: '24px', lineHeight: 1.5 }}>
-              Are you sure you want to clear all messages in Space #{passcode} for everyone? This action cannot be undone.
+            <button type="button" onClick={() => setShowVideoPanel(false)} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyCenter: 'center' }}>
+            {callState === 'calling' && (
+              <div style={{ textAlign: 'center', color: '#fff' }}>
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 700, margin: '0 auto 16px auto' }}>
+                  {(remoteUserName || 'S').slice(0, 2).toUpperCase()}
+                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Calling {remoteUserName}...</h3>
+                <button onClick={endCall} style={{ marginTop: '24px', backgroundColor: '#f44336', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 700, cursor: 'pointer' }}>
+                  End Call
+                </button>
+              </div>
+            )}
+
+            {callState === 'incoming' && (
+              <div style={{ textAlign: 'center', color: '#fff' }}>
+                <div className="wa-call-pulse" style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 700, margin: '0 auto 16px auto' }}>
+                  {(callerName || 'C').slice(0, 2).toUpperCase()}
+                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{callerName} is calling...</h3>
+                <div style={{ display: 'flex', gap: '16px', justifyCenter: 'center', marginTop: '24px' }}>
+                  <button onClick={acceptCall} style={{ backgroundColor: '#25d366', color: '#000', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 700, cursor: 'pointer' }}>
+                    Accept
+                  </button>
+                  <button onClick={declineCall} style={{ backgroundColor: '#f44336', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 700, cursor: 'pointer' }}>
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {callState === 'active' && (
+              <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                {/* Timer Badge */}
+                <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 20, backgroundColor: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: '12px', color: '#25d366', fontWeight: 700, fontSize: '0.8rem' }}>
+                  {formatTimer(callDuration)}
+                </div>
+
+                {/* Remote Stream */}
+                <video ref={remoteVideoCallback} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+
+                {/* Floating PIP Local Stream */}
+                <div style={{ position: 'absolute', top: '16px', right: '16px', width: '130px', height: '95px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #00a884', zIndex: 20, backgroundColor: '#111b21' }}>
+                  <video ref={localVideoCallback} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraOff ? 'none' : 'block' }} />
+                  {cameraOff && (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00a884', fontWeight: 700 }}>
+                      {nickname.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Controls Dock */}
+                <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '16px', zIndex: 20 }}>
+                  <button onClick={toggleMic} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: micMuted ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                    <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
+                  </button>
+                  <button onClick={toggleCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: cameraOff ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                    <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
+                  </button>
+                  <button onClick={endCall} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                    <span className="material-symbols-outlined">call_end</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Clear Chat Modal */}
+      {showClearConfirm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.85)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '100%', maxWidth: '380px', backgroundColor: '#111b21', borderRadius: '16px', border: '1px solid rgba(134, 150, 160, 0.2)', padding: '20px', boxShadow: '0 12px 30px rgba(0,0,0,0.8)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#f44336', marginBottom: '12px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>delete_sweep</span>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#e9edef' }}>Clear All Messages?</h3>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#8696a0', marginBottom: '20px', lineHeight: 1.4 }}>
+              Are you sure you want to clear all chat messages in Space #{passcode} for everyone?
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                className="m3-btn m3-btn-tonal"
-                onClick={() => setShowClearConfirm(false)}
-              >
+            <div style={{ display: 'flex', justifyEnd: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setShowClearConfirm(false)} style={{ background: 'none', border: 'none', color: '#8696a0', fontWeight: 600, cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button
-                type="button"
-                className="m3-btn m3-btn-danger"
-                onClick={handleClearHistory}
-              >
+              <button onClick={handleClearHistory} style={{ backgroundColor: '#f44336', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
                 Clear All
               </button>
             </div>
@@ -2254,97 +1531,33 @@ export default function ChatRoom() {
         />
       )}
 
-      {/* Copy Toast Feedback Popup */}
-      {toastText && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(20, 20, 26, 0.95)',
-            border: '1px solid #25d366',
-            color: '#ffffff',
-            padding: '10px 20px',
-            borderRadius: '24px',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            zIndex: 999999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ color: '#25d366', fontSize: '18px' }}>
-            check_circle
-          </span>
-          <span>{toastText}</span>
-        </div>
-      )}
-
-      {/* Image Lightbox Viewer Modal */}
+      {/* Lightbox Viewer */}
       {lightboxImage && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.92)',
-            zIndex: 999999,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            backdropFilter: 'blur(8px)',
-          }}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.94)', backdropFilter: 'blur(12px)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
           onClick={() => setLightboxImage(null)}
         >
-          <button
-            type="button"
-            style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              color: '#fff',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onClick={() => setLightboxImage(null)}
-          >
+          <button type="button" onClick={() => setLightboxImage(null)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span className="material-symbols-outlined">close</span>
           </button>
-          <img
-            src={lightboxImage.url}
-            alt={lightboxImage.name}
-            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 12px 40px rgba(0,0,0,0.8)' }}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <img src={lightboxImage.url} alt={lightboxImage.name} style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', objectFit: 'contain', boxShadow: '0 12px 40px rgba(0,0,0,0.8)' }} onClick={(e) => e.stopPropagation()} />
           <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{lightboxImage.name}</span>
-            <a
-              href={lightboxImage.url}
-              download
-              target="_blank"
-              rel="noreferrer"
-              className="m3-btn m3-btn-filled"
-              style={{ padding: '6px 16px', fontSize: '0.8rem', borderRadius: '20px' }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <a href={lightboxImage.url} download target="_blank" rel="noreferrer" style={{ backgroundColor: '#00a884', color: '#fff', textDecoration: 'none', padding: '6px 18px', borderRadius: '20px', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
               <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
               Download
             </a>
           </div>
         </div>
       )}
+
+      {/* Toast Feedback */}
+      {toastText && (
+        <div style={{ position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#182229', border: '1px solid #00a884', color: '#ffffff', padding: '8px 18px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 600, zIndex: 99999, display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)' }}>
+          <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '18px' }}>check_circle</span>
+          <span>{toastText}</span>
+        </div>
+      )}
     </div>
   );
 }
-

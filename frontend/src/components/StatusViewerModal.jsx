@@ -18,18 +18,17 @@ export default function StatusViewerModal({
   const currentStatus = statuses[currentIndex];
   const isMyStatus = currentStatus?.nickname === currentNickname;
 
-  // Mark current status as viewed by me
+  // Mark current status as viewed
   useEffect(() => {
     if (currentStatus && onViewStatus) {
       onViewStatus(currentStatus.id);
     }
   }, [currentStatus?.id, onViewStatus]);
 
-  // Handle timer auto-advance (5s default for text & image, video uses video duration)
+  // Timer auto-advance (5s default for text/photo, 12s for video)
   useEffect(() => {
     if (!currentStatus || isPaused) return;
 
-    // Reset progress when index changes
     setProgress(0);
 
     const DURATION = currentStatus.type === 'video' ? 12000 : 5000;
@@ -68,7 +67,6 @@ export default function StatusViewerModal({
     }
   };
 
-  // Extract link if status has URL
   const getLinkPreview = (text) => {
     if (!text) return null;
     const yt = parseYouTubeUrl(text);
@@ -105,17 +103,15 @@ export default function StatusViewerModal({
 
   return (
     <div
-      className="status-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.95)',
+        backgroundColor: '#0b141a',
         zIndex: 99999,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        backdropFilter: 'blur(12px)',
         userSelect: 'none',
       }}
       onMouseDown={() => setIsPaused(true)}
@@ -123,8 +119,9 @@ export default function StatusViewerModal({
       onTouchStart={() => setIsPaused(true)}
       onTouchEnd={() => setIsPaused(false)}
     >
-      {/* Story Container */}
+      {/* Story Card Container */}
       <div
+        className="animate-fade-in"
         style={{
           position: 'relative',
           width: '100%',
@@ -134,10 +131,10 @@ export default function StatusViewerModal({
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: currentStatus.bgColor || '#111b21',
-          background: currentStatus.bgColor || 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
           borderRadius: '16px',
           overflow: 'hidden',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)',
+          border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         {/* Top Segmented Progress Bar */}
@@ -147,11 +144,11 @@ export default function StatusViewerModal({
             top: 0,
             left: 0,
             right: 0,
-            zIndex: 10,
+            zIndex: 20,
             padding: '12px 12px 6px 12px',
             display: 'flex',
             gap: '4px',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
           }}
         >
           {statuses.map((st, i) => (
@@ -182,19 +179,19 @@ export default function StatusViewerModal({
           ))}
         </div>
 
-        {/* Story Header */}
+        {/* WhatsApp Header */}
         <div
           style={{
             position: 'absolute',
             top: '20px',
             left: 0,
             right: 0,
-            zIndex: 10,
+            zIndex: 20,
             padding: '0 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -203,21 +200,26 @@ export default function StatusViewerModal({
                 width: '40px',
                 height: '40px',
                 borderRadius: '50%',
-                backgroundColor: '#25d366',
-                color: '#fff',
+                backgroundColor: '#00a884',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 'bold',
+                fontWeight: 700,
                 fontSize: '1.1rem',
-                border: '2px solid #fff',
+                boxShadow: '0 0 0 2px #00a884',
               }}
             >
               {currentStatus.nickname?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div>
-              <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '0.95rem' }}>
-                {currentStatus.nickname} {isMyStatus && '(You)'}
+              <div style={{ color: '#ffffff', fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>{currentStatus.nickname}</span>
+                {isMyStatus && (
+                  <span style={{ backgroundColor: '#00a884', color: '#fff', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '10px' }}>
+                    You
+                  </span>
+                )}
               </div>
               <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem' }}>
                 {formatTimestamp(currentStatus.createdAt)}
@@ -233,8 +235,8 @@ export default function StatusViewerModal({
                   background: 'rgba(255,255,255,0.15)',
                   border: 'none',
                   color: '#ff5252',
-                  width: '36px',
-                  height: '36px',
+                  width: '34px',
+                  height: '34px',
                   borderRadius: '50%',
                   cursor: 'pointer',
                   display: 'flex',
@@ -248,7 +250,7 @@ export default function StatusViewerModal({
                 }}
                 title="Delete status"
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
                   delete
                 </span>
               </button>
@@ -260,8 +262,8 @@ export default function StatusViewerModal({
                 background: 'rgba(255,255,255,0.15)',
                 border: 'none',
                 color: '#ffffff',
-                width: '36px',
-                height: '36px',
+                width: '34px',
+                height: '34px',
                 borderRadius: '50%',
                 cursor: 'pointer',
                 display: 'flex',
@@ -274,14 +276,14 @@ export default function StatusViewerModal({
               }}
               title="Close status"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                 close
               </span>
             </button>
           </div>
         </div>
 
-        {/* Story Main Media / Content */}
+        {/* Story Viewport */}
         <div
           style={{
             flex: 1,
@@ -295,32 +297,16 @@ export default function StatusViewerModal({
             padding: '70px 20px 80px 20px',
           }}
         >
-          {/* Navigation Click Zones */}
+          {/* Touch Click Zones for Prev/Next */}
           <div
-            style={{
-              position: 'absolute',
-              top: '70px',
-              left: 0,
-              bottom: '80px',
-              width: '35%',
-              zIndex: 5,
-              cursor: 'pointer',
-            }}
+            style={{ position: 'absolute', top: '70px', left: 0, bottom: '80px', width: '35%', zIndex: 10, cursor: 'pointer' }}
             onClick={(e) => {
               e.stopPropagation();
               handlePrev();
             }}
           />
           <div
-            style={{
-              position: 'absolute',
-              top: '70px',
-              right: 0,
-              bottom: '80px',
-              width: '35%',
-              zIndex: 5,
-              cursor: 'pointer',
-            }}
+            style={{ position: 'absolute', top: '70px', right: 0, bottom: '80px', width: '35%', zIndex: 10, cursor: 'pointer' }}
             onClick={(e) => {
               e.stopPropagation();
               handleNext();
@@ -335,41 +321,36 @@ export default function StatusViewerModal({
                 textAlign: 'center',
                 color: '#ffffff',
                 fontSize: '1.4rem',
-                fontWeight: 600,
+                fontWeight: 700,
                 lineHeight: '1.5',
                 padding: '24px',
                 wordBreak: 'break-word',
-                fontFamily: currentStatus.fontStyle || 'sans-serif',
               }}
             >
               {currentStatus.content}
             </div>
           )}
 
-          {/* Render Image Status */}
+          {/* Render Photo Status */}
           {currentStatus.type === 'image' && (
             <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <img
                 src={currentStatus.mediaUrl}
                 alt="Status Media"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '80%',
-                  objectFit: 'contain',
-                  borderRadius: '12px',
-                }}
+                style={{ maxWidth: '100%', maxHeight: '80%', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.8)' }}
               />
               {currentStatus.content && (
                 <div
                   style={{
                     marginTop: '16px',
-                    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                    backgroundColor: 'rgba(11, 20, 26, 0.85)',
                     color: '#ffffff',
-                    padding: '8px 16px',
+                    padding: '8px 18px',
                     borderRadius: '20px',
                     fontSize: '0.9rem',
                     textAlign: 'center',
                     maxWidth: '90%',
+                    backdropFilter: 'blur(6px)',
                   }}
                 >
                   {currentStatus.content}
@@ -387,24 +368,20 @@ export default function StatusViewerModal({
                 autoPlay
                 playsInline
                 controls
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '80%',
-                  objectFit: 'contain',
-                  borderRadius: '12px',
-                }}
+                style={{ maxWidth: '100%', maxHeight: '80%', objectFit: 'contain', borderRadius: '12px', backgroundColor: '#000' }}
               />
               {currentStatus.content && (
                 <div
                   style={{
                     marginTop: '12px',
-                    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                    backgroundColor: 'rgba(11, 20, 26, 0.85)',
                     color: '#ffffff',
-                    padding: '8px 16px',
+                    padding: '8px 18px',
                     borderRadius: '20px',
                     fontSize: '0.9rem',
                     textAlign: 'center',
                     maxWidth: '90%',
+                    backdropFilter: 'blur(6px)',
                   }}
                 >
                   {currentStatus.content}
@@ -413,7 +390,7 @@ export default function StatusViewerModal({
             </div>
           )}
 
-          {/* Enhanced WhatsApp Link Preview Overlay Card */}
+          {/* Link Preview Card Overlay */}
           {linkPreview && (
             <a
               href={linkPreview.url}
@@ -423,56 +400,46 @@ export default function StatusViewerModal({
               style={{
                 position: 'absolute',
                 bottom: '90px',
-                zIndex: 20,
+                zIndex: 30,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                backgroundColor: 'rgba(18, 18, 24, 0.92)',
+                backgroundColor: 'rgba(32, 44, 51, 0.95)',
                 border: `1px solid ${linkPreview.badge}`,
                 padding: '10px 16px',
                 borderRadius: '24px',
                 color: '#ffffff',
                 textDecoration: 'none',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(10px)',
-                transition: 'transform 0.2s ease',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(8px)',
               }}
             >
-              <span className="material-symbols-outlined" style={{ color: linkPreview.badge, fontSize: '22px' }}>
+              <span className="material-symbols-outlined" style={{ color: linkPreview.badge, fontSize: '20px' }}>
                 {linkPreview.icon}
               </span>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ffffff' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff' }}>
                   {linkPreview.title}
                 </span>
-                <span
-                  style={{
-                    fontSize: '0.72rem',
-                    color: 'rgba(255,255,255,0.7)',
-                    maxWidth: '240px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+                <span style={{ fontSize: '0.7rem', color: '#8696a0', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {linkPreview.url}
                 </span>
               </div>
-              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'rgba(255,255,255,0.6)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#8696a0' }}>
                 arrow_forward_ios
               </span>
             </a>
           )}
         </div>
 
-        {/* Footer: Viewers Count & List Button */}
+        {/* Footer: Viewers Button */}
         <div
           style={{
             position: 'absolute',
             bottom: '16px',
             left: 0,
             right: 0,
-            zIndex: 10,
+            zIndex: 20,
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
@@ -481,24 +448,25 @@ export default function StatusViewerModal({
           <button
             type="button"
             style={{
-              background: 'rgba(0, 0, 0, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
+              backgroundColor: 'rgba(0, 168, 132, 0.9)',
+              border: 'none',
               color: '#ffffff',
-              padding: '6px 14px',
+              padding: '6px 16px',
               borderRadius: '20px',
               fontSize: '0.8rem',
+              fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               cursor: 'pointer',
-              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 14px rgba(0, 168, 132, 0.4)',
             }}
             onClick={(e) => {
               e.stopPropagation();
               setShowViewers((prev) => !prev);
             }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#25d366' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
               visibility
             </span>
             <span>{currentStatus.viewers?.length || 0} Viewers</span>
@@ -515,19 +483,20 @@ export default function StatusViewerModal({
               transform: 'translateX(-50%)',
               width: '280px',
               maxHeight: '200px',
-              backgroundColor: 'rgba(20, 20, 26, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              backgroundColor: '#202c33',
+              border: '1px solid rgba(134, 150, 160, 0.2)',
               borderRadius: '16px',
-              padding: '12px',
-              zIndex: 30,
-              color: '#ffffff',
+              padding: '14px',
+              zIndex: 40,
+              color: '#e9edef',
               boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
               overflowY: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
-              Viewed by ({currentStatus.viewers?.length || 0})
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, marginBottom: '8px', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', paddingBottom: '6px', display: 'flex', justifyBetween: 'space-between' }}>
+              <span>Viewed by</span>
+              <span style={{ color: '#00a884', fontWeight: 700 }}>{currentStatus.viewers?.length || 0}</span>
             </div>
             {currentStatus.viewers && currentStatus.viewers.length > 0 ? (
               currentStatus.viewers.map((viewer, idx) => (
@@ -539,17 +508,17 @@ export default function StatusViewerModal({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    color: '#e2e2e6',
+                    color: '#e9edef',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#25d366' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#00a884' }}>
                     check_circle
                   </span>
                   <span>{viewer}</span>
                 </div>
               ))
             ) : (
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: '8px 0' }}>
+              <div style={{ fontSize: '0.75rem', color: '#8696a0', textAlign: 'center', padding: '8px 0' }}>
                 No views yet
               </div>
             )}
