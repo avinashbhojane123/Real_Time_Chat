@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
+
 
 import { getApiBaseUrl, getSocketBaseUrl } from '../utils/apiConfig';
 import YouTubePreview from '../components/YouTubePreview';
@@ -209,11 +210,38 @@ export default function ChatRoom() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
 
-  // Typing & Scroll Pill Feature State
+  // Emoji Particle Burst State
+  const [particles, setParticles] = useState([]);
+  const chatFeedRef = useRef(null);
+
+  const triggerParticleBurst = (emoji, originX = 200, originY = 300) => {
+    const newParticles = Array.from({ length: 7 }, (_, i) => ({
+      id: Date.now() + i + Math.random(),
+      emoji,
+      x: (Math.random() - 0.5) * 120,
+      y: -Math.random() * 140 - 40,
+      scale: 0.6 + Math.random() * 0.8,
+      rotate: (Math.random() - 0.5) * 60,
+      originX,
+      originY,
+    }));
+    setParticles((prev) => [...prev, ...newParticles]);
+    setTimeout(() => {
+      setParticles((prev) => prev.filter((p) => !newParticles.find((np) => np.id === p.id)));
+    }, 1200);
+  };
+
+  // Typing, Scroll Pill & Glassmorphic Header Feature State
   const [typingUsers, setTypingUsers] = useState([]);
   const typingTimeoutRef = useRef(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const { scrollY } = useScroll({ container: chatFeedRef });
+  const headerBlur = useTransform(scrollY, [0, 80], ['blur(4px)', 'blur(16px)']);
+  const headerBgOpacity = useTransform(scrollY, [0, 80], ['rgba(32, 44, 51, 0.85)', 'rgba(32, 44, 51, 0.98)']);
+
+
 
 
   // Search & Pinned Messages Feature State
@@ -973,7 +1001,12 @@ export default function ChatRoom() {
 
   const handleReactToMessage = (messageId, emoji, event) => {
     if (event) {
-      triggerEmojiBurst(emoji, event);
+      const rect = event.currentTarget?.getBoundingClientRect?.();
+      const originX = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+      const originY = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+      triggerParticleBurst(emoji, originX, originY);
+    } else {
+      triggerParticleBurst(emoji, window.innerWidth / 2, window.innerHeight / 2);
     }
     socketRef.current?.emit('reactToMessage', {
       passcode,
@@ -983,6 +1016,7 @@ export default function ChatRoom() {
     setActiveReactionMsgId(null);
     setShowCustomReactionForMsgId(null);
   };
+
 
   const triggerEmojiBurst = (emoji, event) => {
     if (!event) return;
@@ -1319,6 +1353,8 @@ export default function ChatRoom() {
     setDragTranslateX(0);
   };
 
+
+
   // Filter messages by search query
   const filteredMessages = messages.filter((m) => {
     if (!searchQuery.trim()) return true;
@@ -1432,11 +1468,13 @@ export default function ChatRoom() {
 
       {/* 2. Main Chat Panel (Right Workspace Column) */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--chat-wallpaper-bg, #0b141a)', backgroundImage: currentTheme === 'custom' && customWallpaper ? `url(${customWallpaper})` : 'var(--chat-wallpaper-img)', backgroundSize: currentTheme === 'custom' ? 'cover' : '24px 24px', backgroundPosition: 'center', position: 'relative', overflow: 'hidden' }}>
-        {/* WhatsApp Top Header Bar */}
-        <header
+        {/* WhatsApp Top Header Bar with Scroll Glassmorphism */}
+        <motion.header
           style={{
             height: '60px',
-            backgroundColor: '#202c33',
+            backgroundColor: headerBgOpacity,
+            backdropFilter: headerBlur,
+            WebkitBackdropFilter: headerBlur,
             padding: '10px 16px',
             display: 'flex',
             alignItems: 'center',
@@ -1446,6 +1484,7 @@ export default function ChatRoom() {
             boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
           }}
         >
+
           {/* Header Info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
@@ -1559,7 +1598,8 @@ export default function ChatRoom() {
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete_sweep</span>
             </button>
           </div>
-        </header>
+        </motion.header>
+
 
         {/* Optional Search Filter Banner */}
         {showSearch && (
@@ -2110,7 +2150,39 @@ export default function ChatRoom() {
             unreadCount={unreadCount}
             onClick={() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
           />
+
+          {/* Floating Emoji Reaction Particle Burst Layer */}
+          <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>
+            <AnimatePresence>
+              {particles.map((p) => (
+                <motion.span
+                  key={p.id}
+                  initial={{ opacity: 1, y: p.originY, x: p.originX, scale: 0.5 }}
+                  animate={{
+                    opacity: [1, 0.9, 0],
+                    y: p.originY + p.y,
+                    x: p.originX + p.x,
+                    scale: p.scale,
+                    rotate: p.rotate,
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.1, ease: 'easeOut' }}
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    fontSize: '2rem',
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                  }}
+                >
+                  {p.emoji}
+                </motion.span>
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
+
 
 
         {/* Replying Banner Bar */}
@@ -2557,15 +2629,35 @@ export default function ChatRoom() {
                 {/* Remote Stream */}
                 <video ref={remoteVideoCallback} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
-                {/* Floating PIP Local Stream */}
-                <div style={{ position: 'absolute', top: '16px', right: '16px', width: '130px', height: '95px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #00a884', zIndex: 20, backgroundColor: '#111b21' }}>
+                {/* Floating PIP Local Stream with Motion Drag */}
+                <motion.div
+                  drag
+                  dragConstraints={{ top: 0, left: -280, right: 0, bottom: 380 }}
+                  dragElastic={0.15}
+                  whileDrag={{ scale: 1.08, boxShadow: '0 16px 36px rgba(0,0,0,0.7)' }}
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    width: '130px',
+                    height: '95px',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '2px solid #00a884',
+                    zIndex: 30,
+                    backgroundColor: '#111b21',
+                    cursor: 'grab',
+                    touchAction: 'none',
+                  }}
+                >
                   <video ref={localVideoCallback} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraOff ? 'none' : 'block' }} />
                   {cameraOff && (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00a884', fontWeight: 700 }}>
                       {nickname.slice(0, 2).toUpperCase()}
                     </div>
                   )}
-                </div>
+                </motion.div>
+
 
                 {/* Controls Dock */}
                 <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '16px', zIndex: 20 }}>

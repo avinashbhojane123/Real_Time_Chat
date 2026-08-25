@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { parseYouTubeUrl } from './YouTubePreview';
 import AnimatedModal from './animated/AnimatedModal';
+
 
 
 export default function StatusViewerModal({
@@ -115,27 +117,35 @@ export default function StatusViewerModal({
         userSelect: 'none',
       }}
     >
-      {/* Story Card Container */}
-      <div
-        onMouseDown={() => setIsPaused(true)}
-        onMouseUp={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
-          maxHeight: '840px',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: currentStatus.bgColor || '#111b21',
+      {/* Story Card Container with 3D Cube Flip */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentIndex}
+          initial={{ rotateY: 35, opacity: 0.6, scale: 0.96 }}
+          animate={{ rotateY: 0, opacity: 1, scale: 1 }}
+          exit={{ rotateY: -35, opacity: 0.6, scale: 0.96 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 26 }}
+          onMouseDown={() => setIsPaused(true)}
+          onMouseUp={() => setIsPaused(false)}
+          onTouchStart={() => setIsPaused(true)}
+          onTouchEnd={() => setIsPaused(false)}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            maxHeight: '840px',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: currentStatus.bgColor || '#111b21',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            transformStyle: 'preserve-3d',
+            perspective: '1000px',
+          }}
+        >
 
-          borderRadius: '16px',
-          overflow: 'hidden',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)',
-          border: '1px solid rgba(255,255,255,0.08)',
-        }}
-      >
         {/* Top Segmented Progress Bar */}
         <div
           style={{
@@ -523,8 +533,10 @@ export default function StatusViewerModal({
             )}
           </div>
         )}
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </AnimatedModal>
   );
 }
+
 
