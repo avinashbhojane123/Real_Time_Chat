@@ -12,11 +12,14 @@ export default function StatusViewerModal({
   onClose,
   onViewStatus,
   onDeleteStatus,
+  onReplyStatus,
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showViewers, setShowViewers] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replySentToast, setReplySentToast] = useState(false);
   const videoRef = useRef(null);
 
   const currentStatus = statuses[currentIndex];
@@ -102,7 +105,21 @@ export default function StatusViewerModal({
   const formatTimestamp = (dateStr) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  const handleSendReply = (textToSend) => {
+    const text = textToSend || replyText;
+    if (!text || !text.trim()) return;
+    if (onReplyStatus && currentStatus) {
+      onReplyStatus({
+        status: currentStatus,
+        message: text.trim(),
+      });
+    }
+    setReplyText('');
+    setReplySentToast(true);
+    setTimeout(() => setReplySentToast(false), 2200);
   };
 
   return (
@@ -308,14 +325,14 @@ export default function StatusViewerModal({
         >
           {/* Touch Click Zones for Prev/Next */}
           <div
-            style={{ position: 'absolute', top: '70px', left: 0, bottom: '80px', width: '35%', zIndex: 10, cursor: 'pointer' }}
+            style={{ position: 'absolute', top: '70px', left: 0, bottom: '135px', width: '35%', zIndex: 10, cursor: 'pointer' }}
             onClick={(e) => {
               e.stopPropagation();
               handlePrev();
             }}
           />
           <div
-            style={{ position: 'absolute', top: '70px', right: 0, bottom: '80px', width: '35%', zIndex: 10, cursor: 'pointer' }}
+            style={{ position: 'absolute', top: '70px', right: 0, bottom: '135px', width: '35%', zIndex: 10, cursor: 'pointer' }}
             onClick={(e) => {
               e.stopPropagation();
               handleNext();
@@ -441,45 +458,160 @@ export default function StatusViewerModal({
           )}
         </div>
 
-        {/* Footer: Viewers Button */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '16px',
-            left: 0,
-            right: 0,
-            zIndex: 20,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <button
-            type="button"
+        {/* Reply Toast Notification */}
+        {replySentToast && (
+          <div
             style={{
-              backgroundColor: 'rgba(0, 168, 132, 0.9)',
-              border: 'none',
+              position: 'absolute',
+              top: '75px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: '#00a884',
               color: '#ffffff',
-              padding: '6px 16px',
+              padding: '6px 18px',
               borderRadius: '20px',
               fontSize: '0.8rem',
               fontWeight: 700,
+              zIndex: 50,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.6)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(0, 168, 132, 0.4)',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowViewers((prev) => !prev);
             }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              visibility
-            </span>
-            <span>{currentStatus.viewers?.length || 0} Viewers</span>
-          </button>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
+            <span>Reply Sent!</span>
+          </div>
+        )}
+
+        {/* Footer: Reply Bar with Quick Emoji Reactions */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '14px',
+            left: '12px',
+            right: '12px',
+            zIndex: 30,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Quick Reaction Emojis Row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-around',
+              backgroundColor: 'rgba(11, 20, 26, 0.75)',
+              backdropFilter: 'blur(10px)',
+              padding: '6px 12px',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            {['❤️', '😂', '🔥', '😮', '😢', '👍', '👏'].map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => handleSendReply(emoji)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.2rem',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  transition: 'transform 0.15s ease',
+                }}
+                className="hover:scale-125"
+                title={`Reply with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          {/* Reply Text Input & Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendReply(replyText);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'rgba(11, 20, 26, 0.85)',
+              backdropFilter: 'blur(12px)',
+              padding: '6px 8px 6px 16px',
+              borderRadius: '28px',
+              border: '1px solid rgba(0, 168, 132, 0.4)',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+            }}
+          >
+            <input
+              type="text"
+              placeholder={isMyStatus ? "Reply to your status..." : `Reply to ${currentStatus.nickname}...`}
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              onFocus={() => setIsPaused(true)}
+              onBlur={() => setIsPaused(false)}
+              style={{
+                flex: 1,
+                background: 'none',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '0.88rem',
+                outline: 'none',
+              }}
+            />
+            {isMyStatus && (
+              <button
+                type="button"
+                onClick={() => setShowViewers((prev) => !prev)}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.12)',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '6px 10px',
+                  borderRadius: '16px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                }}
+                title="Viewers list"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>
+                <span>{currentStatus.viewers?.length || 0}</span>
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={!replyText.trim()}
+              style={{
+                backgroundColor: replyText.trim() ? '#00a884' : 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: '#ffffff',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: replyText.trim() ? 'pointer' : 'default',
+                transition: 'background-color 0.2s ease',
+              }}
+              title="Send reply"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                send
+              </span>
+            </button>
+          </form>
         </div>
 
         {/* Viewers List Popover */}
@@ -487,7 +619,7 @@ export default function StatusViewerModal({
           <div
             style={{
               position: 'absolute',
-              bottom: '60px',
+              bottom: '120px',
               left: '50%',
               transform: 'translateX(-50%)',
               width: '280px',

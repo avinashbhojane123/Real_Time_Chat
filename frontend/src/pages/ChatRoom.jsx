@@ -23,7 +23,7 @@ function formatMessageTime(dateStr) {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 function formatDateHeader(dateStr) {
@@ -107,7 +107,7 @@ function formatUserPresence(isOnline, lastSeenDate) {
   yesterday.setDate(yesterday.getDate() - 1);
   const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
   if (targetDate.getTime() === today.getTime()) {
     return { text: `last seen today at ${timeStr}`, isOnline: false };
@@ -414,6 +414,36 @@ export default function ChatRoom() {
       passcode,
       statusId,
     });
+  };
+
+  const handleReplyStatus = ({ status, message }) => {
+    if (!status || !message) return;
+
+    let statusSnippet = status.content;
+    if (!statusSnippet) {
+      if (status.type === 'image') statusSnippet = '📷 Photo';
+      else if (status.type === 'video') statusSnippet = '🎥 Video';
+      else statusSnippet = 'Status Story';
+    }
+
+    const replyMsg = {
+      passcode,
+      nickname,
+      message,
+      replyTo: {
+        id: `status-${status.id || Date.now()}`,
+        nickname: status.nickname,
+        message: statusSnippet,
+        isStatus: true,
+        statusType: status.type,
+        statusMediaUrl: status.mediaUrl || null,
+        statusBgColor: status.bgColor || null,
+      },
+      expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+    };
+
+    socketRef.current?.emit('sendMessage', replyMsg);
+    showToast(`Replied to ${status.nickname}'s status`);
   };
 
   const startEditing = (msg) => {
@@ -1903,9 +1933,49 @@ export default function ChatRoom() {
 
                       {/* Reply Quote Inner Box */}
                       {msg.replyTo && (
-                        <div className="wa-quote-box">
-                          <span style={{ fontWeight: 700, color: '#00a884' }}>{msg.replyTo.nickname}: </span>
-                          <span style={{ color: '#8696a0' }}>{msg.replyTo.message}</span>
+                        <div className="wa-quote-box" style={{ position: 'relative', overflow: 'hidden' }}>
+                          {msg.replyTo.isStatus ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {msg.replyTo.statusMediaUrl ? (
+                                <img
+                                  src={msg.replyTo.statusMediaUrl}
+                                  alt="Status thumbnail"
+                                  style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '6px',
+                                    background: msg.replyTo.statusBgColor || 'linear-gradient(135deg, #005c4b, #00a884)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fff' }}>
+                                    donut_large
+                                  </span>
+                                </div>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#00a884', fontWeight: 700 }}>
+                                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>donut_large</span>
+                                  <span>{msg.replyTo.nickname}'s Status</span>
+                                </div>
+                                <div style={{ color: '#8696a0', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {msg.replyTo.message}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <span style={{ fontWeight: 700, color: '#00a884' }}>{msg.replyTo.nickname}: </span>
+                              <span style={{ color: '#8696a0' }}>{msg.replyTo.message}</span>
+                            </>
+                          )}
                         </div>
                       )}
 
@@ -3315,6 +3385,7 @@ export default function ChatRoom() {
           onClose={() => setActiveStatusUser(null)}
           onViewStatus={handleViewStatus}
           onDeleteStatus={handleDeleteStatus}
+          onReplyStatus={handleReplyStatus}
         />
       )}
 
