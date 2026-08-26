@@ -153,8 +153,12 @@ export class ChatGateway
           this.server.to(passcode).emit('messagesExpired', { ids: msgIds });
         }
       }
-    } catch (e) {
-      console.error('Error during self-destruct messages cleanup', e);
+    } catch (e: any) {
+      if (e?.code === '42P01') {
+        console.warn('[Self-Destruct] Table "messages" does not exist yet.');
+      } else {
+        console.error('Error during self-destruct messages cleanup', e);
+      }
     } finally {
       this.isCleaning = false;
     }

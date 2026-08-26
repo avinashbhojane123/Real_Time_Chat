@@ -42,9 +42,7 @@ const isSslEnabled =
         : false,
 
       autoLoadEntities: true,
-      synchronize:
-        process.env.DB_SYNCHRONIZE === 'true' ||
-        (!isProduction && process.env.DB_SYNCHRONIZE !== 'false'),
+      synchronize: process.env.DB_SYNCHRONIZE !== 'false',
     }),
 
     RoomsModule,
