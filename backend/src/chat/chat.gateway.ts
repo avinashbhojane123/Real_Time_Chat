@@ -467,6 +467,7 @@ export class ChatGateway
       expiresAt,
       pollData: data.pollData ?? null,
       locationData: data.locationData ?? null,
+      readBy: [session.nickname],
     });
 
     await this.messageRepo.save(savedMessage);
@@ -493,6 +494,7 @@ export class ChatGateway
       expiresAt: savedMessage.expiresAt,
       pollData: savedMessage.pollData,
       locationData: savedMessage.locationData,
+      readBy: savedMessage.readBy || [savedMessage.nickname],
     };
 
     this.server
@@ -503,6 +505,43 @@ export class ChatGateway
     return {
       success: true,
     };
+  }
+
+  @SubscribeMessage('markRead')
+  async markRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { passcode: string; messageIds: number[]; nickname: string },
+  ) {
+    if (!payload || !payload.messageIds || !payload.messageIds.length) {
+      return { success: false };
+    }
+    const session = this.users.get(client.id);
+    const reader = payload.nickname || session?.nickname;
+    if (!reader) return { success: false };
+
+    const messages = await this.messageRepo.find({
+      where: payload.messageIds.map((id) => ({ id })),
+    });
+
+    const updatedMessageIds: number[] = [];
+    for (const msg of messages) {
+      const currentReadBy = Array.isArray(msg.readBy) ? msg.readBy : [msg.nickname];
+      if (!currentReadBy.includes(reader)) {
+        msg.readBy = [...currentReadBy, reader];
+        await this.messageRepo.save(msg);
+        updatedMessageIds.push(msg.id);
+      }
+    }
+
+    if (updatedMessageIds.length > 0 && payload.passcode) {
+      const roomPasscode = payload.passcode.trim();
+      this.server.to(roomPasscode).emit('messagesRead', {
+        messageIds: updatedMessageIds,
+        readByNick: reader,
+      });
+    }
+
+    return { success: true, updatedCount: updatedMessageIds.length };
   }
 
   @SubscribeMessage('votePoll')

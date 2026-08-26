@@ -120,4 +120,11 @@ export class Message {
     lat: number;
     lng: number;
   } | null;
+
+  @Column({
+    type: 'jsonb',
+    nullable: true,
+    default: null,
+  })
+  readBy!: string[] | null;
 }

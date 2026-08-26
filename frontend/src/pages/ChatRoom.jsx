@@ -793,6 +793,19 @@ export default function ChatRoom() {
       );
     });
 
+    socket.on('messagesRead', ({ messageIds, readByNick }) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (messageIds.includes(m.id)) {
+            const existing = Array.isArray(m.readBy) ? m.readBy : [m.nickname];
+            const updated = existing.includes(readByNick) ? existing : [...existing, readByNick];
+            return { ...m, readBy: updated };
+          }
+          return m;
+        })
+      );
+    });
+
     socket.on('messagePinned', ({ messageId }) => {
       if (!messageId) {
         setPinnedMessage(null);
@@ -888,6 +901,22 @@ export default function ChatRoom() {
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
+
+  // Auto mark incoming unread messages as read when viewed
+  useEffect(() => {
+    if (!socketRef.current || !nickname || !passcode) return;
+    const unreadIncoming = messages.filter(
+      (m) => m.id && m.nickname !== nickname && !(m.readBy && m.readBy.includes(nickname))
+    );
+    if (unreadIncoming.length > 0) {
+      const idsToMark = unreadIncoming.map((m) => m.id);
+      socketRef.current.emit('markRead', {
+        passcode,
+        messageIds: idsToMark,
+        nickname,
+      });
+    }
+  }, [messages, nickname, passcode]);
 
   // Send / Save Message Handler
   const handleSendMessage = (e) => {
@@ -2007,11 +2036,43 @@ export default function ChatRoom() {
                         <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
                           {formatMessageTime(msg.createdAt)}
                         </span>
-                        {isMe && (
-                          <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#53bdeb' }}>
-                            done_all
-                          </span>
-                        )}
+                        {isMe && (() => {
+                          const readByOthers = msg.readBy ? msg.readBy.filter((n) => n !== nickname) : [];
+                          const isRead = readByOthers.length > 0;
+                          const otherUsersOnline = users.some((u) => u.nickname !== nickname && u.isOnline);
+
+                          if (isRead) {
+                            return (
+                              <span
+                                className="material-symbols-outlined"
+                                style={{ fontSize: '15px', color: '#53bdeb' }}
+                                title={`Read by: ${readByOthers.join(', ')}`}
+                              >
+                                done_all
+                              </span>
+                            );
+                          } else if (otherUsersOnline) {
+                            return (
+                              <span
+                                className="material-symbols-outlined"
+                                style={{ fontSize: '15px', color: '#8696a0' }}
+                                title="Delivered to room"
+                              >
+                                done_all
+                              </span>
+                            );
+                          } else {
+                            return (
+                              <span
+                                className="material-symbols-outlined"
+                                style={{ fontSize: '15px', color: '#8696a0' }}
+                                title="Sent"
+                              >
+                                done
+                              </span>
+                            );
+                          }
+                        })()}
                       </div>
 
                       {/* Message 3 Dots Button Trigger (All Messages) */}
