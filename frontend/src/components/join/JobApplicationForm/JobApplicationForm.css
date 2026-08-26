@@ -1,0 +1,5 @@
+.job-app-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}

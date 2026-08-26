@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { motion } from 'motion/react';
 import { getApiBaseUrl } from '../utils/apiConfig';
-import AnimatedModal from '../components/animated/AnimatedModal';
+import { uploadFileApi, joinRoomApi } from '../services/apiService';
+import JobApplicationForm from '../components/join/JobApplicationForm/JobApplicationForm';
+import SecretRoomModal from '../components/modals/SecretRoomModal/SecretRoomModal';
 
 export default function JoinRoom() {
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ export default function JoinRoom() {
 
   // Secret Room Passcode Portal State
   const [showSecretModal, setShowSecretModal] = useState(false);
-  const [baseUrl, setBaseUrl] = useState(
+  const [baseUrl] = useState(
     localStorage.getItem('baseUrl') || getApiBaseUrl()
   );
   const [nickname, setNickname] = useState(sessionStorage.getItem('nickname') || '');
@@ -36,13 +36,10 @@ export default function JoinRoom() {
     setUploading(true);
     setError('');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const cleanApiUrl = baseUrl.replace(/\/+$/, '');
-      const res = await axios.post(`${cleanApiUrl}/upload`, formData);
-      if (res.data && res.data.fileUrl) {
-        setAvatarUrl(res.data.fileUrl);
-        sessionStorage.setItem('avatarUrl', res.data.fileUrl);
+      const data = await uploadFileApi(baseUrl, file);
+      if (data && data.fileUrl) {
+        setAvatarUrl(data.fileUrl);
+        sessionStorage.setItem('avatarUrl', data.fileUrl);
       }
     } catch (err) {
       setError('Avatar upload failed: ' + (err.response?.data?.message || err.message));
@@ -67,13 +64,9 @@ export default function JoinRoom() {
     setJoining(true);
     setError('');
     try {
-      const cleanApiUrl = baseUrl.trim().replace(/\/+$/, '');
-      const res = await axios.post(`${cleanApiUrl}/rooms/join`, {
-        nickname: finalNickname,
-        passcode: passcode.trim(),
-      });
+      const data = await joinRoomApi(baseUrl, finalNickname, passcode);
 
-      if (res.data && res.data.success) {
+      if (data && data.success) {
         sessionStorage.setItem('baseUrl', baseUrl.trim());
         sessionStorage.setItem('nickname', finalNickname);
         sessionStorage.setItem('passcode', passcode.trim());
@@ -184,106 +177,22 @@ export default function JoinRoom() {
               Candidate Application Form
             </h3>
 
-            {appliedSuccess ? (
-              <div style={{ padding: '24px', backgroundColor: 'var(--m3-surface-container-high)', borderRadius: 'var(--m3-radius-m)', textAlign: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '56px', color: '#81c784', marginBottom: '12px' }}>check_circle</span>
-                <h4 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Application Received!</h4>
-                <p style={{ color: 'var(--m3-on-surface-variant)', fontSize: '0.9rem', marginTop: '8px' }}>
-                  Thank you, <strong>{fullName}</strong>. Our engineering recruitment team will review your credentials and contact you shortly.
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleJobSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
-                    Full Legal Name *
-                  </label>
-                  <input
-                    type="text"
-                    className="m3-text-field"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Sarah Jenkins"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    className="m3-text-field"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="sarah.jenkins@example.com"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    className="m3-text-field"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (555) 019-2834"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
-                    GitHub / Portfolio URL
-                  </label>
-                  <input
-                    type="url"
-                    className="m3-text-field"
-                    value={portfolio}
-                    onChange={(e) => setPortfolio(e.target.value)}
-                    placeholder="https://github.com/username"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
-                    Upload Resume (PDF / DOCX)
-                  </label>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => setResumeFile(e.target.files[0])}
-                    style={{ display: 'none' }}
-                    id="resume-upload-input"
-                  />
-                  <label htmlFor="resume-upload-input" className="m3-btn m3-btn-outlined" style={{ width: '100%', justifyContent: 'center' }}>
-                    <span className="material-symbols-outlined">upload_file</span>
-                    {resumeFile ? resumeFile.name : 'Select Resume File'}
-                  </label>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
-                    Cover Letter & Relevant Experience
-                  </label>
-                  <textarea
-                    className="m3-text-field"
-                    rows={4}
-                    value={coverLetter}
-                    onChange={(e) => setCoverLetter(e.target.value)}
-                    placeholder="Briefly describe your experience with WebSockets, WebRTC, and real-time backend microservices..."
-                  />
-                </div>
-
-                <button type="submit" className="m3-btn m3-btn-filled" style={{ padding: '14px 24px', fontSize: '1rem' }}>
-                  <span className="material-symbols-outlined">send</span>
-                  Submit Application
-                </button>
-              </form>
-            )}
+            <JobApplicationForm
+              appliedSuccess={appliedSuccess}
+              fullName={fullName}
+              setFullName={setFullName}
+              email={email}
+              setEmail={setEmail}
+              phone={phone}
+              setPhone={setPhone}
+              portfolio={portfolio}
+              setPortfolio={setPortfolio}
+              resumeFile={resumeFile}
+              setResumeFile={setResumeFile}
+              coverLetter={coverLetter}
+              setCoverLetter={setCoverLetter}
+              handleJobSubmit={handleJobSubmit}
+            />
           </div>
 
           {/* Job Overview Column */}
@@ -316,134 +225,23 @@ export default function JoinRoom() {
       </main>
 
       {/* Secret Room Passcode Modal */}
-      <AnimatedModal
+      <SecretRoomModal
         isOpen={showSecretModal}
         onClose={() => setShowSecretModal(false)}
-        maxWidth="460px"
-        enableDragDismiss={true}
-      >
-        <div
-          className="m3-card"
-          style={{
-            backgroundColor: 'var(--m3-surface-container-highest)',
-            borderRadius: 'var(--m3-radius-xl)',
-            boxShadow: 'var(--m3-elevation-3)',
-            padding: '24px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span className="material-symbols-outlined" style={{ color: 'var(--m3-primary)' }}>vpn_key</span>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--m3-on-surface)' }}>Secret Space Portal</h3>
-            </div>
-            <button
-              className="m3-btn m3-btn-icon m3-btn-outlined"
-              onClick={() => setShowSecretModal(false)}
-              style={{ width: '36px', height: '36px' }}
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </div>
-
-          {error && (
-            <div
-              style={{
-                backgroundColor: 'var(--m3-error-container)',
-                color: 'var(--m3-on-error)',
-                padding: '10px 14px',
-                borderRadius: 'var(--m3-radius-m)',
-                marginBottom: '16px',
-                fontSize: '0.85rem',
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {roomVerified ? (
-            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#81c784' }}>
-                  check_circle
-                </span>
-                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--m3-on-surface)', margin: 0 }}>
-                  Room Passcode Verified
-                </h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--m3-on-surface-variant)', margin: 0 }}>
-                  Successfully authenticated for Room: <strong>{passcode}</strong> as <strong>{nickname}</strong>
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                <button
-                  type="button"
-                  className="m3-btn m3-btn-outlined"
-                  style={{ flex: 1, padding: '10px' }}
-                  onClick={() => setRoomVerified(false)}
-                >
-                  Edit Details
-                </button>
-                <button
-                  type="button"
-                  className="m3-btn m3-btn-filled"
-                  style={{ flex: 1, padding: '10px', backgroundColor: 'var(--m3-primary)', color: '#fff' }}
-                  onClick={() => navigate('/chat')}
-                >
-                  <span className="material-symbols-outlined">meeting_room</span>
-                  Enter Chatroom Now
-                </button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSecretJoin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
-                  User Nickname
-                </label>
-                <input
-                  type="text"
-                  className="m3-text-field"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Enter your nickname"
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
-                  Room Passcode
-                </label>
-                <input
-                  type="password"
-                  className="m3-text-field"
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Enter passcode"
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '4px' }}>
-                  Avatar Image (Optional)
-                </label>
-                <input type="file" onChange={handleAvatarUpload} accept="image/*" id="secret-avatar-upload" style={{ display: 'none' }} />
-                <label htmlFor="secret-avatar-upload" className="m3-btn m3-btn-outlined" style={{ width: '100%', justifyContent: 'center' }}>
-                  <span className="material-symbols-outlined">upload_file</span>
-                  {uploading ? 'Uploading...' : avatarUrl ? 'Change Avatar' : 'Upload Avatar'}
-                </label>
-              </div>
-
-              <button type="submit" disabled={joining} className="m3-btn m3-btn-filled" style={{ marginTop: '8px', padding: '12px' }}>
-                <span className="material-symbols-outlined">meeting_room</span>
-                {joining ? 'Authenticating Passcode...' : 'Verify & Connect Room Space'}
-              </button>
-            </form>
-          )}
-        </div>
-      </AnimatedModal>
-
+        error={error}
+        roomVerified={roomVerified}
+        setRoomVerified={setRoomVerified}
+        passcode={passcode}
+        nickname={nickname}
+        setNickname={setNickname}
+        setPasscode={setPasscode}
+        handleAvatarUpload={handleAvatarUpload}
+        uploading={uploading}
+        avatarUrl={avatarUrl}
+        joining={joining}
+        handleSecretJoin={handleSecretJoin}
+        onNavigateChat={() => navigate('/chat')}
+      />
 
       {/* Footer */}
       <footer style={{ backgroundColor: 'var(--m3-surface-container-lowest)', borderTop: '1px solid var(--m3-outline-variant)', padding: '20px 32px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--m3-on-surface-variant)' }}>
