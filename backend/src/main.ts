@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { join } from 'path';
 
 import { AppModule } from './app.module';
@@ -41,14 +42,14 @@ async function bootstrap() {
 
   app.useStaticAssets(uploadPath, {
     prefix: uploadPrefix,
-    setHeaders: (res) => {
+    setHeaders: (res: Response) => {
       res.set('Access-Control-Allow-Origin', '*');
       res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       res.set('Access-Control-Allow-Headers', 'Content-Type');
       res.set('X-Content-Type-Options', 'nosniff');
       res.set(
         'Content-Security-Policy',
-        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "default-src 'self'; img-src 'self' data: blob: *; media-src 'self' data: blob: *; style-src 'self' 'unsafe-inline';",
       );
       res.set('X-Frame-Options', 'DENY');
       res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -69,4 +70,8 @@ async function bootstrap() {
   console.log(`Application running on port ${port}`);
 }
 
-bootstrap();
+bootstrap().catch((err: unknown) => {
+  console.error('Fatal error during application startup:', err);
+  process.exit(1);
+});
+

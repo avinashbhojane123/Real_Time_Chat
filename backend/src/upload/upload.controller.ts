@@ -93,11 +93,14 @@ export class UploadController {
       }),
 
       fileFilter: (req, file, cb) => {
-        const ext = extname(file.originalname).toLowerCase();
-        if (blockedExtList.includes(ext)) {
+        const parts = file.originalname.toLowerCase().split('.');
+        const hasBlockedExt = parts.some((p) =>
+          blockedExtList.includes(`.${p}`),
+        );
+        if (hasBlockedExt) {
           return cb(
             new Error(
-              `Executable or blocked file type (${ext}) is not allowed`,
+              `Executable or blocked file extension detected in filename (${file.originalname})`,
             ),
             false,
           );
@@ -112,7 +115,7 @@ export class UploadController {
   )
   uploadFile(
     @UploadedFile()
-    file: any,
+    file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

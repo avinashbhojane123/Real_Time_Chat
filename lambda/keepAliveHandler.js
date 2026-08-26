@@ -11,8 +11,13 @@ exports.handler = async (event, context) => {
   const rawUrl =
     (event && event.url) ||
     process.env.RENDER_SERVER_URL ||
-    process.env.TARGET_URL ||
-    'https://yoursitehere.onrender.com';
+    process.env.TARGET_URL;
+
+  if (!rawUrl) {
+    throw new Error(
+      'Target server URL is missing. Please set RENDER_SERVER_URL or TARGET_URL environment variable.',
+    );
+  }
 
   // Automatically append ping route if missing
   let url = rawUrl.replace(/\/+$/, '');

@@ -182,7 +182,8 @@ export default function ChatRoom() {
   const passcode = (sessionStorage.getItem('passcode') || '').trim();
 
   // Responsive Roster Panel Toggle State
-  const [showRosterPanel, setShowRosterPanel] = useState(true);
+  const [showRosterPanel, setShowRosterPanel] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
+  const [isDesktopFullScreen, setIsDesktopFullScreen] = useState(false);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -267,13 +268,36 @@ export default function ChatRoom() {
   const [remoteStream, setRemoteStream] = useState(null);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
-  const [videoFit, setVideoFit] = useState('contain'); // 'contain' (Fit Entire Frame) | 'cover' (Fill Screen)
+  const [videoFit, setVideoFit] = useState('cover'); // 'cover' (Fill Screen 100%) | 'contain' (Fit Entire Frame)
   const [facingMode, setFacingMode] = useState('user'); // 'user' (front) | 'environment' (back)
+  const [isStreamSwapped, setIsStreamSwapped] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
 
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
   const screenStreamRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileDevice(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (showVideoPanel) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showVideoPanel]);
 
   // Themes & Wallpapers Feature State
   const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('chat_theme') || 'wa-doodle');
@@ -341,6 +365,8 @@ export default function ChatRoom() {
   const watchDogTimerRef = useRef(null);
   const lastInboundBytesRef = useRef(0);
   const stalledCountRef = useRef(0);
+  const latestOfferRef = useRef(null);
+  const lastCallEndedAtRef = useRef(0);
 
   // Derived Recipient & Online Call Check State
   const otherUsers = users.filter((u) => u.nickname !== nickname);
@@ -440,8 +466,10 @@ export default function ChatRoom() {
     }
     setCallDuration(0);
     pendingIceCandidatesRef.current = [];
+    latestOfferRef.current = null;
     lastInboundBytesRef.current = 0;
     stalledCountRef.current = 0;
+    lastCallEndedAtRef.current = Date.now();
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -572,27 +600,27 @@ export default function ChatRoom() {
     return pc;
   }, [passcode, triggerIceRestart]);
 
-  // Sync localStream to local video node
+  // Sync localStream and remoteStream to video nodes considering stream swap
   useEffect(() => {
-    const videoNode = localVideoRef.current;
-    if (videoNode && localStream) {
-      videoNode.srcObject = localStream;
-      videoNode.play().catch((err) => {
-        console.warn('[WebRTC] Local video play error:', err);
-      });
-    }
-  }, [localStream, callState, showVideoPanel]);
+    const mainNode = isStreamSwapped ? localVideoRef.current : remoteVideoRef.current;
+    const pipNode = isStreamSwapped ? remoteVideoRef.current : localVideoRef.current;
 
-  // Sync remoteStream to remote video node
-  useEffect(() => {
-    const videoNode = remoteVideoRef.current;
-    if (videoNode && remoteStream) {
-      videoNode.srcObject = remoteStream;
-      videoNode.play().catch((err) => {
-        console.warn('[WebRTC] Remote video play error:', err);
+    const mainStream = isStreamSwapped ? localStream : remoteStream;
+    const pipStream = isStreamSwapped ? remoteStream : localStream;
+
+    if (mainNode && mainStream) {
+      mainNode.srcObject = mainStream;
+      mainNode.play().catch((err) => {
+        console.warn('[WebRTC] Main video play error:', err);
       });
     }
-  }, [remoteStream, callState, showVideoPanel]);
+    if (pipNode && pipStream) {
+      pipNode.srcObject = pipStream;
+      pipNode.play().catch((err) => {
+        console.warn('[WebRTC] PIP video play error:', err);
+      });
+    }
+  }, [localStream, remoteStream, callState, showVideoPanel, isStreamSwapped]);
 
 
 
@@ -799,12 +827,16 @@ export default function ChatRoom() {
 
     // WebRTC Signaling Event Handlers
     const handleIncomingCall = ({ callerName: caller }) => {
+      if (caller === nickname) return;
+      if (Date.now() - lastCallEndedAtRef.current < 4000) return;
       setCallerName(caller || 'Space Member');
       updateCallState('incoming');
       setShowVideoPanel(true);
     };
 
     const handleOffer = async ({ from, offer }) => {
+      if (from === nickname) return;
+      if (Date.now() - lastCallEndedAtRef.current < 4000) return;
       setShowVideoPanel(true);
       if (callStateRef.current === 'active' || callStateRef.current === 'calling') {
         const pc = createPeerConnection();
@@ -818,7 +850,7 @@ export default function ChatRoom() {
 
       setCallerName(from || 'Space Member');
       updateCallState('incoming');
-      window.latestOffer = offer;
+      latestOfferRef.current = offer;
     };
 
     const handleAnswer = async ({ answer }) => {
@@ -844,6 +876,7 @@ export default function ChatRoom() {
     socket.on('webrtcCandidate', handleCandidate);
     socket.on('webrtcCandidateRelay', handleCandidate);
     socket.on('callEnded', () => cleanUpCall());
+    socket.on('callDeclined', () => cleanUpCall());
 
     return () => {
       socket.disconnect();
@@ -956,8 +989,8 @@ export default function ChatRoom() {
       setLocalStream(stream);
 
       const pc = createPeerConnection();
-      if (window.latestOffer) {
-        await pc.setRemoteDescription(new RTCSessionDescription(window.latestOffer));
+      if (latestOfferRef.current) {
+        await pc.setRemoteDescription(new RTCSessionDescription(latestOfferRef.current));
         processPendingIceCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -970,12 +1003,12 @@ export default function ChatRoom() {
   };
 
   const declineCall = () => {
-    socketRef.current?.emit('callEnded', { passcode });
+    socketRef.current?.emit('declineCall', { passcode });
     cleanUpCall();
   };
 
   const endCall = () => {
-    socketRef.current?.emit('callEnded', { passcode });
+    socketRef.current?.emit('endCall', { passcode });
     cleanUpCall();
   };
 
@@ -1402,16 +1435,18 @@ export default function ChatRoom() {
   return (
     <div className={`theme-${currentTheme}`} style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: 'var(--chat-wallpaper-bg, #111b21)', overflow: 'hidden' }}>
       
-      {/* 1. Chats Roster Panel (Left Column) */}
+      {/* 1. Chats Roster Panel (Left Column / Mobile Full Drawer) */}
       <aside
         style={{
-          width: '320px',
+          width: isMobileDevice ? '100%' : '320px',
+          position: isMobileDevice ? 'absolute' : 'relative',
+          inset: isMobileDevice ? 0 : 'auto',
           backgroundColor: 'var(--chat-roster-bg, #111b21)',
           borderRight: '1px solid rgba(134, 150, 160, 0.15)',
           display: showRosterPanel ? 'flex' : 'none',
           flexDirection: 'column',
           height: '100%',
-          zIndex: 30,
+          zIndex: isMobileDevice ? 100 : 30,
           flexShrink: 0,
         }}
       >
@@ -1428,6 +1463,25 @@ export default function ChatRoom() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {isMobileDevice && (
+              <button
+                type="button"
+                onClick={() => setShowRosterPanel(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#00a884',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginRight: '2px',
+                }}
+                title="Back to Chat"
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+            )}
             {renderStatusAvatar(nickname, '36px', true)}
             <div>
               <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>
@@ -1960,120 +2014,122 @@ export default function ChatRoom() {
                         )}
                       </div>
 
-                      {/* Message 3 Dots Button Trigger (Sender Only) */}
-                      {isMe && (
-                        <>
+                      {/* Message 3 Dots Button Trigger (All Messages) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: isMe ? '2px' : 'auto',
+                          left: !isMe ? '2px' : 'auto',
+                          background: 'none',
+                          border: 'none',
+                          color: '#8696a0',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 15,
+                        }}
+                        className="group-hover:opacity-100 opacity-60 hover:opacity-100"
+                        title="Message options"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
+                      </button>
+
+                      {/* 3 Dots Context Dropdown Menu */}
+                      {activeMenuMsgId === msg.id && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '26px',
+                            right: isMe ? '6px' : 'auto',
+                            left: !isMe ? '6px' : 'auto',
+                            backgroundColor: '#233138',
+                            borderRadius: '10px',
+                            boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
+                            border: '1px solid rgba(134, 150, 160, 0.2)',
+                            padding: '4px 0',
+                            zIndex: 60,
+                            minWidth: '150px',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
+                            onClick={() => {
+                              setActiveReactionMsgId(msg.id);
+                              setActiveMenuMsgId(null);
                             }}
-                            style={{
-                              position: 'absolute',
-                              top: '2px',
-                              right: '2px',
-                              background: 'none',
-                              border: 'none',
-                              color: '#8696a0',
-                              cursor: 'pointer',
-                              padding: '2px',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              zIndex: 15,
-                            }}
-                            className="group-hover:opacity-100 opacity-60 hover:opacity-100"
-                            title="Message options"
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            className="hover:bg-[#182229]"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>add_reaction</span>
+                            <span>React</span>
                           </button>
 
-                          {/* 3 Dots Context Dropdown Menu */}
-                          {activeMenuMsgId === msg.id && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '26px',
-                                right: '6px',
-                                backgroundColor: '#233138',
-                                borderRadius: '10px',
-                                boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
-                                border: '1px solid rgba(134, 150, 160, 0.2)',
-                                padding: '4px 0',
-                                zIndex: 60,
-                                minWidth: '150px',
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyingTo(msg);
+                              setActiveMenuMsgId(null);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            className="hover:bg-[#182229]"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>reply</span>
+                            <span>Reply</span>
+                          </button>
+
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                startEditing(msg);
+                                setActiveMenuMsgId(null);
                               }}
-                              onClick={(e) => e.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                              className="hover:bg-[#182229]"
                             >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveReactionMsgId(msg.id);
-                                  setActiveMenuMsgId(null);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                                className="hover:bg-[#182229]"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>add_reaction</span>
-                                <span>React</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setReplyingTo(msg);
-                                  setActiveMenuMsgId(null);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                                className="hover:bg-[#182229]"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>reply</span>
-                                <span>Reply</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  startEditing(msg);
-                                  setActiveMenuMsgId(null);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                                className="hover:bg-[#182229]"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>edit</span>
-                                <span>Edit</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleTogglePinMessage(msg);
-                                  setActiveMenuMsgId(null);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                                className="hover:bg-[#182229]"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>push_pin</span>
-                                <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleDeleteMessage(msg.id);
-                                  setActiveMenuMsgId(null);
-                                }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
-                                className="hover:bg-[#182229]"
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f44336' }}>delete</span>
-                                <span>Delete</span>
-                              </button>
-                            </div>
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>edit</span>
+                              <span>Edit</span>
+                            </button>
                           )}
-                        </>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleTogglePinMessage(msg);
+                              setActiveMenuMsgId(null);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            className="hover:bg-[#182229]"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>push_pin</span>
+                            <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
+                          </button>
+
+                          {isMe && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleDeleteMessage(msg.id);
+                                setActiveMenuMsgId(null);
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                              className="hover:bg-[#182229]"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f44336' }}>delete</span>
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       )}
 
                       {/* Emoji Reactions Popover */}
@@ -2603,54 +2659,268 @@ export default function ChatRoom() {
         )}
       </main>
 
-      {/* WebRTC Video Call Overlay Canvas */}
+      {/* WebRTC WhatsApp Video Call Canvas */}
       {showVideoPanel && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(11, 20, 26, 0.95)',
-            backdropFilter: 'blur(12px)',
-            zIndex: 9999,
+            backgroundColor: 'rgba(11, 20, 26, 0.88)',
+            backdropFilter: 'blur(14px)',
+            zIndex: 999999,
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: isMobileDevice || isDesktopFullScreen ? '0' : '20px',
           }}
           className="animate-fade-in"
         >
-          <div style={{ height: '56px', backgroundColor: '#202c33', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#e9edef' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1rem' }}>
-              <span className="material-symbols-outlined" style={{ color: '#00a884' }}>videocam</span>
-              <span>WhatsApp Video Call</span>
+          <div
+            style={{
+              width: isMobileDevice || isDesktopFullScreen ? '100vw' : '880px',
+              height: isMobileDevice || isDesktopFullScreen ? '100vh' : '580px',
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+              backgroundColor: '#0b141a',
+              borderRadius: isMobileDevice || isDesktopFullScreen ? '0' : '16px',
+              border: isMobileDevice || isDesktopFullScreen ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: isMobileDevice || isDesktopFullScreen ? 'none' : '0 24px 70px rgba(0, 0, 0, 0.85)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+          {/* Header Bar */}
+          <div
+            style={{
+              height: '60px',
+              backgroundColor: '#111b21',
+              padding: '0 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#e9edef',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              zIndex: 50,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: '#00a884',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                  videocam
+                </span>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>WhatsApp Video Call</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#25d366' }}>
+                    lock
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>
+                  End-to-end encrypted • {videoFit === 'cover' ? 'Fill Screen (100%)' : 'Fit Entire Frame'}
+                </div>
+              </div>
             </div>
-            <button type="button" onClick={() => setShowVideoPanel(false)} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
-              <span className="material-symbols-outlined">close</span>
-            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {!isMobileDevice && (
+                <button
+                  type="button"
+                  onClick={() => setIsDesktopFullScreen((prev) => !prev)}
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    border: 'none',
+                    color: '#e9edef',
+                    padding: '6px 12px',
+                    borderRadius: '16px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                  title={isDesktopFullScreen ? 'Restore Desktop Window' : 'Maximize to Fullscreen'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                    {isDesktopFullScreen ? 'fullscreen_exit' : 'fullscreen'}
+                  </span>
+                  <span>{isDesktopFullScreen ? 'Restore' : 'Fullscreen'}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setVideoFit((prev) => (prev === 'cover' ? 'contain' : 'cover'))}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: 'none',
+                  color: '#e9edef',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                  {videoFit === 'cover' ? 'crop_free' : 'fullscreen'}
+                </span>
+                <span>{videoFit === 'cover' ? 'Fit Frame' : 'Fill Screen'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowVideoPanel(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#8696a0',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
           </div>
 
-          <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Main Viewport */}
+          <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', overflow: 'hidden' }}>
             {callState === 'calling' && (
-              <div style={{ textAlign: 'center', color: '#fff' }}>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 700, margin: '0 auto 16px auto' }}>
-                  {(remoteUserName || 'S').slice(0, 2).toUpperCase()}
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', backgroundColor: '#0b141a' }}>
+                <div
+                  className="wa-call-pulse"
+                  style={{
+                    width: '96px',
+                    height: '96px',
+                    borderRadius: '50%',
+                    backgroundColor: '#00a884',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.5rem',
+                    fontWeight: 700,
+                    marginBottom: '20px',
+                    boxShadow: '0 8px 24px rgba(0, 168, 132, 0.4)',
+                  }}
+                >
+                  {(remoteUserName || 'U').slice(0, 2).toUpperCase()}
                 </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Calling {remoteUserName}...</h3>
-                <button onClick={endCall} style={{ marginTop: '24px', backgroundColor: '#f44336', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 700, cursor: 'pointer' }}>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px' }}>
+                  Calling {remoteUserName}...
+                </h3>
+                <p style={{ color: '#8696a0', fontSize: '0.9rem', marginBottom: '32px' }}>
+                  Waiting for response
+                </p>
+                <button
+                  onClick={endCall}
+                  style={{
+                    backgroundColor: '#ea0038',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '14px 32px',
+                    borderRadius: '30px',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(234, 0, 56, 0.4)',
+                  }}
+                >
+                  <span className="material-symbols-outlined">call_end</span>
                   End Call
                 </button>
               </div>
             )}
 
             {callState === 'incoming' && (
-              <div style={{ textAlign: 'center', color: '#fff' }}>
-                <div className="wa-call-pulse" style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 700, margin: '0 auto 16px auto' }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', backgroundColor: '#0b141a' }}>
+                <div
+                  className="wa-call-pulse"
+                  style={{
+                    width: '96px',
+                    height: '96px',
+                    borderRadius: '50%',
+                    backgroundColor: '#00a884',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.5rem',
+                    fontWeight: 700,
+                    marginBottom: '20px',
+                    boxShadow: '0 8px 24px rgba(0, 168, 132, 0.4)',
+                  }}
+                >
                   {(callerName || 'C').slice(0, 2).toUpperCase()}
                 </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{callerName} is calling...</h3>
-                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '24px' }}>
-                  <button onClick={acceptCall} style={{ backgroundColor: '#25d366', color: '#000', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 700, cursor: 'pointer' }}>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px' }}>
+                  {callerName}
+                </h3>
+                <p style={{ color: '#25d366', fontSize: '0.95rem', fontWeight: 600, marginBottom: '32px' }}>
+                  Incoming WhatsApp Video Call...
+                </p>
+                <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
+                  <button
+                    onClick={acceptCall}
+                    style={{
+                      backgroundColor: '#25d366',
+                      color: '#0b141a',
+                      border: 'none',
+                      padding: '14px 32px',
+                      borderRadius: '30px',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
+                    }}
+                  >
+                    <span className="material-symbols-outlined">call</span>
                     Accept
                   </button>
-                  <button onClick={declineCall} style={{ backgroundColor: '#f44336', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 700, cursor: 'pointer' }}>
+                  <button
+                    onClick={declineCall}
+                    style={{
+                      backgroundColor: '#ea0038',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '14px 32px',
+                      borderRadius: '30px',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 14px rgba(234, 0, 56, 0.4)',
+                    }}
+                  >
+                    <span className="material-symbols-outlined">call_end</span>
                     Decline
                   </button>
                 </div>
@@ -2659,12 +2929,31 @@ export default function ChatRoom() {
 
             {callState === 'active' && (
               <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                {/* Timer Badge */}
-                <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 20, backgroundColor: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: '12px', color: '#25d366', fontWeight: 700, fontSize: '0.8rem' }}>
-                  {formatTimer(callDuration)}
+                {/* Duration Badge */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    left: '16px',
+                    zIndex: 20,
+                    backgroundColor: 'rgba(11, 20, 26, 0.75)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    color: '#25d366',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#25d366', display: 'inline-block' }} />
+                  <span>{formatTimer(callDuration)}</span>
                 </div>
 
-                {/* Remote Stream */}
+                {/* Remote Stream (100% Fit Screen PC Desktop) */}
                 <video
                   ref={remoteVideoRef}
                   autoPlay
@@ -2672,87 +2961,256 @@ export default function ChatRoom() {
                   style={{
                     width: '100%',
                     height: '100%',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
                     objectFit: videoFit,
                     backgroundColor: '#0b141a',
-                    transition: 'all 0.3s ease',
+                    transition: 'object-fit 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 />
 
-                {/* Floating PIP Local Stream with Motion Drag */}
+                {/* Floating PIP Local Stream with Responsive Dimensions & Stream Swap */}
                 <motion.div
                   drag
                   dragConstraints={{ top: 0, left: -280, right: 0, bottom: 380 }}
                   dragElastic={0.15}
-                  whileDrag={{ scale: 1.08, boxShadow: '0 16px 36px rgba(0,0,0,0.7)' }}
+                  whileDrag={{ scale: 1.08, boxShadow: '0 16px 36px rgba(0,0,0,0.8)' }}
+                  onClick={() => setIsStreamSwapped((prev) => !prev)}
+                  title="Click to swap main and PIP video views"
                   style={{
                     position: 'absolute',
-                    top: '16px',
-                    right: '16px',
-                    width: '160px',
-                    height: '110px',
-                    borderRadius: '14px',
+                    top: isMobileDevice ? '72px' : '76px',
+                    right: isMobileDevice ? '12px' : '20px',
+                    width: isMobileDevice ? '112px' : '190px',
+                    height: isMobileDevice ? '158px' : '130px',
+                    borderRadius: '16px',
                     overflow: 'hidden',
-                    border: '2px solid #00a884',
+                    border: '2.5px solid #00a884',
                     zIndex: 30,
                     backgroundColor: '#111b21',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-                    cursor: 'grab',
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.7)',
+                    cursor: 'pointer',
                     touchAction: 'none',
                   }}
                 >
-                  <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: cameraOff ? 'none' : 'block' }} />
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                      display: cameraOff ? 'none' : 'block',
+                    }}
+                  />
 
                   {cameraOff && (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00a884', fontWeight: 700 }}>
-                      {nickname.slice(0, 2).toUpperCase()}
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#111b21',
+                        color: '#00a884',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          backgroundColor: '#00a884',
+                          color: '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.1rem',
+                        }}
+                      >
+                        {nickname.slice(0, 2).toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+
+                  {micMuted && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '6px',
+                        right: '6px',
+                        backgroundColor: 'rgba(234, 0, 56, 0.9)',
+                        color: '#fff',
+                        borderRadius: '50%',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                        mic_off
+                      </span>
                     </div>
                   )}
                 </motion.div>
 
-
-                {/* Controls Dock */}
-                <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '16px', zIndex: 20 }}>
-                  <button onClick={toggleMic} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: micMuted ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={micMuted ? 'Unmute Mic' : 'Mute Mic'}>
-                    <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
-                  </button>
-                  <button onClick={toggleCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: cameraOff ? '#f44336' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}>
-                    <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
-                  </button>
+                {/* WhatsApp Floating Dock Controls */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '32px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    padding: '12px 24px',
+                    backgroundColor: 'rgba(32, 44, 51, 0.85)',
+                    backdropFilter: 'blur(12px)',
+                    borderRadius: '40px',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+                    zIndex: 40,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
                   <button
-                    onClick={() => setVideoFit((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
+                    onClick={toggleMic}
                     style={{
                       width: '48px',
                       height: '48px',
                       borderRadius: '50%',
-                      backgroundColor: videoFit === 'contain' ? '#00a884' : '#202c33',
+                      backgroundColor: micMuted ? '#ea0038' : 'rgba(255, 255, 255, 0.12)',
                       color: '#fff',
                       border: 'none',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      transition: 'all 0.2s ease',
                     }}
-                    title={videoFit === 'contain' ? 'Mode: Fit Entire Frame (Click to Fill Screen)' : 'Mode: Fill Screen (Click to Fit Entire Frame)'}
+                    title={micMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+                  >
+                    <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
+                  </button>
+
+                  <button
+                    onClick={toggleCamera}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: cameraOff ? '#ea0038' : 'rgba(255, 255, 255, 0.12)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+                  >
+                    <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setVideoFit((prev) => (prev === 'cover' ? 'contain' : 'cover'))}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: videoFit === 'cover' ? '#00a884' : 'rgba(255, 255, 255, 0.12)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title={videoFit === 'cover' ? 'Mode: Fill Screen 100% (Click to Fit Frame)' : 'Mode: Fit Frame (Click to Fill Screen)'}
                   >
                     <span className="material-symbols-outlined">
-                      {videoFit === 'contain' ? 'aspect_ratio' : 'fit_screen'}
+                      {videoFit === 'cover' ? 'aspect_ratio' : 'fit_screen'}
                     </span>
                   </button>
-                  <button onClick={flipCamera} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={`Reverse Camera (Front/Back) - Current: ${facingMode === 'user' ? 'Front' : 'Back'}`}>
+
+                  <button
+                    onClick={flipCamera}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title={`Switch Camera (Front/Back) - Currently: ${facingMode === 'user' ? 'Front' : 'Back'}`}
+                  >
                     <span className="material-symbols-outlined">cameraswitch</span>
                   </button>
-                  <button onClick={toggleScreenShare} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: isScreenSharing ? '#00a884' : '#202c33', color: '#fff', border: 'none', cursor: 'pointer' }} title={isScreenSharing ? 'Stop Screen Sharing' : 'Share Screen'}>
+
+                  <button
+                    onClick={toggleScreenShare}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      backgroundColor: isScreenSharing ? '#00a884' : 'rgba(255, 255, 255, 0.12)',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title={isScreenSharing ? 'Stop Screen Sharing' : 'Share Screen'}
+                  >
                     <span className="material-symbols-outlined">{isScreenSharing ? 'stop_screen_share' : 'screen_share'}</span>
                   </button>
-                  <button onClick={endCall} style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#f44336', color: '#fff', border: 'none', cursor: 'pointer' }} title="End Call">
-                    <span className="material-symbols-outlined">call_end</span>
+
+                  <button
+                    onClick={endCall}
+                    style={{
+                      width: '52px',
+                      height: '52px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ea0038',
+                      color: '#fff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 14px rgba(234, 0, 56, 0.5)',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title="End Call"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>
+                      call_end
+                    </span>
                   </button>
                 </div>
-
               </div>
             )}
           </div>
         </div>
+      </div>
       )}
 
       {/* Clear History Modal */}

@@ -79,7 +79,10 @@ export class InstagramService {
     const match = inputUrl.match(regex);
 
     if (match && match[2]) {
-      const type = match[1] === 'reels' ? 'reel' : match[1];
+      const type =
+        match[1] === 'reels' || match[1] === 'share/reel'
+          ? 'reel'
+          : match[1];
       const shortcode = match[2];
       return {
         shortcode,

@@ -149,7 +149,7 @@ export default function JoinRoom() {
       </header>
 
       {/* Main Career Portal Layout */}
-      <main style={{ flex: 1, maxWdith: '1000px', width: '100%', margin: '0 auto', padding: '40px 24px' }}>
+      <main style={{ flex: 1, maxWidth: '1000px', width: '100%', margin: '0 auto', padding: '40px 24px' }}>
         {/* Job Banner Card */}
         <div className="m3-card" style={{ marginBottom: '32px', borderLeft: '6px solid var(--m3-primary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>

@@ -171,6 +171,24 @@ export class ChatGateway
 
   private socketMessageTimes = new Map<string, number[]>();
 
+  private checkRateLimit(
+    client: Socket,
+    maxLimit = 15,
+    windowMs = 3000,
+  ): boolean {
+    const now = Date.now();
+    const timestamps = (this.socketMessageTimes.get(client.id) || []).filter(
+      (t) => now - t < windowMs,
+    );
+    if (timestamps.length >= maxLimit) {
+      client.emit('error', { message: 'Rate limit exceeded. Please slow down.' });
+      return false;
+    }
+    timestamps.push(now);
+    this.socketMessageTimes.set(client.id, timestamps);
+    return true;
+  }
+
   handleConnection(client: Socket) {
     console.log('Client connected:', client.id);
   }
@@ -395,16 +413,9 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SendMessageDto,
   ) {
-    const now = Date.now();
-    const timestamps = (this.socketMessageTimes.get(client.id) || []).filter(
-      (t) => now - t < 3000,
-    );
-    if (timestamps.length >= 10) {
-      client.emit('error', { message: 'Too many messages. Please slow down.' });
+    if (!this.checkRateLimit(client, 10, 3000)) {
       return { success: false, message: 'Rate limit exceeded' };
     }
-    timestamps.push(now);
-    this.socketMessageTimes.set(client.id, timestamps);
 
     let session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) {
@@ -839,16 +850,29 @@ export class ChatGateway
     @MessageBody() data: ClearHistoryDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    const targetPasscode = (data?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return { success: false, message: 'Unauthorized session' };
+    }
 
     const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode },
+      where: { passcode: targetPasscode },
     });
-    if (!room) return;
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const user = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!user) return { success: false, message: 'User not verified in room' };
 
     await this.messageRepo.delete({ roomId: room.id });
 
-    this.server.to(data.passcode).emit('historyCleared');
+    console.log(
+      `[ClearHistory] Room ${targetPasscode} history cleared by user ${session.nickname}`,
+    );
+
+    this.server.to(targetPasscode).emit('historyCleared');
+    return { success: true };
   }
 
   @SubscribeMessage('reactToMessage')
@@ -899,6 +923,10 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: CreateStatusDto,
   ) {
+    if (!this.checkRateLimit(client, 5, 5000)) {
+      return { success: false, message: 'Rate limit exceeded' };
+    }
+
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode.trim())
       return { success: false };
