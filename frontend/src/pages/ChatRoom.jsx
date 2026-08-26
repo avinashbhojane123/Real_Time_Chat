@@ -205,8 +205,9 @@ export default function ChatRoom() {
   const [activeMenuMsgId, setActiveMenuMsgId] = useState(null);
   const [showCustomReactionForMsgId, setShowCustomReactionForMsgId] = useState(null);
 
-  // Clear Confirmation Modal State
+  // Clear & Logout Confirmation Modal State
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Status Feature State
   const [statuses, setStatuses] = useState([]);
@@ -470,6 +471,19 @@ export default function ChatRoom() {
   const handleClearHistory = () => {
     socketRef.current?.emit('clearHistory', { passcode });
     setShowClearConfirm(false);
+  };
+
+  const handleLogout = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    cleanUpCall();
+    sessionStorage.clear();
+    localStorage.removeItem('passcode');
+    localStorage.removeItem('nickname');
+    localStorage.removeItem('avatarUrl');
+    navigate('/', { replace: true });
   };
 
   const handleTogglePinMessage = (msg) => {
@@ -1562,6 +1576,16 @@ export default function ChatRoom() {
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>donut_large</span>
             </button>
+
+            {/* Logout Button */}
+            <button
+              type="button"
+              onClick={() => setShowLogoutConfirm(true)}
+              style={{ background: 'none', border: 'none', color: '#ff4e4e', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
+              title="Logout"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
+            </button>
           </div>
         </div>
 
@@ -1736,6 +1760,16 @@ export default function ChatRoom() {
               title="Search Messages"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>search</span>
+            </button>
+
+            {/* Logout Button */}
+            <button
+              type="button"
+              onClick={() => setShowLogoutConfirm(true)}
+              style={{ background: 'none', border: 'none', color: '#ff4e4e', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', transition: 'all 0.2s ease' }}
+              title="Logout / Leave Room"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
             </button>
           </div>
         </motion.header>
@@ -2707,6 +2741,20 @@ export default function ChatRoom() {
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#f44336' }}>delete_sweep</span>
                     <span>Clear Room History</span>
                   </button>
+
+                  {/* 7. Log Out */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLogoutConfirm(true);
+                      setShowActionMenu(false);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#ff4e4e', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff4e4e' }}>logout</span>
+                    <span>Log Out</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -3351,6 +3399,29 @@ export default function ChatRoom() {
               </button>
               <button onClick={handleClearHistory} style={{ backgroundColor: '#f44336', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
                 Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(11, 20, 26, 0.85)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '100%', maxWidth: '380px', backgroundColor: '#111b21', borderRadius: '16px', border: '1px solid rgba(134, 150, 160, 0.2)', padding: '20px', boxShadow: '0 12px 30px rgba(0,0,0,0.8)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ff4e4e', marginBottom: '12px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>logout</span>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#e9edef' }}>Log Out of Chat Room?</h3>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#8696a0', marginBottom: '20px', lineHeight: 1.4 }}>
+              Are you sure you want to exit the chat room and log out? Your session info will be cleared.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setShowLogoutConfirm(false)} style={{ background: 'none', border: 'none', color: '#8696a0', fontWeight: 600, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleLogout} style={{ backgroundColor: '#ff4e4e', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}>
+                Log Out
               </button>
             </div>
           </div>
