@@ -1,0 +1,8 @@
+.wa-call-container {
+  position: fixed;
+  inset: 0;
+  background-color: #0b141a;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+}
