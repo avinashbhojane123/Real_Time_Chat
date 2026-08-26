@@ -1737,16 +1737,6 @@ export default function ChatRoom() {
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>search</span>
             </button>
-
-            {/* Clear History Button */}
-            <button
-              type="button"
-              onClick={() => setShowClearConfirm(true)}
-              style={{ background: 'none', border: 'none', color: '#f44336', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-              title="Clear Room History"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete_sweep</span>
-            </button>
           </div>
         </motion.header>
 
