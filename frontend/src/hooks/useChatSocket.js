@@ -45,6 +45,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         os: clientDevice.os,
       });
       socket.emit('getStatuses', { passcode });
+      socket.emit('getUsers', { passcode });
     });
 
     // Chat History Event Listeners
@@ -71,13 +72,33 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       });
     });
 
-    // User List / Room Users Listener
-    socket.on('roomUsers', (userList) => {
+    // User List / Room Users Listeners
+    socket.on('usersList', (userList) => {
       setUsers(userList || []);
     });
 
     socket.on('userList', (userList) => {
       setUsers(userList || []);
+    });
+
+    socket.on('roomUsers', (userList) => {
+      setUsers(userList || []);
+    });
+
+    socket.on('userOnline', () => {
+      socket.emit('getUsers', { passcode });
+    });
+
+    socket.on('userOffline', () => {
+      socket.emit('getUsers', { passcode });
+    });
+
+    socket.on('userJoined', () => {
+      socket.emit('getUsers', { passcode });
+    });
+
+    socket.on('userLeft', () => {
+      socket.emit('getUsers', { passcode });
     });
 
     // Typing Listeners
