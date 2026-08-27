@@ -2,7 +2,11 @@
   "name": "frontend",
   "private": true,
   "version": "1.0.0",
+  "description": "Real-time chat & media frontend application built with React, WebSockets, and Material Design 3",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -24,3 +28,4 @@
     "vite": "^6.0.1"
   }
 }
+

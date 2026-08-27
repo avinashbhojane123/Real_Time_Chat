@@ -1,11 +1,15 @@
 {
   "name": "backend",
   "version": "0.0.1",
-  "description": "",
+  "description": "Real-time chat NestJS microservices backend with Socket.io & TypeORM PostgreSQL",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+
     "build": "npx nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
