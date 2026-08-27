@@ -475,7 +475,9 @@ export default function JoinRoom() {
         handleAvatarUpload={handleAvatarUpload}
         uploading={uploading}
         avatarUrl={avatarUrl}
+        setAvatarUrl={setAvatarUrl}
         joining={joining}
+
         handleSecretJoin={handleSecretJoin}
         onNavigateChat={() => navigate('/chat')}
       />
