@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
+import './ChatRoom.css';
 
 // Utilities & Config
 import { getApiBaseUrl } from '../utils/apiConfig';
