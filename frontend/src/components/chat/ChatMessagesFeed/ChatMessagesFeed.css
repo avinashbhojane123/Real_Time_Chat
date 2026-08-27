@@ -47,3 +47,79 @@
 .m3-media-card:hover {
   border-color: rgba(0, 168, 132, 0.4) !important;
 }
+
+/* Feature 1 (Set 2): M3 Reaction Assist Chips */
+.m3-reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: #202c33;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 150ms var(--m3-easing-emphasized), border-color 200ms var(--m3-easing-emphasized);
+}
+
+.m3-reaction-chip:hover {
+  border-color: rgba(0, 168, 132, 0.6);
+  transform: scale(1.08);
+}
+
+/* Feature 3 (Set 2): M3 Quoted Reply Sub-Card Container */
+.m3-quote-card {
+  border-left: 3.5px solid #00a884 !important;
+  background-color: rgba(0, 0, 0, 0.25) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  margin-bottom: 6px !important;
+}
+
+/* Feature 2 (Set 2): M3 Undo Snackbar with Action Button */
+.m3-snackbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 48px;
+  background-color: #e9edef;
+  color: #111b21;
+  border-radius: 8px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.m3-snackbar-action {
+  background: none;
+  border: none;
+  color: #00a884;
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Feature 6 (Set 2): M3 Informational System Badge */
+.m3-system-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background-color: #1d232a;
+  color: #8696a0;
+  font-size: 0.73rem;
+  font-weight: 600;
+  border: 1px solid rgba(134, 150, 160, 0.15);
+  margin: 8px auto;
+}

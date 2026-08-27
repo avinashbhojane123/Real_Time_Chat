@@ -164,9 +164,9 @@ export default function ChatMessagesFeed({
                       </div>
                     )}
 
-                    {/* Reply Quote Inner Box */}
+                    {/* Feature 3 (Set 2): M3 Quoted Reply Sub-Card */}
                     {msg.replyTo && (
-                      <div className="wa-quote-box" style={{ position: 'relative', overflow: 'hidden' }}>
+                      <div className="wa-quote-box m3-quote-card" style={{ position: 'relative', overflow: 'hidden' }}>
                         {msg.replyTo.isStatus ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {msg.replyTo.statusMediaUrl ? (
@@ -188,14 +188,12 @@ export default function ChatMessagesFeed({
                                   flexShrink: 0,
                                 }}
                               >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#fff' }}>
-                                  donut_large
-                                </span>
+                                <Icon icon="solar:play-circle-bold-duotone" width="18" height="18" style={{ color: '#fff' }} />
                               </div>
                             )}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#00a884', fontWeight: 700 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>donut_large</span>
+                                <Icon icon="solar:play-circle-bold-duotone" width="14" height="14" />
                                 <span>{msg.replyTo.nickname}'s Status</span>
                               </div>
                               <div style={{ color: '#8696a0', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -216,21 +214,23 @@ export default function ChatMessagesFeed({
                     <div>
                       {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
 
-                      {/* Image Attachment Preview with Motion layoutId */}
+                      {/* Feature 8 & 5 (Set 2): Image Attachment Preview with M3 Media Card & Motion layoutId */}
                       {msg.fileUrl && msg.fileType?.startsWith('image/') && (
-                        <motion.img
-                          layoutId={`chat-img-${msg.id}`}
-                          src={msg.fileUrl}
-                          alt="Attachment"
-                          style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginTop: '6px', cursor: 'pointer', objectFit: 'cover' }}
-                          onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName, id: msg.id })}
-                        />
+                        <div className="m3-media-card" style={{ marginTop: '6px' }}>
+                          <motion.img
+                            layoutId={`chat-img-${msg.id}`}
+                            src={msg.fileUrl}
+                            alt="Attachment"
+                            style={{ maxWidth: '100%', maxHeight: '280px', cursor: 'pointer', objectFit: 'cover', display: 'block' }}
+                            onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName, id: msg.id })}
+                          />
+                        </div>
                       )}
 
                       {/* Audio Voice Note Player */}
                       {msg.fileUrl && msg.fileType?.startsWith('audio/') && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', borderRadius: '12px', minWidth: '220px' }}>
-                          <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '22px' }}>graphic_eq</span>
+                        <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px' }}>
+                          <Icon icon="solar:volume-loud-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
                           <audio controls src={msg.fileUrl} style={{ height: '30px', flex: 1, outline: 'none' }} />
                         </div>
                       )}
@@ -238,10 +238,11 @@ export default function ChatMessagesFeed({
                       {/* Document & File Attachment Card */}
                       {msg.fileUrl && !msg.fileType?.startsWith('image/') && !msg.fileType?.startsWith('audio/') && (
                         <div
+                          className="m3-media-card"
                           onClick={() => setDocumentViewerFile({ url: msg.fileUrl, name: msg.fileName, type: msg.fileType })}
-                          style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', borderRadius: '10px', cursor: 'pointer', border: '1px solid rgba(134,150,160,0.15)' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', cursor: 'pointer' }}
                         >
-                          <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '24px' }}>description</span>
+                          <Icon icon="solar:document-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.fileName || 'Attachment Document'}</div>
                             <div style={{ fontSize: '0.7rem', color: '#8696a0' }}>Click to preview document</div>
@@ -251,7 +252,7 @@ export default function ChatMessagesFeed({
 
                       {/* Live Interactive Poll Card */}
                       {msg.pollData && (
-                        <div className="poll-card" style={{ marginTop: '6px' }}>
+                        <div className="poll-card m3-media-card" style={{ marginTop: '6px', padding: '10px 12px' }}>
                           <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#e9edef', marginBottom: '8px' }}>
                             {msg.pollData.question}
                           </div>
@@ -272,7 +273,7 @@ export default function ChatMessagesFeed({
                                     <div className="poll-option-fill" style={{ width: `${pct}%` }} />
                                     <div className="poll-option-content">
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        {hasVoted && <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '16px' }}>check_circle</span>}
+                                        {hasVoted && <Icon icon="solar:check-circle-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />}
                                         <span>{opt.text}</span>
                                       </div>
                                       <span style={{ fontSize: '0.74rem', fontWeight: 700, opacity: 0.85 }}>{pct}% ({voteCount})</span>
@@ -287,7 +288,7 @@ export default function ChatMessagesFeed({
 
                       {/* Shared Location Card */}
                       {msg.locationData && (
-                        <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(134,150,160,0.2)', backgroundColor: 'rgba(0,0,0,0.25)', maxWidth: '280px' }}>
+                        <div className="m3-media-card" style={{ marginTop: '6px', maxWidth: '280px', backgroundColor: 'rgba(0,0,0,0.25)' }}>
                           <a
                             href={`https://www.google.com/maps?q=${msg.locationData.lat},${msg.locationData.lng}`}
                             target="_blank"
@@ -301,10 +302,10 @@ export default function ChatMessagesFeed({
                             />
                             <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#182229' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#00a884', fontWeight: 700 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>location_on</span>
+                                <Icon icon="solar:map-point-wave-bold-duotone" width="18" height="18" />
                                 <span>View on Google Maps</span>
                               </div>
-                              <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#8696a0' }}>open_in_new</span>
+                              <Icon icon="solar:export-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
                             </div>
                           </a>
                         </div>
@@ -329,7 +330,7 @@ export default function ChatMessagesFeed({
                     >
                       {msg.expiresAt && (
                         <span style={{ fontSize: '0.65rem', color: '#ff9800', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Disappearing secret message">
-                          <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>timer</span>
+                          <Icon icon="solar:stopwatch-bold-duotone" width="13" height="13" />
                         </span>
                       )}
                       {msg.isEdited && (
@@ -390,9 +391,8 @@ export default function ChatMessagesFeed({
                       className="group-hover:opacity-100 opacity-60 hover:opacity-100"
                       title="Message options"
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
+                      <Icon icon="solar:alt-arrow-down-bold-duotone" width="16" height="16" />
                     </button>
-
                     {/* 3 Dots Context Dropdown Menu */}
                     {activeMenuMsgId === msg.id && (
                       <div
