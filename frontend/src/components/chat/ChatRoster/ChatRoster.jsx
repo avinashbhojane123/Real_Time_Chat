@@ -36,14 +36,17 @@ export default function ChatRoster({
   users = [],
   messages = [],
   typingUsers = [],
+  statusUserList = [],
   renderStatusAvatar,
+  setActiveStatusUser,
+  setShowStatusCreator,
   setChatMessage,
   chatInputRef,
   setShowLogoutConfirm,
   setShowThemeModal,
   setShowClearConfirm,
 }) {
-  const [activeTab, setActiveTab] = useState('people'); // 'people' | 'media'
+  const [activeTab, setActiveTab] = useState('people'); // 'people' | 'status' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState(null); // Motion Lightbox Modal
@@ -152,6 +155,52 @@ export default function ChatRoster({
             >
               {onlineUsers.length}
             </span>
+          )}
+        </motion.button>
+
+        {/* 2. Status Stories Rail Button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={() => {
+            if (statusUserList.length > 0) {
+              setActiveStatusUser && setActiveStatusUser(statusUserList[0]);
+            } else {
+              setShowStatusCreator && setShowStatusCreator(true);
+            }
+          }}
+          style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(37, 211, 102, 0.12)',
+            border: '1px solid rgba(37, 211, 102, 0.35)',
+            color: '#25d366',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '14px',
+            position: 'relative',
+          }}
+          className="media-item-card"
+          title={statusUserList.length > 0 ? `${statusUserList.length} Active Status Stories` : 'Add Status Update'}
+        >
+          <Icon icon="solar:play-circle-bold-duotone" width="24" height="24" style={{ color: '#25d366' }} />
+          {statusUserList.length > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                backgroundColor: '#25d366',
+                boxShadow: '0 0 8px #25d366',
+              }}
+            />
           )}
         </motion.button>
 
@@ -318,24 +367,62 @@ export default function ChatRoster({
           onClick={() => setActiveTab('people')}
           style={{
             flex: 1,
-            padding: '10px',
+            padding: '10px 4px',
             background: 'none',
             border: 'none',
             color: activeTab === 'people' ? '#00a884' : '#8696a0',
             fontWeight: 700,
-            fontSize: '0.82rem',
+            fontSize: '0.8rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
+            gap: '5px',
             position: 'relative',
             transition: 'color 0.2s ease',
           }}
         >
-          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="18" height="18" />
+          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="16" height="16" />
           <span>People ({users.length})</span>
           {activeTab === 'people' && (
+            <motion.div
+              layoutId="activeTabUnderline"
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                backgroundColor: '#00a884',
+              }}
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('status')}
+          style={{
+            flex: 1,
+            padding: '10px 4px',
+            background: 'none',
+            border: 'none',
+            color: activeTab === 'status' ? '#00a884' : '#8696a0',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '5px',
+            position: 'relative',
+            transition: 'color 0.2s ease',
+          }}
+        >
+          <Icon icon="solar:play-circle-bold-duotone" width="16" height="16" />
+          <span>Status ({statusUserList.length})</span>
+          {activeTab === 'status' && (
             <motion.div
               layoutId="activeTabUnderline"
               style={{
@@ -356,23 +443,23 @@ export default function ChatRoster({
           onClick={() => setActiveTab('media')}
           style={{
             flex: 1,
-            padding: '10px',
+            padding: '10px 4px',
             background: 'none',
             border: 'none',
             color: activeTab === 'media' ? '#00a884' : '#8696a0',
             fontWeight: 700,
-            fontSize: '0.82rem',
+            fontSize: '0.8rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
+            gap: '5px',
             position: 'relative',
             transition: 'color 0.2s ease',
           }}
         >
-          <Icon icon="solar:folder-with-files-bold-duotone" width="18" height="18" />
-          <span>Media & Docs ({mediaMessages.length})</span>
+          <Icon icon="solar:folder-with-files-bold-duotone" width="16" height="16" />
+          <span>Media ({mediaMessages.length})</span>
           {activeTab === 'media' && (
             <motion.div
               layoutId="activeTabUnderline"
@@ -392,7 +479,99 @@ export default function ChatRoster({
 
       {/* Motion Tab Transitions */}
       <AnimatePresence mode="wait">
-        {activeTab === 'people' ? (
+        {activeTab === 'status' ? (
+          <motion.div
+            key="status-tab"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2 }}
+            style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}
+          >
+            {/* My Status Card */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                MY STATUS
+              </div>
+              <motion.div
+                whileHover={{ backgroundColor: '#182229', x: 2 }}
+                onClick={() => setShowStatusCreator && setShowStatusCreator(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '8px 10px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  backgroundColor: '#111b21',
+                  border: '1px solid rgba(134, 150, 160, 0.15)',
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#005c4b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>
+                    {nickname ? nickname.slice(0, 2).toUpperCase() : 'ME'}
+                  </div>
+                  <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', backgroundColor: '#00a884', color: '#111b21', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #111b21' }}>
+                    <Icon icon="solar:add-square-bold-duotone" width="12" height="12" />
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>My Status</div>
+                  <div style={{ fontSize: '0.74rem', color: '#8696a0' }}>Tap to add status update</div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Recent Status Updates */}
+            <div>
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                RECENT UPDATES ({statusUserList.length})
+              </div>
+              {statusUserList.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#8696a0', padding: '24px 8px', fontSize: '0.8rem' }}>
+                  No recent status updates from your contacts yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {statusUserList.map((stUser) => (
+                    <motion.div
+                      key={stUser.nickname}
+                      whileHover={{ backgroundColor: '#182229', x: 3 }}
+                      onClick={() => setActiveStatusUser && setActiveStatusUser(stUser)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '8px 10px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        backgroundColor: '#111b21',
+                        border: '1px solid rgba(134, 150, 160, 0.15)',
+                      }}
+                    >
+                      {renderStatusAvatar ? renderStatusAvatar(stUser) : (
+                        <div style={{ width: '42px', height: '42px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                            {stUser.nickname.slice(0, 2).toUpperCase()}
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {stUser.nickname}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
+                          {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <Icon icon="solar:alt-arrow-right-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : activeTab === 'people' ? (
           <motion.div
             key="people-tab"
             initial={{ opacity: 0, x: -10 }}
