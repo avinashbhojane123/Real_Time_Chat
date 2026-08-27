@@ -83,6 +83,7 @@ export default function ChatHeader({
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>{recipientUser.nickname}</span>
+                  <Icon icon="solar:shield-check-bold-duotone" width="16" height="16" style={{ color: '#00a884', opacity: 0.9 }} title="End-to-end encrypted chat" />
                 </div>
 
                 {/* Live Typing Status or Online/Offline Presence Indicator */}
@@ -157,9 +158,11 @@ export default function ChatHeader({
                   : 'User is offline - Video call unavailable'
             }
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-              {callState === 'active' ? 'videocam' : 'video_call'}
-            </span>
+            <Icon
+              icon={callState === 'active' ? 'line-md:video-twotone' : 'solar:videocamera-record-bold-duotone'}
+              width="20"
+              height="20"
+            />
           </button>
 
           {/* Voice Call Button */}
@@ -181,21 +184,42 @@ export default function ChatHeader({
               opacity: !isRecipientOnline ? 0.5 : 1,
               padding: '6px',
               borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               transition: 'all 0.2s ease',
             }}
             title={isRecipientOnline ? 'Start Voice Call' : 'User is offline - Voice call unavailable'}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>call</span>
+            <Icon
+              icon={callState === 'active' || callState === 'calling' ? 'line-md:phone-call-loop' : 'solar:phone-bold-duotone'}
+              width="20"
+              height="20"
+            />
           </button>
 
           {/* Search Icon Button */}
           <button
             type="button"
             onClick={() => setShowSearch(!showSearch)}
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: showSearch ? '#00a884' : '#8696a0',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
             title="Search Messages"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>search</span>
+            <Icon
+              icon={showSearch ? 'line-md:close' : 'solar:magnifer-bold-duotone'}
+              width="20"
+              height="20"
+            />
           </button>
         </div>
       </motion.header>
@@ -221,9 +245,12 @@ export default function ChatHeader({
                 outline: 'none',
               }}
             />
-            <span className="material-symbols-outlined" style={{ position: 'absolute', left: '10px', color: '#8696a0', fontSize: '18px' }}>
-              search
-            </span>
+            <Icon
+              icon="solar:magnifer-bold-duotone"
+              width="18"
+              height="18"
+              style={{ position: 'absolute', left: '10px', color: '#8696a0' }}
+            />
           </div>
           <button
             type="button"
@@ -231,9 +258,9 @@ export default function ChatHeader({
               setShowSearch(false);
               setSearchQuery('');
             }}
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
+            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
           >
-            <span className="material-symbols-outlined">close</span>
+            <Icon icon="line-md:close" width="18" height="18" />
           </button>
         </div>
       )}
@@ -242,9 +269,7 @@ export default function ChatHeader({
       {pinnedMessage && (
         <div style={{ backgroundColor: '#182229', borderBottom: '1px solid #00a884', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-            <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '18px' }}>
-              push_pin
-            </span>
+            <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#00a884' }} />
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00a884' }}>{pinnedMessage.nickname}:</span>
             <span style={{ fontSize: '0.8rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {pinnedMessage.message}
