@@ -9,6 +9,8 @@ export default function ChatHeader({
   headerBlur,
   showRosterPanel,
   setShowRosterPanel,
+  showRailSidebar,
+  setShowRailSidebar,
   renderStatusAvatar,
   recipientUser,
   isRecipientOnline,
@@ -44,30 +46,35 @@ export default function ChatHeader({
       >
         {/* Header Info: Recipient Name, Avatar, Online/Offline Presence & Hamburger Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* 3-Line Hamburger Menu Toggle Button (Only visible when ChatRoster sidebar is hidden) */}
-          {!showRosterPanel && (
-            <motion.button
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.9 }}
-              type="button"
-              onClick={() => setShowRosterPanel(true)}
-              style={{
-                backgroundColor: 'rgba(0, 168, 132, 0.12)',
-                border: '1px solid rgba(0, 168, 132, 0.3)',
-                color: '#00a884',
-                cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s ease',
-              }}
-              title="Open Participants Roster Sidebar"
-            >
-              <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
-            </motion.button>
-          )}
+          {/* 3-Line Hamburger Menu Toggle Button (Toggles 60px Icon-Only Left Sidebar Rail) */}
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.9 }}
+            type="button"
+            onClick={() => {
+              if (showRosterPanel) {
+                setShowRosterPanel(false);
+                setShowRailSidebar(true);
+              } else {
+                setShowRailSidebar(!showRailSidebar);
+              }
+            }}
+            style={{
+              backgroundColor: showRailSidebar ? '#00a884' : 'rgba(0, 168, 132, 0.12)',
+              border: '1px solid rgba(0, 168, 132, 0.3)',
+              color: showRailSidebar ? '#111b21' : '#00a884',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+            }}
+            title="Toggle Left Action Sidebar (Participants, Theme, Clear, Logout)"
+          >
+            <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
+          </motion.button>
 
           {/* Recipient User Info & Avatar */}
           {recipientUser ? (

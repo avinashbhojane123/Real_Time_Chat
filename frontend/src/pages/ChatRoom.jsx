@@ -78,8 +78,9 @@ export default function ChatRoom() {
   // WebRTC Video/Voice Call Hook
   const webRTC = useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast });
 
-  // Responsive Roster Panel Toggle State
-  const [showRosterPanel, setShowRosterPanel] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
+  // Responsive Roster & Rail Sidebar Toggle State
+  const [showRosterPanel, setShowRosterPanel] = useState(false);
+  const [showRailSidebar, setShowRailSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const [isMobileDevice, setIsMobileDevice] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
   useEffect(() => {
@@ -433,12 +434,13 @@ export default function ChatRoom() {
         isMobileDevice={isMobileDevice}
         showRosterPanel={showRosterPanel}
         setShowRosterPanel={setShowRosterPanel}
+        showRailSidebar={showRailSidebar}
+        setShowRailSidebar={setShowRailSidebar}
         nickname={nickname}
         users={users}
         messages={messages}
         typingUsers={typingUsers}
         statusUserList={statusUserList}
-
 
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
@@ -469,6 +471,8 @@ export default function ChatRoom() {
           headerBlur={headerBlur}
           showRosterPanel={showRosterPanel}
           setShowRosterPanel={setShowRosterPanel}
+          showRailSidebar={showRailSidebar}
+          setShowRailSidebar={setShowRailSidebar}
           renderStatusAvatar={renderStatusAvatar}
           recipientUser={recipientUser}
           isRecipientOnline={isRecipientOnline}
