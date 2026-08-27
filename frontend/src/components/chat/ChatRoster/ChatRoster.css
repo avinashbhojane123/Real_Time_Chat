@@ -75,3 +75,26 @@
   color: #8696a0;
   backdrop-filter: blur(8px);
 }
+
+/* uupm.cc Team Activity Heat Meter (Feature #4) */
+.uupm-activity-meter-card {
+  margin: 8px 12px;
+  padding: 10px 14px;
+  background: rgba(20, 30, 36, 0.85);
+  border-radius: 12px;
+  border: 1px solid rgba(134, 150, 160, 0.15);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.uupm-activity-bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #00a884 0%, rgba(0, 168, 132, 0.2) 100%);
+  transition: all 0.3s ease;
+}
+
+.uupm-activity-bar:hover {
+  background: linear-gradient(180deg, #00d2a0 0%, rgba(0, 210, 160, 0.4) 100%);
+  box-shadow: 0 0 10px rgba(0, 168, 132, 0.5);
+}
