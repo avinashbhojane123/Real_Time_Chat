@@ -1,7 +1,44 @@
 import React from 'react';
 
+/**
+ * Detects live Network Connection metrics using Network Information API
+ */
+export function detectNetworkInfo() {
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const connection =
+    typeof navigator !== 'undefined'
+      ? navigator.connection || navigator.mozConnection || navigator.webkitConnection
+      : null;
+
+  let effectiveType = '4g';
+  let downlink = 10; // Mbps
+  let rtt = 25; // ms
+  let saveData = false;
+
+  if (connection) {
+    effectiveType = connection.effectiveType || '4g';
+    downlink = connection.downlink || 10;
+    rtt = connection.rtt || 25;
+    saveData = Boolean(connection.saveData);
+  }
+
+  // Format human-readable connection label (e.g., '📶 4G • 25ms')
+  const label = isOnline
+    ? `${effectiveType.toUpperCase()} • ${rtt}ms`
+    : '🔴 Offline';
+
+  return {
+    isOnline,
+    effectiveType,
+    downlink,
+    rtt,
+    saveData,
+    label,
+  };
+}
+
 export function detectClientDevice() {
-  const ua = navigator.userAgent;
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   let deviceType = 'Desktop';
   let deviceModel = 'PC';
   let os = 'Windows';
@@ -39,7 +76,9 @@ export function detectClientDevice() {
     browser = 'Edge';
   }
 
-  return { deviceType, deviceModel, browser, os };
+  const network = detectNetworkInfo();
+
+  return { deviceType, deviceModel, browser, os, network };
 }
 
 export function renderDeviceBadge(user) {
@@ -70,24 +109,48 @@ export function renderDeviceBadge(user) {
 
   if (browser) label += ` • ${browser}`;
 
+  const networkLabel = user.network?.label || user.networkLabel || '4G • 18ms';
+
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px',
-        fontSize: '0.68rem',
-        color: '#8696a0',
-        backgroundColor: '#202c33',
-        padding: '2px 6px',
-        borderRadius: '4px',
-        marginTop: '3px',
-      }}
-    >
-      <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#00a884' }}>
-        {icon}
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '3px' }}>
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '0.68rem',
+          color: '#8696a0',
+          backgroundColor: '#202c33',
+          padding: '2px 6px',
+          borderRadius: '4px',
+        }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#00a884' }}>
+          {icon}
+        </span>
+        <span>{label}</span>
       </span>
-      <span>{label}</span>
-    </span>
+
+      {/* Network Info Badge */}
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '0.68rem',
+          color: '#00a884',
+          backgroundColor: 'rgba(0, 168, 132, 0.1)',
+          border: '1px solid rgba(0, 168, 132, 0.25)',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontWeight: 600,
+        }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+          wifi
+        </span>
+        <span>{networkLabel}</span>
+      </span>
+    </div>
   );
 }
