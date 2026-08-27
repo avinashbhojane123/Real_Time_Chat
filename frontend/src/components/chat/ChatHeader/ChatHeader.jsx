@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Icon } from '@iconify/react';
+import { formatUserPresence } from '../../../utils/chatUtils';
 import './ChatHeader.css';
 
 export default function ChatHeader({
@@ -41,7 +42,7 @@ export default function ChatHeader({
           boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         }}
       >
-        {/* Header Info & Telemetry Badges (Feature #1) */}
+        {/* Header Info: Recipient Name, Avatar, Online/Offline Presence & Hamburger Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {/* 3-Line Hamburger Menu Toggle Button (Only visible when ChatRoster sidebar is hidden) */}
           {!showRosterPanel && (
@@ -68,12 +69,45 @@ export default function ChatHeader({
             </motion.button>
           )}
 
-          {/* Telemetry Badges */}
+          {/* Recipient User Info & Avatar */}
+          {recipientUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setShowRosterPanel(true)}>
+              {renderStatusAvatar && renderStatusAvatar(recipientUser.nickname, '38px', isRecipientOnline, {}, recipientUser.avatarUrl)}
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{recipientUser.nickname}</span>
+                </div>
 
-
-          {typingUsers && typingUsers.length > 0 && (
-            <div style={{ fontSize: '0.74rem', color: '#00a884' }}>
-              {typingUsers.join(', ')} is typing...
+                {/* Live Typing Status or Online/Offline Presence Indicator */}
+                {typingUsers && typingUsers.length > 0 ? (
+                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" />
+                    <span>{typingUsers.join(', ')} is typing...</span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.72rem', color: isRecipientOnline ? '#00a884' : '#8696a0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon
+                      icon={isRecipientOnline ? 'solar:check-circle-bold-duotone' : 'solar:clock-circle-bold-duotone'}
+                      width="12"
+                      height="12"
+                      style={{ color: isRecipientOnline ? '#00a884' : '#8696a0' }}
+                    />
+                    <span>{formatUserPresence(isRecipientOnline, recipientUser?.lastSeen).text}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef' }}>Group Chat Space</span>
+              {typingUsers && typingUsers.length > 0 ? (
+                <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" />
+                  <span>{typingUsers.join(', ')} is typing...</span>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.72rem', color: '#8696a0' }}>Click to view room participants</div>
+              )}
             </div>
           )}
         </div>
