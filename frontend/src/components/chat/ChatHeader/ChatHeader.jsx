@@ -42,14 +42,7 @@ export default function ChatHeader({
       >
         {/* Header Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={() => setShowRosterPanel(!showRosterPanel)}
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
-            title="Toggle Participants Panel"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
-          </button>
+
 
           {typingUsers && typingUsers.length > 0 && (
             <div style={{ fontSize: '0.74rem', color: '#00a884' }}>

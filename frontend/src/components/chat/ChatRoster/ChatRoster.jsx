@@ -11,7 +11,7 @@ export default function ChatRoster({
   users,
   renderStatusAvatar,
 }) {
-  // Collapsed State: Render thin 60px vertical sidebar rail with interactive button
+  // Collapsed State: Render thin 60px vertical sidebar rail with Online Participants Button (Group Icon)
   if (!showRosterPanel) {
     if (isMobileDevice) return null; // On mobile, collapsed state hides completely so chat gets 100% width
 
@@ -27,48 +27,24 @@ export default function ChatRoster({
           height: '100%',
           zIndex: 30,
           flexShrink: 0,
-          paddingTop: '10px',
+          paddingTop: '12px',
         }}
       >
-        {/* Toggle Button on Collapsed Left Sidebar Rail */}
+        {/* Online Count Badge Icon Button (Group Icon) */}
         <button
           type="button"
           onClick={() => setShowRosterPanel(true)}
           style={{
-            width: '42px',
-            height: '42px',
+            width: '44px',
+            height: '44px',
             borderRadius: '50%',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
             border: 'none',
             color: '#00a884',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            position: 'relative',
-          }}
-          title="Open Online Participants Panel"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>menu</span>
-        </button>
-
-        {/* Online Count Badge Icon Button */}
-        <button
-          type="button"
-          onClick={() => setShowRosterPanel(true)}
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '50%',
-            backgroundColor: 'transparent',
-            border: 'none',
-            color: '#8696a0',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: '16px',
             position: 'relative',
             transition: 'all 0.2s ease',
           }}
@@ -127,47 +103,31 @@ export default function ChatRoster({
           borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={() => setShowRosterPanel(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#00a884',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background-color 0.2s ease',
-            }}
-            title="Collapse Participants Panel"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '22px' }}>group</span>
           <span style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
             Participants ({users ? users.length : 0})
           </span>
         </div>
 
-        {isMobileDevice && (
-          <button
-            type="button"
-            onClick={() => setShowRosterPanel(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#8696a0',
-              cursor: 'pointer',
-              padding: '4px',
-            }}
-            title="Close Panel"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setShowRosterPanel(false)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#8696a0',
+            cursor: 'pointer',
+            padding: '6px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          title="Close Participants Panel"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+        </button>
       </div>
 
       {/* Online Participants Roster List */}
