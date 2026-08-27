@@ -40,8 +40,32 @@ export default function ChatHeader({
           boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         }}
       >
-        {/* Header Info */}
+        {/* Header Info & Telemetry Badges (Feature #1) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* 3-Line Hamburger Menu Toggle Button for ChatRoster Sidebar */}
+          <motion.button
+            whileHover={{ scale: 1.15, rotate: showRosterPanel ? 90 : 0 }}
+            whileTap={{ scale: 0.9 }}
+            type="button"
+            onClick={() => setShowRosterPanel(!showRosterPanel)}
+            style={{
+              backgroundColor: 'rgba(0, 168, 132, 0.12)',
+              border: '1px solid rgba(0, 168, 132, 0.3)',
+              color: '#00a884',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+            }}
+            title="Toggle Participants Roster Sidebar"
+          >
+            <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
+          </motion.button>
+
+          {/* Telemetry Badges */}
 
 
           {typingUsers && typingUsers.length > 0 && (
@@ -85,8 +109,8 @@ export default function ChatHeader({
               callState === 'active'
                 ? 'Toggle Video Panel'
                 : isRecipientOnline
-                ? 'Start Video Call'
-                : 'User is offline - Video call unavailable'
+                  ? 'Start Video Call'
+                  : 'User is offline - Video call unavailable'
             }
           >
             <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
