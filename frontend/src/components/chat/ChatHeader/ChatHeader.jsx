@@ -49,21 +49,21 @@ export default function ChatHeader({
         animate={
           callState === 'active' || callState === 'calling'
             ? {
-                borderColor: [
-                  'rgba(0, 168, 132, 0.3)',
-                  'rgba(37, 211, 102, 0.95)',
-                  'rgba(0, 168, 132, 0.3)',
-                ],
-                boxShadow: [
-                  '0 1px 3px rgba(0,0,0,0.3)',
-                  '0 4px 20px rgba(0, 168, 132, 0.45)',
-                  '0 1px 3px rgba(0,0,0,0.3)',
-                ],
-              }
+              borderColor: [
+                'rgba(0, 168, 132, 0.3)',
+                'rgba(37, 211, 102, 0.95)',
+                'rgba(0, 168, 132, 0.3)',
+              ],
+              boxShadow: [
+                '0 1px 3px rgba(0,0,0,0.3)',
+                '0 4px 20px rgba(0, 168, 132, 0.45)',
+                '0 1px 3px rgba(0,0,0,0.3)',
+              ],
+            }
             : {
-                borderColor: 'rgba(134, 150, 160, 0.15)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-              }
+              borderColor: 'rgba(134, 150, 160, 0.15)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            }
         }
         transition={
           callState === 'active' || callState === 'calling'

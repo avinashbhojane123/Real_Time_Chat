@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Icon } from '@iconify/react';
 import AnimatedMessageBubble from '../../animated/AnimatedMessageBubble';
 import AnimatedTypingIndicator from '../../animated/AnimatedTypingIndicator';
 import ScrollToBottomPill from '../../animated/ScrollToBottomPill';
@@ -62,7 +63,7 @@ export default function ChatMessagesFeed({
               margin: '0 auto 12px auto',
             }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>forum</span>
+            <Icon icon="solar:chat-round-line-bold-duotone" width="32" height="32" />
           </div>
           <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e9edef', marginBottom: '4px' }}>
             Welcome to the Chat
@@ -86,18 +87,20 @@ export default function ChatMessagesFeed({
                 onSwipeReply={() => setReplyingTo(msg)}
                 style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
               >
-                {/* Date Header Pill */}
+                {/* Feature 2: M3 Sticky Date Header Tonal Pill */}
                 {showDate && (
-                  <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 6px 0', position: 'sticky', top: '8px', zIndex: 15 }}>
                     <div
                       style={{
-                        backgroundColor: '#182229',
-                        color: '#8696a0',
+                        backgroundColor: '#202c33',
+                        color: '#00a884',
                         fontSize: '0.72rem',
-                        fontWeight: 600,
-                        padding: '4px 12px',
-                        borderRadius: '8px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                        fontWeight: 700,
+                        padding: '4px 14px',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                        border: '1px solid rgba(0, 168, 132, 0.25)',
+                        backdropFilter: 'blur(8px)',
                       }}
                     >
                       {formatDateHeader(msg.createdAt)}
@@ -120,7 +123,7 @@ export default function ChatMessagesFeed({
                   onPointerUp={() => handlePointerUp(msg)}
                   onPointerCancel={() => handlePointerUp(msg)}
                 >
-                  {/* Animated Drag-to-Reply Visual Indicator */}
+                  {/* Feature 5: M3 Swipe-to-Reply Spring Snap Visual Indicator */}
                   {activeDragId === msg.id && dragTranslateX > 5 && (
                     <div
                       style={{
@@ -130,29 +133,28 @@ export default function ChatMessagesFeed({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        width: '32px',
-                        height: '32px',
+                        width: '34px',
+                        height: '34px',
                         borderRadius: '50%',
                         backgroundColor: '#202c33',
-                        border: '2px solid #00a884',
+                        border: `2px solid ${dragTranslateX > 50 ? '#00a884' : 'rgba(0, 168, 132, 0.5)'}`,
                         color: '#00a884',
                         opacity: Math.min(dragTranslateX / 40, 1),
                         transform: `scale(${Math.min(dragTranslateX / 40, 1.2)})`,
-                        transition: 'transform 0.1s ease',
+                        transition: 'transform 0.15s cubic-bezier(0.2, 0, 0, 1)',
                         zIndex: 10,
                       }}
                     >
-                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                        reply
-                      </span>
+                      <Icon icon="solar:reply-bold-duotone" width="18" height="18" />
                     </div>
                   )}
 
+                  {/* Feature 1 & 6: M3 Asymmetrical Bubbles & Contextual Selection Highlight Surface */}
                   <div
-                    className={`wa-bubble-box ${isMe ? 'wa-bubble-out' : 'wa-bubble-in'} group`}
+                    className={`wa-bubble-box ${isMe ? 'wa-bubble-out' : 'wa-bubble-in'} ${activeMenuMsgId === msg.id ? 'm3-selected-surface' : ''} group`}
                     style={{
                       transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
-                      transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1)',
+                      transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
                     }}
                   >
                     {/* Sender Nickname Header for Incoming Messages */}
@@ -336,42 +338,29 @@ export default function ChatMessagesFeed({
                       <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
                         {formatMessageTime(msg.createdAt)}
                       </span>
+                      {/* Feature 3: M3 Expressive Delivery Status Checkmarks */}
                       {isMe && (() => {
                         const readByOthers = msg.readBy ? msg.readBy.filter((n) => n !== nickname) : [];
                         const isRead = readByOthers.length > 0;
                         const otherUsersOnline = users.some((u) => u.nickname !== nickname && u.isOnline);
 
-                        if (isRead) {
-                          return (
-                            <span
-                              className="material-symbols-outlined"
-                              style={{ fontSize: '15px', color: '#53bdeb' }}
-                              title={`Read by: ${readByOthers.join(', ')}`}
-                            >
-                              done_all
-                            </span>
-                          );
-                        } else if (otherUsersOnline) {
-                          return (
-                            <span
-                              className="material-symbols-outlined"
-                              style={{ fontSize: '15px', color: '#8696a0' }}
-                              title="Delivered to room"
-                            >
-                              done_all
-                            </span>
-                          );
-                        } else {
-                          return (
-                            <span
-                              className="material-symbols-outlined"
-                              style={{ fontSize: '15px', color: '#8696a0' }}
-                              title="Sent"
-                            >
-                              done
-                            </span>
-                          );
-                        }
+                        return (
+                          <motion.span
+                            key={isRead ? 'read' : 'unread'}
+                            initial={{ scale: 0.8 }}
+                            animate={{ scale: isRead ? [0.8, 1.25, 1] : 1 }}
+                            transition={{ duration: 0.35, ease: [0.2, 0, 0, 1] }}
+                            style={{ display: 'inline-flex', alignItems: 'center' }}
+                            title={isRead ? `Read by: ${readByOthers.join(', ')}` : otherUsersOnline ? 'Delivered' : 'Sent'}
+                          >
+                            <Icon
+                              icon={isRead ? 'solar:check-read-bold-duotone' : otherUsersOnline ? 'solar:check-read-linear' : 'solar:check-linear'}
+                              width="16"
+                              height="16"
+                              style={{ color: isRead ? '#53bdeb' : '#8696a0' }}
+                            />
+                          </motion.span>
+                        );
                       })()}
                     </div>
 
@@ -611,11 +600,58 @@ export default function ChatMessagesFeed({
         <AnimatedTypingIndicator typingUsers={typingUsers} />
       </AnimatePresence>
       <div ref={chatBottomRef} />
-      <ScrollToBottomPill
-        visible={showScrollToBottom}
-        unreadCount={unreadCount}
-        onClick={() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-      />
+      {/* Feature 4: M3 Small Extended FAB with Unread Numerical Badge */}
+      <AnimatePresence>
+        {showScrollToBottom && (
+          <motion.button
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            type="button"
+            onClick={() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+            style={{
+              position: 'fixed',
+              bottom: '80px',
+              right: '24px',
+              backgroundColor: 'rgba(0, 168, 132, 0.25)',
+              color: '#00a884',
+              border: '1px solid rgba(0, 168, 132, 0.4)',
+              backdropFilter: 'blur(10px)',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              zIndex: 40,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+            }}
+          >
+            <Icon icon="solar:arrow-down-bold-duotone" width="18" height="18" />
+            <span>Scroll to bottom</span>
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  backgroundColor: '#00a884',
+                  color: '#111b21',
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  padding: '2px 7px',
+                  borderRadius: '10px',
+                  marginLeft: '4px',
+                }}
+              >
+                +{unreadCount}
+              </span>
+            )}
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Floating Emoji Reaction Particle Burst Layer */}
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>

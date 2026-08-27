@@ -1,3 +1,10 @@
+/* Material Design 3 (M3) Feed Design Tokens */
+:root {
+  --m3-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --m3-surface-container: #111b21;
+  --m3-surface-container-high: #202c33;
+}
+
 .wa-feed-container {
   flex: 1;
   overflow-y: auto;
@@ -5,4 +12,38 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Feature 1: M3 Asymmetrical Corner Radii for Message Bubbles */
+.wa-bubble-out {
+  border-radius: 16px 16px 4px 16px !important;
+  background-color: #005c4b !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 200ms var(--m3-easing-emphasized), background-color 200ms var(--m3-easing-emphasized);
+}
+
+.wa-bubble-in {
+  border-radius: 16px 16px 16px 4px !important;
+  background-color: #202c33 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 200ms var(--m3-easing-emphasized), background-color 200ms var(--m3-easing-emphasized);
+}
+
+/* Feature 6: M3 Contextual Selection Highlight Surface */
+.wa-bubble-box.m3-selected-surface {
+  outline: 2px solid #00a884;
+  box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3) !important;
+  background-color: rgba(0, 168, 132, 0.25) !important;
+}
+
+/* Feature 8: M3 Media Attachment Card Container */
+.m3-media-card {
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  overflow: hidden;
+  transition: border-color 200ms var(--m3-easing-emphasized);
+}
+
+.m3-media-card:hover {
+  border-color: rgba(0, 168, 132, 0.4) !important;
 }
