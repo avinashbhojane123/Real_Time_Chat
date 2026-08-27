@@ -515,7 +515,11 @@ export default function ChatMessagesFeed({
                             type="button"
                             className="reaction-item-btn"
                             onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => handleReactToMessage(msg.id, emoji, e)}
+                            onPointerUp={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReactToMessage(msg.id, emoji, e);
+                            }}
                           >
                             {emoji}
                           </button>
@@ -524,6 +528,7 @@ export default function ChatMessagesFeed({
                           type="button"
                           className="reaction-item-btn"
                           onPointerDown={(e) => e.stopPropagation()}
+                          onPointerUp={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowCustomReactionForMsgId(showCustomReactionForMsgId === msg.id ? null : msg.id);
@@ -540,6 +545,9 @@ export default function ChatMessagesFeed({
                     {/* Custom Reaction Emoji Picker Grid */}
                     {showCustomReactionForMsgId === msg.id && (
                       <div
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         style={{
                           position: 'absolute',
                           top: '-200px',
@@ -551,7 +559,7 @@ export default function ChatMessagesFeed({
                           border: '1px solid rgba(134, 150, 160, 0.25)',
                           borderRadius: '16px',
                           boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
-                          zIndex: 80,
+                          zIndex: 100,
                           padding: '8px',
                           display: 'flex',
                           flexDirection: 'column',
@@ -561,10 +569,14 @@ export default function ChatMessagesFeed({
                           <span>Select Reaction</span>
                           <button
                             type="button"
-                            onClick={() => setShowCustomReactionForMsgId(null)}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCustomReactionForMsgId(null);
+                            }}
                             style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+                            <Icon icon="solar:close-circle-bold-duotone" width="18" height="18" />
                           </button>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px', overflowY: 'auto', padding: '4px' }}>
@@ -574,7 +586,12 @@ export default function ChatMessagesFeed({
                               type="button"
                               style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '4px', borderRadius: '6px' }}
                               className="hover:bg-[#2a3942]"
-                              onClick={(e) => handleReactToMessage(msg.id, emoji, e)}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onPointerUp={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReactToMessage(msg.id, emoji, e);
+                              }}
                             >
                               {emoji}
                             </button>
@@ -583,31 +600,29 @@ export default function ChatMessagesFeed({
                       </div>
                     )}
 
-                    {/* Reactions Pill Display */}
+                    {/* Feature 1 (Set 2): M3 Reaction Assist Chips */}
                     {msg.reactions && msg.reactions.length > 0 && (
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          backgroundColor: '#202c33',
-                          border: '1px solid rgba(134, 150, 160, 0.2)',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          marginTop: '4px',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                          cursor: 'pointer',
+                      <motion.button
+                        type="button"
+                        className="m3-reaction-chip"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.92 }}
+                        transition={{ type: 'spring', stiffness: 450, damping: 22 }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
                         }}
                         title={msg.reactions.map((r) => `${r.nickname}: ${r.emoji}`).join('\n')}
                       >
                         {Array.from(new Set(msg.reactions.map((r) => r.emoji))).map((emoji, i) => (
                           <span key={i}>{emoji}</span>
                         ))}
-                        <span style={{ color: '#8696a0', fontWeight: 600, fontSize: '0.7rem' }}>
+                        <span style={{ color: '#00a884', fontWeight: 700, fontSize: '0.7rem' }}>
                           {msg.reactions.length}
                         </span>
-                      </div>
+                      </motion.button>
                     )}
                   </div>
                 </div>
