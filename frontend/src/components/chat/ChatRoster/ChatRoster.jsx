@@ -302,6 +302,100 @@ export default function ChatRoster({
         </motion.button>
       </div>
 
+      {/* Quick Action Toolbar inside Expanded Roster Panel */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          padding: '8px 12px',
+          backgroundColor: '#182229',
+          borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
+        }}
+      >
+        {/* 1. Change Theme & Wallpaper */}
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          type="button"
+          onClick={() => setShowThemeModal && setShowThemeModal(true)}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '7px 8px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(0, 112, 243, 0.12)',
+            border: '1px solid rgba(0, 112, 243, 0.3)',
+            color: '#0070f3',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+          title="Change Theme & Wallpaper"
+        >
+          <Icon icon="solar:palette-bold-duotone" width="16" height="16" />
+          <span>Theme</span>
+        </motion.button>
+
+        {/* 2. Clear Room History */}
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          type="button"
+          onClick={() => setShowClearConfirm && setShowClearConfirm(true)}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '7px 8px',
+            margin: '0 6px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255, 152, 0, 0.12)',
+            border: '1px solid rgba(255, 152, 0, 0.3)',
+            color: '#ff9800',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+          title="Clear Room History"
+        >
+          <Icon icon="solar:trash-bin-trash-bold-duotone" width="16" height="16" />
+          <span>Clear</span>
+        </motion.button>
+
+        {/* 3. Log Out */}
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          type="button"
+          onClick={() => setShowLogoutConfirm && setShowLogoutConfirm(true)}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '7px 8px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(244, 67, 54, 0.12)',
+            border: '1px solid rgba(244, 67, 54, 0.3)',
+            color: '#f44336',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+          title="Log Out Session"
+        >
+          <Icon icon="solar:logout-2-bold-duotone" width="16" height="16" />
+          <span>Log Out</span>
+        </motion.button>
+      </div>
+
       {/* Tab Selector Bar */}
       <div
         style={{
