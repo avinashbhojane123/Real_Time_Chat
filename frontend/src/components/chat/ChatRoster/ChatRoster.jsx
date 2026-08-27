@@ -45,27 +45,28 @@ export default function ChatRoster({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {isMobileDevice && (
-            <button
-              type="button"
-              onClick={() => setShowRosterPanel(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#00a884',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                marginRight: '2px',
-              }}
-              title="Back to Chat"
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowRosterPanel(!showRosterPanel)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#8696a0',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Toggle Participants Panel"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
+          </button>
+          <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#e9edef' }}>
+            Participants
+          </span>
         </div>
       </div>
+
 
 
 
