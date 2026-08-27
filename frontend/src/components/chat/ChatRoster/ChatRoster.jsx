@@ -73,20 +73,8 @@ export default function ChatRoster({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Status Story Trigger Button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (statusUserList && statusUserList.length > 0) setActiveStatusUser(statusUserList[0]);
-              else setShowStatusCreator(true);
-            }}
-            style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
-            title="Status Stories"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>donut_large</span>
-          </button>
-
           {/* Logout Button */}
+
           <button
             type="button"
             onClick={() => setShowLogoutConfirm(true)}
