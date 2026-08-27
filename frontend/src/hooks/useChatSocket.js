@@ -117,6 +117,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
 
     // Reaction & Edit & Delete Listeners
+    socket.on('messageReactionsUpdated', ({ messageId, reactions }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+      );
+    });
+
     socket.on('messageReaction', ({ messageId, reactions }) => {
       setMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
@@ -255,6 +261,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   };
 
   const handleReactToMessage = (messageId, emoji) => {
+    socketRef.current?.emit('reactToMessage', {
+      passcode,
+      nickname,
+      messageId,
+      emoji,
+    });
     socketRef.current?.emit('reactMessage', {
       passcode,
       nickname,

@@ -43,12 +43,32 @@ export default function ChatMessagesFeed({
   EMOJI_LIST,
   pinnedMessage,
 }) {
+  // Helper function to normalize reaction maps/arrays into a clean list
+  const getNormalizedReactions = (reactions) => {
+    if (!reactions) return [];
+    if (Array.isArray(reactions)) return reactions;
+    if (typeof reactions === 'object') {
+      const list = [];
+      Object.entries(reactions).forEach(([emoji, users]) => {
+        if (Array.isArray(users)) {
+          users.forEach((userNick) => {
+            list.push({ emoji, nickname: userNick });
+          });
+        }
+      });
+      return list;
+    }
+    return [];
+  };
+
+  const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
+
   return (
     <div
       ref={chatFeedRef}
       className="wa-doodle-wallpaper wa-feed-container"
     >
-      {filteredMessages.length === 0 ? (
+      {visibleMessages.length === 0 ? (
         <div style={{ margin: 'auto', textAlign: 'center', color: '#8696a0', padding: '32px 16px', maxWidth: '380px' }}>
           <div
             style={{
@@ -74,11 +94,11 @@ export default function ChatMessagesFeed({
         </div>
       ) : (
         <AnimatePresence initial={false}>
-          {filteredMessages.map((msg, idx) => {
+          {visibleMessages.map((msg, idx) => {
             const isMe = msg.nickname === nickname;
             const showDate =
               idx === 0 ||
-              formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
+              formatDateHeader(msg.createdAt) !== formatDateHeader(visibleMessages[idx - 1].createdAt);
 
             const isMenuActive = activeMenuMsgId === msg.id || activeReactionMsgId === msg.id || showCustomReactionForMsgId === msg.id;
 
@@ -627,29 +647,33 @@ export default function ChatMessagesFeed({
                     )}
 
                     {/* Feature 1 (Set 2): M3 Reaction Assist Chips */}
-                    {msg.reactions && msg.reactions.length > 0 && (
-                      <motion.button
-                        type="button"
-                        className="m3-reaction-chip"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.92 }}
-                        transition={{ type: 'spring', stiffness: 450, damping: 22 }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onPointerUp={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
-                        }}
-                        title={msg.reactions.map((r) => `${r.nickname}: ${r.emoji}`).join('\n')}
-                      >
-                        {Array.from(new Set(msg.reactions.map((r) => r.emoji))).map((emoji, i) => (
-                          <span key={i}>{emoji}</span>
-                        ))}
-                        <span style={{ color: '#00a884', fontWeight: 700, fontSize: '0.7rem' }}>
-                          {msg.reactions.length}
-                        </span>
-                      </motion.button>
-                    )}
+                    {(() => {
+                      const normalizedReactions = getNormalizedReactions(msg.reactions);
+                      if (normalizedReactions.length === 0) return null;
+                      return (
+                        <motion.button
+                          type="button"
+                          className="m3-reaction-chip"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.92 }}
+                          transition={{ type: 'spring', stiffness: 450, damping: 22 }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onPointerUp={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
+                          }}
+                          title={normalizedReactions.map((r) => `${r.nickname}: ${r.emoji}`).join('\n')}
+                        >
+                          {Array.from(new Set(normalizedReactions.map((r) => r.emoji))).map((emoji, i) => (
+                            <span key={i}>{emoji}</span>
+                          ))}
+                          <span style={{ color: '#00a884', fontWeight: 700, fontSize: '0.7rem' }}>
+                            {normalizedReactions.length}
+                          </span>
+                        </motion.button>
+                      );
+                    })()}
                   </div>
                 </div>
               </AnimatedMessageBubble>
