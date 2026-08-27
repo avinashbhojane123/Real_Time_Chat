@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { Icon } from '@iconify/react';
 import './ChatHeader.css';
 
 export default function ChatHeader({
