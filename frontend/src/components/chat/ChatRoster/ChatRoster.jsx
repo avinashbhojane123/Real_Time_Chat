@@ -71,20 +71,9 @@ export default function ChatRoster({
             </h2>
           </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Logout Button */}
-
-          <button
-            type="button"
-            onClick={() => setShowLogoutConfirm(true)}
-            style={{ background: 'none', border: 'none', color: '#ff4e4e', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center' }}
-            title="Logout"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
-          </button>
-        </div>
       </div>
+
+
 
       {/* Online Participants Roster List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>

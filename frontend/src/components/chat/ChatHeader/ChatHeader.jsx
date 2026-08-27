@@ -144,18 +144,9 @@ export default function ChatHeader({
           >
             <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>search</span>
           </button>
-
-          {/* Logout Button */}
-          <button
-            type="button"
-            onClick={() => setShowLogoutConfirm(true)}
-            style={{ background: 'none', border: 'none', color: '#ff4e4e', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', transition: 'all 0.2s ease' }}
-            title="Logout / Leave Room"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
-          </button>
         </div>
       </motion.header>
+
 
       {/* Optional Search Filter Banner */}
       {showSearch && (
