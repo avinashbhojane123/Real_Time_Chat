@@ -2,15 +2,8 @@ import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import AnimatedModal from '../../animated/AnimatedModal';
 
-// Quick Preset Avatars
-const PRESET_AVATARS = [
-  { id: 'cyber', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Cyber', label: 'Bot' },
-  { id: 'agent', url: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Agent', label: 'Avatar' },
-  { id: 'stealth', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=Stealth', label: 'Matrix' },
-  { id: 'hero', url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Hero', label: 'Hero' },
-];
-
 export default function SecretRoomModal({
+
   isOpen,
   onClose,
   error,
@@ -259,47 +252,19 @@ export default function SecretRoomModal({
               </div>
             </div>
 
-            {/* Preset Avatar Selection & File Upload */}
+            {/* Avatar File Upload */}
             <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--m3-on-surface)', marginBottom: '6px' }}>
                 <Icon icon="solar:camera-minimalistic-bold-duotone" width="16" height="16" style={{ color: 'var(--m3-primary)' }} />
-                <span>Select Avatar or Upload Image</span>
+                <span>Avatar Image (Optional)</span>
               </label>
-              
-              {/* Preset Avatars Row */}
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                {PRESET_AVATARS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setAvatarUrl && setAvatarUrl(preset.url)}
-                    style={{
-                      flex: 1,
-                      padding: '6px',
-                      borderRadius: '12px',
-                      border: avatarUrl === preset.url ? '2px solid var(--m3-primary)' : '1px solid var(--m3-outline-variant)',
-                      backgroundColor: avatarUrl === preset.url ? 'rgba(208, 188, 255, 0.12)' : 'var(--m3-surface-container-low)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <img src={preset.url} alt={preset.label} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
-                    <span style={{ fontSize: '0.7rem', color: 'var(--m3-on-surface-variant)' }}>{preset.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Custom File Upload Button */}
               <input type="file" onChange={handleAvatarUpload} accept="image/*" id="secret-avatar-upload" style={{ display: 'none' }} />
               <label htmlFor="secret-avatar-upload" className="job-app-file-dropzone" style={{ minHeight: '42px', padding: '10px 14px' }}>
                 <Icon icon="solar:cloud-upload-bold-duotone" width="20" height="20" />
-                <span>{uploading ? 'Uploading Image...' : avatarUrl ? 'Change Custom Image' : 'Upload Custom Image'}</span>
+                <span>{uploading ? 'Uploading Image...' : avatarUrl ? 'Change Avatar Image' : 'Upload Avatar Image'}</span>
               </label>
             </div>
+
 
             {/* Submit Button */}
             <button
