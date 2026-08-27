@@ -4,6 +4,28 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
 import './ChatRoster.css';
 
+// Motion.dev Stagger Variants (Feature #1)
+const listContainerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.04,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 8, scale: 0.98 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 400, damping: 25 },
+  },
+};
+
 export default function ChatRoster({
   isMobileDevice,
   showRosterPanel,
@@ -65,7 +87,9 @@ export default function ChatRoster({
           paddingTop: '12px',
         }}
       >
-        <button
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
           type="button"
           onClick={() => setShowRosterPanel(true)}
           style={{
@@ -80,7 +104,6 @@ export default function ChatRoster({
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
-            transition: 'all 0.2s ease',
           }}
           className="media-item-card"
           title={`${onlineUsers.length} Online Participants`}
@@ -105,14 +128,22 @@ export default function ChatRoster({
               {onlineUsers.length}
             </span>
           )}
-        </button>
+        </motion.button>
       </aside>
     );
   }
 
-  // Expanded Panel View (320px)
+  // Expanded Panel View (320px) with Feature #6 (Drag swipe to dismiss drawer)
   return (
-    <aside
+    <motion.aside
+      drag={isMobileDevice ? 'x' : false}
+      dragSnapToOrigin={true}
+      dragElastic={0.15}
+      onDragEnd={(e, info) => {
+        if (info.offset.x < -80 || info.offset.x > 80) {
+          setShowRosterPanel(false);
+        }
+      }}
       style={{
         width: isMobileDevice ? '100%' : '320px',
         position: isMobileDevice ? 'absolute' : 'relative',
@@ -124,6 +155,7 @@ export default function ChatRoster({
         height: '100%',
         zIndex: isMobileDevice ? 100 : 30,
         flexShrink: 0,
+        touchAction: 'pan-y',
       }}
     >
       {/* Header Bar */}
@@ -145,7 +177,9 @@ export default function ChatRoster({
           </span>
         </div>
 
-        <button
+        <motion.button
+          whileHover={{ scale: 1.15, rotate: 90 }}
+          whileTap={{ scale: 0.9 }}
           type="button"
           onClick={() => setShowRosterPanel(false)}
           style={{
@@ -158,15 +192,14 @@ export default function ChatRoster({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
           }}
           title="Close Panel"
         >
           <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
-        </button>
+        </motion.button>
       </div>
 
-      {/* Tab Selector Bar (Iconify Participants Tab vs Media & Docs Tab) */}
+      {/* Tab Selector Bar */}
       <div
         style={{
           display: 'flex',
@@ -223,7 +256,7 @@ export default function ChatRoster({
         </button>
       </div>
 
-      {/* Animation #3: Framer Motion Smooth Tab Transitions */}
+      {/* Motion Tab Transitions */}
       <AnimatePresence mode="wait">
         {activeTab === 'people' ? (
           <motion.div
@@ -257,62 +290,84 @@ export default function ChatRoster({
                 <Icon icon={showOnlineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
               </div>
 
-              {showOnlineGroup &&
-                (onlineUsers.length === 0 ? (
-                  <div style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Icon icon="line-md:loading-twotone-loop" width="18" height="18" style={{ color: '#00a884' }} />
-                    <span>Connecting participants...</span>
-                  </div>
-                ) : (
-                  onlineUsers.map((u, idx) => {
-                    const presence = formatUserPresence(u.isOnline, u.lastSeen);
-                    const isMe = u.nickname === nickname;
-                    const isTyping = typingUsers && typingUsers.includes(u.nickname);
-
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          padding: '10px 16px',
-                          cursor: 'pointer',
-                        }}
-                        className="roster-item-card"
-                      >
-                        <div className="online-avatar-pulse">
-                          {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
+              {/* Feature #4: Motion Accordion Height Animation */}
+              <AnimatePresence>
+                {showOnlineGroup && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    {/* Feature #1: Motion Staggered List Entrance */}
+                    <motion.div
+                      variants={listContainerVariants}
+                      initial="hidden"
+                      animate="show"
+                    >
+                      {onlineUsers.length === 0 ? (
+                        <div style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Icon icon="line-md:loading-twotone-loop" width="18" height="18" style={{ color: '#00a884' }} />
+                          <span>Connecting participants...</span>
                         </div>
+                      ) : (
+                        onlineUsers.map((u, idx) => {
+                          const presence = formatUserPresence(u.isOnline, u.lastSeen);
+                          const isMe = u.nickname === nickname;
+                          const isTyping = typingUsers && typingUsers.includes(u.nickname);
 
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
-                              {u.nickname} {isMe && '(You)'}
-                            </span>
-
-                            {/* Typing Indicator Icon (line-md:chat-bubble-twotone-loop) */}
-                            {isTyping && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
-                                <Icon icon="line-md:chat-bubble-twotone-loop" width="16" height="16" />
-                                <span>typing...</span>
+                          return (
+                            /* Feature #2: Motion Layout Reordering */
+                            <motion.div
+                              key={u.nickname || idx}
+                              variants={itemVariants}
+                              layout
+                              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '10px 16px',
+                                cursor: 'pointer',
+                              }}
+                              className="roster-item-card"
+                            >
+                              <div className="online-avatar-pulse">
+                                {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
                               </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" />
-                            <span>{presence.text}</span>
-                          </div>
 
-                          {/* Desktop & Mobile Platform Badges + Ping Meter */}
-                          <div style={{ marginTop: '4px' }}>
-                            {renderRosterDeviceBadge(u)}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ))}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
+                                    {u.nickname} {isMe && '(You)'}
+                                  </span>
+
+                                  {/* Typing Indicator Icon */}
+                                  {isTyping && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
+                                      <Icon icon="line-md:chat-bubble-twotone-loop" width="16" height="16" />
+                                      <span>typing...</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" />
+                                  <span>{presence.text}</span>
+                                </div>
+
+                                <div style={{ marginTop: '4px' }}>
+                                  {renderRosterDeviceBadge(u)}
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      )}
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Group 2 - OFFLINE PARTICIPANTS */}
@@ -339,37 +394,59 @@ export default function ChatRoster({
                   <Icon icon={showOfflineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
                 </div>
 
-                {showOfflineGroup &&
-                  offlineUsers.map((u, idx) => {
-                    const presence = formatUserPresence(u.isOnline, u.lastSeen);
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          padding: '10px 16px',
-                          cursor: 'pointer',
-                          opacity: 0.65,
-                        }}
-                        className="roster-item-card"
+                {/* Feature #4: Motion Accordion Height Animation */}
+                <AnimatePresence>
+                  {showOfflineGroup && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <motion.div
+                        variants={listContainerVariants}
+                        initial="hidden"
+                        animate="show"
                       >
-                        {renderStatusAvatar(u.nickname, '38px', false, {}, u.avatarUrl)}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
-                              {u.nickname}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: '#8696a0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" />
-                            <span>{presence.text}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        {offlineUsers.map((u, idx) => {
+                          const presence = formatUserPresence(u.isOnline, u.lastSeen);
+                          return (
+                            /* Feature #2: Motion Layout Reordering */
+                            <motion.div
+                              key={u.nickname || idx}
+                              variants={itemVariants}
+                              layout
+                              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '10px 16px',
+                                cursor: 'pointer',
+                                opacity: 0.65,
+                              }}
+                              className="roster-item-card"
+                            >
+                              {renderStatusAvatar(u.nickname, '38px', false, {}, u.avatarUrl)}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
+                                    {u.nickname}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#8696a0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" />
+                                  <span>{presence.text}</span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </motion.div>
@@ -389,10 +466,17 @@ export default function ChatRoster({
                 <div>No media or documents shared yet in this room session.</div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <motion.div
+                variants={listContainerVariants}
+                initial="hidden"
+                animate="show"
+                style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+              >
                 {mediaMessages.map((m, idx) => (
-                  <div
+                  <motion.div
                     key={idx}
+                    variants={itemVariants}
+                    layout
                     style={{
                       backgroundColor: '#202c33',
                       borderRadius: '10px',
@@ -442,7 +526,9 @@ export default function ChatRoster({
                     </div>
 
                     {m.fileUrl && (
-                      <a
+                      <motion.a
+                        whileHover={{ scale: 1.15 }}
+                        whileTap={{ scale: 0.9 }}
                         href={m.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -450,21 +536,21 @@ export default function ChatRoster({
                         title="Download / Open File"
                       >
                         <Icon icon="solar:download-minimalistic-bold-duotone" width="22" height="22" />
-                      </a>
+                      </motion.a>
                     )}
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Encrypted Session Badge Footer (solar:shield-keyhole-bold-duotone) */}
+      {/* Encrypted Session Badge Footer */}
       <div className="e2ee-footer-badge">
         <Icon icon="solar:shield-keyhole-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
         <span>E2E Encrypted Session • Zero Trace</span>
       </div>
-    </aside>
+    </motion.aside>
   );
 }
