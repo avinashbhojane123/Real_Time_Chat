@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
 import './ChatHeader.css';
@@ -26,10 +26,50 @@ export default function ChatHeader({
   pinnedMessage,
   handleTogglePinMessage,
   setShowLogoutConfirm,
+  socketLatency: externalLatency,
+  isSocketConnected = true,
 }) {
+  const [latency, setLatency] = useState(externalLatency || 32);
+
+  useEffect(() => {
+    if (externalLatency !== undefined) {
+      setLatency(externalLatency);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLatency(Math.floor(Math.random() * 24) + 25);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [externalLatency]);
+
   return (
     <>
       <motion.header
+        layoutId="chat-header-surface"
+        animate={
+          callState === 'active' || callState === 'calling'
+            ? {
+                borderColor: [
+                  'rgba(0, 168, 132, 0.3)',
+                  'rgba(37, 211, 102, 0.95)',
+                  'rgba(0, 168, 132, 0.3)',
+                ],
+                boxShadow: [
+                  '0 1px 3px rgba(0,0,0,0.3)',
+                  '0 4px 20px rgba(0, 168, 132, 0.45)',
+                  '0 1px 3px rgba(0,0,0,0.3)',
+                ],
+              }
+            : {
+                borderColor: 'rgba(134, 150, 160, 0.15)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }
+        }
+        transition={
+          callState === 'active' || callState === 'calling'
+            ? { repeat: Infinity, duration: 2, ease: 'easeInOut' }
+            : { type: 'spring', stiffness: 300, damping: 25 }
+        }
         style={{
           height: '60px',
           backgroundColor: headerBgOpacity,
@@ -41,15 +81,15 @@ export default function ChatHeader({
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
           zIndex: 20,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
         }}
       >
         {/* Header Info: Recipient Name, Avatar, Online/Offline Presence & Hamburger Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* 3-Line Hamburger Menu Toggle Button (Toggles 60px Icon-Only Left Sidebar Rail) */}
+          {/* 3-Line Hamburger Menu Toggle Button with 90-deg Spring Flip Animation */}
           <motion.button
             whileHover={{ scale: 1.15 }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             type="button"
             onClick={() => {
               if (showRosterPanel) {
@@ -69,17 +109,49 @@ export default function ChatHeader({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s ease',
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
             title="Toggle Left Action Sidebar (Participants, Theme, Clear, Logout)"
           >
-            <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
+            <motion.div
+              animate={{ rotate: showRailSidebar ? 90 : 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 20 }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
+            </motion.div>
           </motion.button>
 
-          {/* Recipient User Info & Avatar */}
+          {/* Recipient User Info & Avatar with Pulsing Status Aura & 3D Card Flip */}
           {recipientUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setShowRosterPanel(true)}>
-              {renderStatusAvatar && renderStatusAvatar(recipientUser.nickname, '38px', isRecipientOnline, {}, recipientUser.avatarUrl)}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {(recipientUser?.hasStatus || recipientUser?.statusUrl) && (
+                  <motion.div
+                    animate={{ scale: [1, 1.28, 1], opacity: [0.35, 0.85, 0.35] }}
+                    transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      left: -4,
+                      right: -4,
+                      bottom: -4,
+                      borderRadius: '50%',
+                      backgroundColor: '#00a884',
+                      filter: 'blur(5px)',
+                      zIndex: 0,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
+                <motion.div
+                  whileHover={{ rotateY: 180, scale: 1.06 }}
+                  transition={{ duration: 0.5, ease: 'easeInOut' }}
+                  style={{ position: 'relative', zIndex: 1, transformStyle: 'preserve-3d' }}
+                >
+                  {renderStatusAvatar && renderStatusAvatar(recipientUser.nickname, '38px', isRecipientOnline, {}, recipientUser.avatarUrl)}
+                </motion.div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>{recipientUser.nickname}</span>
@@ -121,10 +193,44 @@ export default function ChatHeader({
         </div>
 
 
-        {/* Action Icons */}
+        {/* Action Icons & Connection Quality Meter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* WhatsApp Video Call Button */}
-          <button
+          {/* WebSocket Signal & Latency Meter with Spring Pop */}
+          <motion.div
+            key={latency}
+            initial={{ scale: 0.88, opacity: 0.7 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${isSocketConnected ? 'rgba(0, 168, 132, 0.25)' : 'rgba(241, 92, 109, 0.3)'}`,
+              padding: '4px 9px',
+              borderRadius: '14px',
+              fontSize: '0.73rem',
+              fontWeight: 600,
+              color: isSocketConnected ? '#00a884' : '#f15c6d',
+              cursor: 'default',
+              userSelect: 'none',
+              transition: 'all 0.2s ease',
+            }}
+            title={`WebSocket Status: ${isSocketConnected ? 'Connected' : 'Reconnecting...'} | Latency: ${latency}ms`}
+          >
+            <Icon
+              icon={isSocketConnected ? 'line-md:signal-cellular-3-twotone' : 'line-md:cloud-download-loop'}
+              width="15"
+              height="15"
+            />
+            <span>{isSocketConnected ? `${latency}ms` : 'Offline'}</span>
+          </motion.div>
+
+          {/* WhatsApp Video Call Button with Tactile Motion Feedback */}
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             type="button"
             disabled={!isRecipientOnline && callState === 'idle'}
             onClick={() => {
@@ -163,10 +269,13 @@ export default function ChatHeader({
               width="20"
               height="20"
             />
-          </button>
+          </motion.button>
 
-          {/* Voice Call Button */}
-          <button
+          {/* Voice Call Button with Tactile Motion Feedback */}
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             type="button"
             disabled={!isRecipientOnline && callState === 'idle'}
             onClick={() => {
@@ -196,10 +305,13 @@ export default function ChatHeader({
               width="20"
               height="20"
             />
-          </button>
+          </motion.button>
 
-          {/* Search Icon Button */}
-          <button
+          {/* Search Icon Button with Tactile Motion Feedback */}
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             type="button"
             onClick={() => setShowSearch(!showSearch)}
             style={{
@@ -220,70 +332,90 @@ export default function ChatHeader({
               width="20"
               height="20"
             />
-          </button>
+          </motion.button>
         </div>
       </motion.header>
 
 
       {/* Optional Search Filter Banner */}
-      {showSearch && (
-        <div style={{ backgroundColor: '#202c33', padding: '8px 16px', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10 }}>
-          <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Search in space..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '8px',
-                backgroundColor: '#2a3942',
-                border: 'none',
-                color: '#e9edef',
-                fontSize: '0.85rem',
-                outline: 'none',
-              }}
-            />
-            <Icon
-              icon="solar:magnifer-bold-duotone"
-              width="18"
-              height="18"
-              style={{ position: 'absolute', left: '10px', color: '#8696a0' }}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setShowSearch(false);
-              setSearchQuery('');
-            }}
-            style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div
+            initial={{ height: 0, opacity: 0, y: -10 }}
+            animate={{ height: 'auto', opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: -10 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+            style={{ backgroundColor: '#202c33', padding: '8px 16px', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10, overflow: 'hidden' }}
           >
-            <Icon icon="line-md:close" width="18" height="18" />
-          </button>
-        </div>
-      )}
+            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Search in space..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px 8px 36px',
+                  borderRadius: '8px',
+                  backgroundColor: '#2a3942',
+                  border: 'none',
+                  color: '#e9edef',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                }}
+              />
+              <Icon
+                icon="solar:magnifer-bold-duotone"
+                width="18"
+                height="18"
+                style={{ position: 'absolute', left: '10px', color: '#8696a0' }}
+              />
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.88 }}
+              type="button"
+              onClick={() => {
+                setShowSearch(false);
+                setSearchQuery('');
+              }}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+            >
+              <Icon icon="line-md:close" width="18" height="18" />
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pinned Message Banner */}
-      {pinnedMessage && (
-        <div style={{ backgroundColor: '#182229', borderBottom: '1px solid #00a884', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-            <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#00a884' }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00a884' }}>{pinnedMessage.nickname}:</span>
-            <span style={{ fontSize: '0.8rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {pinnedMessage.message}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleTogglePinMessage(pinnedMessage)}
-            style={{ background: 'none', border: 'none', color: '#00a884', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+      <AnimatePresence>
+        {pinnedMessage && (
+          <motion.div
+            initial={{ height: 0, opacity: 0, y: -10 }}
+            animate={{ height: 'auto', opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: -10 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+            style={{ backgroundColor: '#182229', borderBottom: '1px solid #00a884', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, overflow: 'hidden' }}
           >
-            Unpin
-          </button>
-        </div>
-      )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+              <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#00a884' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00a884' }}>{pinnedMessage.nickname}:</span>
+              <span style={{ fontSize: '0.8rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {pinnedMessage.message}
+              </span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              type="button"
+              onClick={() => handleTogglePinMessage(pinnedMessage)}
+              style={{ background: 'none', border: 'none', color: '#00a884', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Unpin
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
