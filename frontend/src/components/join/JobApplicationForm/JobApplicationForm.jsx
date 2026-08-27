@@ -303,20 +303,12 @@ export default function JobApplicationForm({
 
       <button
         type="submit"
-        className="m3-btn m3-btn-filled"
-        style={{
-          padding: '14px 24px',
-          fontSize: '1rem',
-          fontWeight: 700,
-          width: '100%',
-          justifyContent: 'center',
-          marginTop: '8px',
-          boxShadow: 'var(--m3-elevation-2)',
-        }}
+        className="m3-btn m3-btn-filled job-app-submit-btn"
       >
         <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>send</span>
         Submit Official Application
       </button>
+
     </form>
   );
 }
