@@ -42,28 +42,30 @@ export default function ChatHeader({
       >
         {/* Header Info & Telemetry Badges (Feature #1) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* 3-Line Hamburger Menu Toggle Button for ChatRoster Sidebar */}
-          <motion.button
-            whileHover={{ scale: 1.15, rotate: showRosterPanel ? 90 : 0 }}
-            whileTap={{ scale: 0.9 }}
-            type="button"
-            onClick={() => setShowRosterPanel(!showRosterPanel)}
-            style={{
-              backgroundColor: 'rgba(0, 168, 132, 0.12)',
-              border: '1px solid rgba(0, 168, 132, 0.3)',
-              color: '#00a884',
-              cursor: 'pointer',
-              padding: '8px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
-            }}
-            title="Toggle Participants Roster Sidebar"
-          >
-            <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
-          </motion.button>
+          {/* 3-Line Hamburger Menu Toggle Button (Only visible when ChatRoster sidebar is hidden) */}
+          {!showRosterPanel && (
+            <motion.button
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.9 }}
+              type="button"
+              onClick={() => setShowRosterPanel(true)}
+              style={{
+                backgroundColor: 'rgba(0, 168, 132, 0.12)',
+                border: '1px solid rgba(0, 168, 132, 0.3)',
+                color: '#00a884',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Open Participants Roster Sidebar"
+            >
+              <Icon icon="solar:hamburger-menu-bold-duotone" width="22" height="22" />
+            </motion.button>
+          )}
 
           {/* Telemetry Badges */}
 
