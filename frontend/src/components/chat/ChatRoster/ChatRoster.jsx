@@ -49,22 +49,27 @@ export default function ChatRoster({
     (m) => m.fileUrl || m.type === 'image' || m.type === 'video' || m.type === 'audio' || m.type === 'document'
   );
 
-  // Helper to render platform & connection ping badge
+  // Helper to render platform & connection ping badge with Motion Feature #4 Badge Micro-Interactions
   const renderRosterDeviceBadge = (u) => {
     const isMobile = u.isMobile || (u.userAgent && /mobile|android|iphone|ipad/i.test(u.userAgent));
     return (
-      <div className="device-badge-glow">
-        <Icon
-          icon={isMobile ? 'solar:smartphone-bold-duotone' : 'solar:laptop-minimalistic-bold-duotone'}
-          width="13"
-          height="13"
-          style={{ color: '#00a884' }}
-        />
+      <motion.div
+        whileHover={{ scale: 1.05, x: 2 }}
+        className="device-badge-glow"
+      >
+        <motion.div whileHover={{ rotate: [0, 10, -10, 0] }} style={{ display: 'flex', alignItems: 'center' }}>
+          <Icon
+            icon={isMobile ? 'solar:smartphone-bold-duotone' : 'solar:laptop-minimalistic-bold-duotone'}
+            width="13"
+            height="13"
+            style={{ color: '#00a884' }}
+          />
+        </motion.div>
         <span>{isMobile ? 'Mobile' : 'Desktop'}</span>
         <span style={{ color: 'rgba(134, 150, 160, 0.4)' }}>•</span>
         <Icon icon="solar:wifi-router-bold-duotone" width="12" height="12" style={{ color: '#00a884' }} />
         <span style={{ color: '#00a884', fontWeight: 600 }}>18ms</span>
-      </div>
+      </motion.div>
     );
   };
 
@@ -133,7 +138,7 @@ export default function ChatRoster({
     );
   }
 
-  // Expanded Panel View (320px) with Feature #6 (Drag swipe to dismiss drawer)
+  // Expanded Panel View (320px) with Motion Drag Swipe Dismiss
   return (
     <motion.aside
       drag={isMobileDevice ? 'x' : false}
@@ -171,7 +176,9 @@ export default function ChatRoster({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />
+          <motion.div whileHover={{ scale: 1.15, rotate: 10 }}>
+            <Icon icon="solar:users-group-two-rounded-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />
+          </motion.div>
           <span style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
             Participants ({users.length})
           </span>
@@ -199,12 +206,13 @@ export default function ChatRoster({
         </motion.button>
       </div>
 
-      {/* Tab Selector Bar */}
+      {/* Tab Selector Bar with Motion Feature #1 (Magnetic Active Tab Indicator layoutId) */}
       <div
         style={{
           display: 'flex',
           backgroundColor: '#111b21',
           borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
+          position: 'relative',
         }}
       >
         <button
@@ -215,7 +223,6 @@ export default function ChatRoster({
             padding: '10px',
             background: 'none',
             border: 'none',
-            borderBottom: activeTab === 'people' ? '2px solid #00a884' : '2px solid transparent',
             color: activeTab === 'people' ? '#00a884' : '#8696a0',
             fontWeight: 700,
             fontSize: '0.82rem',
@@ -224,11 +231,26 @@ export default function ChatRoster({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            transition: 'all 0.2s ease',
+            position: 'relative',
+            transition: 'color 0.2s ease',
           }}
         >
           <Icon icon="solar:users-group-two-rounded-bold-duotone" width="18" height="18" />
           <span>People ({users.length})</span>
+          {activeTab === 'people' && (
+            <motion.div
+              layoutId="activeTabUnderline"
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                backgroundColor: '#00a884',
+              }}
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
         </button>
 
         <button
@@ -239,7 +261,6 @@ export default function ChatRoster({
             padding: '10px',
             background: 'none',
             border: 'none',
-            borderBottom: activeTab === 'media' ? '2px solid #00a884' : '2px solid transparent',
             color: activeTab === 'media' ? '#00a884' : '#8696a0',
             fontWeight: 700,
             fontSize: '0.82rem',
@@ -248,11 +269,26 @@ export default function ChatRoster({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            transition: 'all 0.2s ease',
+            position: 'relative',
+            transition: 'color 0.2s ease',
           }}
         >
           <Icon icon="solar:folder-with-files-bold-duotone" width="18" height="18" />
           <span>Media & Docs ({mediaMessages.length})</span>
+          {activeTab === 'media' && (
+            <motion.div
+              layoutId="activeTabUnderline"
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                backgroundColor: '#00a884',
+              }}
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
         </button>
       </div>
 
@@ -284,13 +320,15 @@ export default function ChatRoster({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icon icon="solar:check-circle-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
+                  <motion.div whileHover={{ scale: 1.2, rotate: 10 }}>
+                    <Icon icon="solar:check-circle-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
+                  </motion.div>
                   <span>ONLINE ({onlineUsers.length})</span>
                 </div>
                 <Icon icon={showOnlineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
               </div>
 
-              {/* Feature #4: Motion Accordion Height Animation */}
+              {/* Motion Accordion Height Animation */}
               <AnimatePresence>
                 {showOnlineGroup && (
                   <motion.div
@@ -300,7 +338,7 @@ export default function ChatRoster({
                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                     style={{ overflow: 'hidden' }}
                   >
-                    {/* Feature #1: Motion Staggered List Entrance */}
+                    {/* Motion Staggered List Entrance */}
                     <motion.div
                       variants={listContainerVariants}
                       initial="hidden"
@@ -318,7 +356,6 @@ export default function ChatRoster({
                           const isTyping = typingUsers && typingUsers.includes(u.nickname);
 
                           return (
-                            /* Feature #2: Motion Layout Reordering */
                             <motion.div
                               key={u.nickname || idx}
                               variants={itemVariants}
@@ -388,13 +425,14 @@ export default function ChatRoster({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon icon="solar:clock-circle-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                    <motion.div whileHover={{ scale: 1.2, rotate: 10 }}>
+                      <Icon icon="solar:clock-circle-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                    </motion.div>
                     <span>OFFLINE / AWAY ({offlineUsers.length})</span>
                   </div>
                   <Icon icon={showOfflineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
                 </div>
 
-                {/* Feature #4: Motion Accordion Height Animation */}
                 <AnimatePresence>
                   {showOfflineGroup && (
                     <motion.div
@@ -412,7 +450,6 @@ export default function ChatRoster({
                         {offlineUsers.map((u, idx) => {
                           const presence = formatUserPresence(u.isOnline, u.lastSeen);
                           return (
-                            /* Feature #2: Motion Layout Reordering */
                             <motion.div
                               key={u.nickname || idx}
                               variants={itemVariants}
@@ -488,7 +525,8 @@ export default function ChatRoster({
                     }}
                     className="media-item-card"
                   >
-                    <div
+                    <motion.div
+                      whileHover={{ scale: 1.15, rotate: 5 }}
                       style={{
                         width: '38px',
                         height: '38px',
@@ -514,7 +552,7 @@ export default function ChatRoster({
                         width="22"
                         height="22"
                       />
-                    </div>
+                    </motion.div>
 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -527,7 +565,7 @@ export default function ChatRoster({
 
                     {m.fileUrl && (
                       <motion.a
-                        whileHover={{ scale: 1.15 }}
+                        whileHover={{ scale: 1.2, rotate: -10 }}
                         whileTap={{ scale: 0.9 }}
                         href={m.fileUrl}
                         target="_blank"
@@ -548,7 +586,9 @@ export default function ChatRoster({
 
       {/* Encrypted Session Badge Footer */}
       <div className="e2ee-footer-badge">
-        <Icon icon="solar:shield-keyhole-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
+        <motion.div whileHover={{ rotate: 360, scale: 1.2 }} transition={{ duration: 0.5 }}>
+          <Icon icon="solar:shield-keyhole-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
+        </motion.div>
         <span>E2E Encrypted Session • Zero Trace</span>
       </div>
     </motion.aside>
