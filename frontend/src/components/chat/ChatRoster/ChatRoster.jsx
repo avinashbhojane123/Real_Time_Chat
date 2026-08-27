@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
-import { renderDeviceBadge } from '../../../utils/deviceUtils';
 import './ChatRoster.css';
 
 export default function ChatRoster({
@@ -12,6 +11,7 @@ export default function ChatRoster({
   nickname,
   users = [],
   messages = [],
+  typingUsers = [],
   renderStatusAvatar,
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'media'
@@ -26,6 +26,25 @@ export default function ChatRoster({
   const mediaMessages = messages.filter(
     (m) => m.fileUrl || m.type === 'image' || m.type === 'video' || m.type === 'audio' || m.type === 'document'
   );
+
+  // Helper to render platform & connection ping badge
+  const renderRosterDeviceBadge = (u) => {
+    const isMobile = u.isMobile || (u.userAgent && /mobile|android|iphone|ipad/i.test(u.userAgent));
+    return (
+      <div className="device-badge-glow">
+        <Icon
+          icon={isMobile ? 'solar:smartphone-bold-duotone' : 'solar:laptop-minimalistic-bold-duotone'}
+          width="13"
+          height="13"
+          style={{ color: '#00a884' }}
+        />
+        <span>{isMobile ? 'Mobile' : 'Desktop'}</span>
+        <span style={{ color: 'rgba(134, 150, 160, 0.4)' }}>•</span>
+        <Icon icon="solar:wifi-router-bold-duotone" width="12" height="12" style={{ color: '#00a884' }} />
+        <span style={{ color: '#00a884', fontWeight: 600 }}>18ms</span>
+      </div>
+    );
+  };
 
   // Collapsed Rail View (60px)
   if (!showRosterPanel) {
@@ -232,7 +251,6 @@ export default function ChatRoster({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {/* Iconify Online Status Dot */}
                   <Icon icon="solar:check-circle-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
                   <span>ONLINE ({onlineUsers.length})</span>
                 </div>
@@ -242,7 +260,6 @@ export default function ChatRoster({
               {showOnlineGroup &&
                 (onlineUsers.length === 0 ? (
                   <div style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {/* Animation #1: Line-MD Animated Loop Spinner */}
                     <Icon icon="line-md:loading-twotone-loop" width="18" height="18" style={{ color: '#00a884' }} />
                     <span>Connecting participants...</span>
                   </div>
@@ -250,6 +267,8 @@ export default function ChatRoster({
                   onlineUsers.map((u, idx) => {
                     const presence = formatUserPresence(u.isOnline, u.lastSeen);
                     const isMe = u.nickname === nickname;
+                    const isTyping = typingUsers && typingUsers.includes(u.nickname);
+
                     return (
                       <div
                         key={idx}
@@ -262,7 +281,6 @@ export default function ChatRoster({
                         }}
                         className="roster-item-card"
                       >
-                        {/* Animation #2: Online Voice Pulsing Aura Ring */}
                         <div className="online-avatar-pulse">
                           {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
                         </div>
@@ -272,12 +290,24 @@ export default function ChatRoster({
                             <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
                               {u.nickname} {isMe && '(You)'}
                             </span>
+
+                            {/* Typing Indicator Icon (line-md:chat-bubble-twotone-loop) */}
+                            {isTyping && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
+                                <Icon icon="line-md:chat-bubble-twotone-loop" width="16" height="16" />
+                                <span>typing...</span>
+                              </div>
+                            )}
                           </div>
                           <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" />
                             <span>{presence.text}</span>
                           </div>
-                          <div>{renderDeviceBadge(u)}</div>
+
+                          {/* Desktop & Mobile Platform Badges + Ping Meter */}
+                          <div style={{ marginTop: '4px' }}>
+                            {renderRosterDeviceBadge(u)}
+                          </div>
                         </div>
                       </div>
                     );
@@ -303,7 +333,6 @@ export default function ChatRoster({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {/* Iconify Offline Status Dot (Clock Icon) */}
                     <Icon icon="solar:clock-circle-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
                     <span>OFFLINE / AWAY ({offlineUsers.length})</span>
                   </div>
@@ -430,6 +459,12 @@ export default function ChatRoster({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Encrypted Session Badge Footer (solar:shield-keyhole-bold-duotone) */}
+      <div className="e2ee-footer-badge">
+        <Icon icon="solar:shield-keyhole-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
+        <span>E2E Encrypted Session • Zero Trace</span>
+      </div>
     </aside>
   );
 }

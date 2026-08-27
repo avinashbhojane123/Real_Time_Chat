@@ -435,7 +435,9 @@ export default function ChatRoom() {
         nickname={nickname}
         users={users}
         messages={messages}
+        typingUsers={typingUsers}
         statusUserList={statusUserList}
+
 
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
