@@ -434,7 +434,9 @@ export default function ChatRoom() {
         setShowRosterPanel={setShowRosterPanel}
         nickname={nickname}
         users={users}
+        messages={messages}
         statusUserList={statusUserList}
+
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
         setShowStatusCreator={setShowStatusCreator}
