@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
 import './ChatRoster.css';
 
-// Motion.dev Stagger Variants (Feature #1)
+// Motion.dev Stagger Variants
 const listContainerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -49,7 +49,7 @@ export default function ChatRoster({
     (m) => m.fileUrl || m.type === 'image' || m.type === 'video' || m.type === 'audio' || m.type === 'document'
   );
 
-  // Helper to render platform & connection ping badge with Motion Feature #4 Badge Micro-Interactions
+  // Helper to render platform & connection ping badge
   const renderRosterDeviceBadge = (u) => {
     const isMobile = u.isMobile || (u.userAgent && /mobile|android|iphone|ipad/i.test(u.userAgent));
     return (
@@ -138,7 +138,7 @@ export default function ChatRoster({
     );
   }
 
-  // Expanded Panel View (320px) with Motion Drag Swipe Dismiss
+  // Expanded Panel View (320px)
   return (
     <motion.aside
       drag={isMobileDevice ? 'x' : false}
@@ -206,7 +206,7 @@ export default function ChatRoster({
         </motion.button>
       </div>
 
-      {/* Tab Selector Bar with Motion Feature #1 (Magnetic Active Tab Indicator layoutId) */}
+      {/* Tab Selector Bar */}
       <div
         style={{
           display: 'flex',
@@ -325,7 +325,15 @@ export default function ChatRoster({
                   </motion.div>
                   <span>ONLINE ({onlineUsers.length})</span>
                 </div>
-                <Icon icon={showOnlineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
+
+                {/* Motion Feature #3: Accordion Chevron Spring Rotation */}
+                <motion.div
+                  animate={{ rotate: showOnlineGroup ? 0 : -90 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  <Icon icon="lucide:chevron-down" width="16" height="16" />
+                </motion.div>
               </div>
 
               {/* Motion Accordion Height Animation */}
@@ -338,7 +346,6 @@ export default function ChatRoster({
                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                     style={{ overflow: 'hidden' }}
                   >
-                    {/* Motion Staggered List Entrance */}
                     <motion.div
                       variants={listContainerVariants}
                       initial="hidden"
@@ -360,6 +367,7 @@ export default function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
+                              whileTap={{ scale: 0.97 }}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -380,7 +388,6 @@ export default function ChatRoster({
                                     {u.nickname} {isMe && '(You)'}
                                   </span>
 
-                                  {/* Typing Indicator Icon */}
                                   {isTyping && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
                                       <Icon icon="line-md:chat-bubble-twotone-loop" width="16" height="16" />
@@ -430,7 +437,15 @@ export default function ChatRoster({
                     </motion.div>
                     <span>OFFLINE / AWAY ({offlineUsers.length})</span>
                   </div>
-                  <Icon icon={showOfflineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
+
+                  {/* Motion Feature #3: Accordion Chevron Spring Rotation */}
+                  <motion.div
+                    animate={{ rotate: showOfflineGroup ? 0 : -90 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    style={{ display: 'flex', alignItems: 'center' }}
+                  >
+                    <Icon icon="lucide:chevron-down" width="16" height="16" />
+                  </motion.div>
                 </div>
 
                 <AnimatePresence>
@@ -454,6 +469,7 @@ export default function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
+                              whileTap={{ scale: 0.97 }}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -514,6 +530,7 @@ export default function ChatRoster({
                     key={idx}
                     variants={itemVariants}
                     layout
+                    whileTap={{ scale: 0.97 }}
                     style={{
                       backgroundColor: '#202c33',
                       borderRadius: '10px',
@@ -584,9 +601,13 @@ export default function ChatRoster({
         )}
       </AnimatePresence>
 
-      {/* Encrypted Session Badge Footer */}
+      {/* Encrypted Session Badge Footer with Feature #4 Heartbeat Scale Pulse */}
       <div className="e2ee-footer-badge">
-        <motion.div whileHover={{ rotate: 360, scale: 1.2 }} transition={{ duration: 0.5 }}>
+        <motion.div
+          animate={{ scale: [1, 1.12, 1] }}
+          transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+          whileHover={{ rotate: 360, scale: 1.3 }}
+        >
           <Icon icon="solar:shield-keyhole-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
         </motion.div>
         <span>E2E Encrypted Session • Zero Trace</span>
