@@ -1,0 +1,207 @@
+/* ==========================================================================
+   JoinRoom Dedicated Page Styles & Device-Adaptive Responsive Layout
+   ========================================================================== */
+
+.job-app-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.job-app-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--m3-primary);
+  margin-top: 10px;
+  margin-bottom: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--m3-outline-variant);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-app-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.job-app-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.job-app-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Custom Styled Select Dropdown for All Mobile & Desktop Browsers */
+.job-app-select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 36px 10px 14px;
+  border-radius: var(--m3-radius-s);
+  border: 1px solid var(--m3-outline-variant);
+  background-color: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23D0BCFF'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 20px;
+}
+
+.job-app-select:focus {
+  border-color: var(--m3-primary);
+  background-color: var(--m3-surface-container);
+  box-shadow: 0 0 0 3px rgba(208, 188, 255, 0.18);
+}
+
+.job-app-select option {
+  background-color: var(--m3-surface-container-high);
+  color: var(--m3-on-surface);
+  padding: 10px;
+}
+
+/* File Dropzone Picker */
+.job-app-file-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px dashed var(--m3-outline);
+  border-radius: var(--m3-radius-s);
+  background-color: var(--m3-surface-container-low);
+  color: var(--m3-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  word-break: break-all;
+  text-align: center;
+}
+
+.job-app-file-dropzone:hover {
+  border-color: var(--m3-primary);
+  background-color: var(--m3-surface-container-high);
+}
+
+/* Submit Button Touch Target */
+.job-app-submit-btn {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 24px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  justify-content: center;
+  margin-top: 8px;
+  box-shadow: var(--m3-elevation-2);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.job-app-submit-btn:hover {
+  box-shadow: var(--m3-elevation-3);
+  transform: translateY(-1px);
+}
+
+.job-app-submit-btn:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Multi-Device Responsive Breakpoints for JoinRoom Page
+   ========================================================================== */
+
+/* 1. Mobile Phones & Small Screens (up to 640px) */
+@media (max-width: 640px) {
+  .job-app-form-container {
+    gap: 16px;
+  }
+
+  .job-app-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .job-app-section-title {
+    font-size: 0.8rem;
+    letter-spacing: 0.6px;
+  }
+
+  .job-app-select,
+  .m3-text-field {
+    min-height: 44px;
+    font-size: 0.88rem;
+    padding: 10px 12px;
+  }
+
+  .job-app-file-dropzone {
+    min-height: 44px;
+    font-size: 0.84rem;
+    padding: 10px 12px;
+  }
+}
+
+/* 2. Extra Small / Compact Devices (320px to 380px) */
+@media (max-width: 380px) {
+  .job-app-form-container {
+    gap: 12px;
+  }
+
+  .job-app-label {
+    font-size: 0.78rem;
+  }
+
+  .job-app-section-title {
+    font-size: 0.76rem;
+  }
+
+  .job-app-submit-btn {
+    font-size: 0.9rem;
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+}
+
+/* 3. Tablets & Foldables (641px to 1024px) */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .job-app-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .job-app-form-container {
+    gap: 20px;
+  }
+}
+
+/* 4. Large Laptops & Desktop Monitors (1025px+) */
+@media (min-width: 1025px) {
+  .job-app-grid-2 {
+    gap: 20px;
+  }
+}
