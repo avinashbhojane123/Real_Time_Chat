@@ -37,6 +37,7 @@ export default function ChatRoster({
   renderStatusAvatar,
   setChatMessage,
   chatInputRef,
+  setShowLogoutConfirm,
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
@@ -105,6 +106,7 @@ export default function ChatRoster({
           paddingTop: '12px',
         }}
       >
+        {/* Participants Button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
@@ -146,6 +148,31 @@ export default function ChatRoster({
               {onlineUsers.length}
             </span>
           )}
+        </motion.button>
+
+        {/* Log Out Button below Participants on Left Rail Sidebar */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={() => setShowLogoutConfirm && setShowLogoutConfirm(true)}
+          style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(244, 67, 54, 0.12)',
+            border: '1px solid rgba(244, 67, 54, 0.3)',
+            color: '#f44336',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '14px',
+          }}
+          className="media-item-card"
+          title="Log Out Session"
+        >
+          <Icon icon="solar:logout-2-bold-duotone" width="22" height="22" style={{ color: '#f44336' }} />
         </motion.button>
       </aside>
     );
@@ -577,10 +604,10 @@ export default function ChatRoster({
                           m.type === 'image'
                             ? 'solar:gallery-bold-duotone'
                             : m.type === 'video'
-                            ? 'solar:videocamera-record-bold-duotone'
-                            : m.type === 'audio'
-                            ? 'solar:microphone-bold-duotone'
-                            : 'solar:document-bold-duotone'
+                              ? 'solar:videocamera-record-bold-duotone'
+                              : m.type === 'audio'
+                                ? 'solar:microphone-bold-duotone'
+                                : 'solar:document-bold-duotone'
                         }
                         width="22"
                         height="22"
