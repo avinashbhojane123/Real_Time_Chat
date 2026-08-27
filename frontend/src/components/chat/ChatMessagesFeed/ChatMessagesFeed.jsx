@@ -80,12 +80,20 @@ export default function ChatMessagesFeed({
               idx === 0 ||
               formatDateHeader(msg.createdAt) !== formatDateHeader(filteredMessages[idx - 1].createdAt);
 
+            const isMenuActive = activeMenuMsgId === msg.id || activeReactionMsgId === msg.id || showCustomReactionForMsgId === msg.id;
+
             return (
               <AnimatedMessageBubble
                 key={msg.id || idx}
                 isOwn={isMe}
                 onSwipeReply={() => setReplyingTo(msg)}
-                style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  position: 'relative',
+                  zIndex: isMenuActive ? 100 : 1,
+                }}
               >
                 {/* Feature 2: M3 Sticky Date Header Tonal Pill */}
                 {showDate && (
@@ -117,6 +125,7 @@ export default function ChatMessagesFeed({
                     position: 'relative',
                     alignItems: 'center',
                     userSelect: 'none',
+                    zIndex: isMenuActive ? 100 : 1,
                   }}
                   onPointerDown={(e) => handlePointerDown(e, msg.id)}
                   onPointerMove={(e) => handlePointerMove(e, msg.id)}
@@ -365,57 +374,74 @@ export default function ChatMessagesFeed({
                       })()}
                     </div>
 
-                    {/* Message 3 Dots Button Trigger */}
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onPointerUp={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: '2px',
-                        right: isMe ? '2px' : 'auto',
-                        left: !isMe ? '2px' : 'auto',
-                        background: 'none',
-                        border: 'none',
-                        color: '#8696a0',
-                        cursor: 'pointer',
-                        padding: '4px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 25,
-                      }}
-                      className="group-hover:opacity-100 opacity-60 hover:opacity-100"
-                      title="Message options"
-                    >
-                      <Icon icon="solar:alt-arrow-down-bold-duotone" width="16" height="16" />
-                    </button>
+                      {/* Backdrop dismiss overlay for active menus */}
+                      {isMenuActive && (
+                        <div
+                          style={{ position: 'fixed', inset: 0, zIndex: 90, cursor: 'default' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuMsgId(null);
+                            setActiveReactionMsgId(null);
+                            setShowCustomReactionForMsgId(null);
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        />
+                      )}
 
-                    {/* 3 Dots Context Dropdown Menu */}
-                    {activeMenuMsgId === msg.id && (
-                      <div
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onPointerUp={(e) => e.stopPropagation()}
-                        style={{
-                          position: 'absolute',
-                          top: '26px',
-                          right: isMe ? '6px' : 'auto',
-                          left: !isMe ? '6px' : 'auto',
-                          backgroundColor: '#233138',
-                          borderRadius: '10px',
-                          boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
-                          border: '1px solid rgba(134, 150, 160, 0.2)',
-                          padding: '6px 0',
-                          zIndex: 100,
-                          minWidth: '150px',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      {/* Message 3 Dots Button Trigger */}
+                      {!msg.isDeleted && (
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onPointerUp={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '4px',
+                            right: isMe ? '4px' : 'auto',
+                            left: !isMe ? '4px' : 'auto',
+                            background: 'none',
+                            border: 'none',
+                            color: '#8696a0',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 25,
+                          }}
+                          className="group-hover:opacity-100 opacity-60 hover:opacity-100"
+                          title="Message options"
+                        >
+                          <Icon icon="solar:alt-arrow-down-bold-duotone" width="16" height="16" />
+                        </button>
+                      )}
+
+                      {/* 3 Dots Context Dropdown Menu */}
+                      {!msg.isDeleted && activeMenuMsgId === msg.id && (
+                        <div
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onPointerUp={(e) => e.stopPropagation()}
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            marginTop: '4px',
+                            right: isMe ? '0px' : 'auto',
+                            left: !isMe ? '0px' : 'auto',
+                            backgroundColor: '#233138',
+                            borderRadius: '10px',
+                            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.75)',
+                            border: '1px solid rgba(134, 150, 160, 0.25)',
+                            padding: '6px 0',
+                            zIndex: 200,
+                            minWidth: '150px',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                         <button
                           type="button"
                           onPointerDown={(e) => e.stopPropagation()}
