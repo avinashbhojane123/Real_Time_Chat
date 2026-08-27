@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { uploadFileApi, joinRoomApi } from '../services/apiService';
 import SecretRoomModal from '../components/modals/SecretRoomModal/SecretRoomModal';
-import '../components/join/JobApplicationForm/JobApplicationForm.css';
+
 
 export default function JoinRoom() {
   const navigate = useNavigate();
