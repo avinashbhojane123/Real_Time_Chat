@@ -38,8 +38,18 @@ if (typeof window !== 'undefined') {
   );
 }
 
+// Register PWA Service Worker in production for offline caching & installability
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service Worker registration skipped:', err);
+    });
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
+
