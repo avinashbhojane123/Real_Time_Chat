@@ -38,4 +38,9 @@ export class JoinRoomDto {
   @IsOptional()
   @MaxLength(2000)
   avatarUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  networkLabel?: string;
 }

@@ -261,6 +261,7 @@ export class ChatGateway
           browser: user.browser,
           os: user.os,
           avatarUrl: user.avatarUrl,
+          networkLabel: user.networkLabel,
         })),
       );
     }
@@ -337,6 +338,7 @@ export class ChatGateway
         browser: data.browser,
         os: data.os,
         avatarUrl: data.avatarUrl,
+        networkLabel: data.networkLabel,
       });
     } else {
       user.isOnline = true;
@@ -345,6 +347,9 @@ export class ChatGateway
       user.deviceModel = data.deviceModel || user.deviceModel;
       user.browser = data.browser || user.browser;
       user.os = data.os || user.os;
+      if (data.networkLabel) {
+        user.networkLabel = data.networkLabel;
+      }
       if (data.avatarUrl) {
         user.avatarUrl = data.avatarUrl;
       }
@@ -394,6 +399,7 @@ export class ChatGateway
         browser: user.browser,
         os: user.os,
         avatarUrl: user.avatarUrl,
+        networkLabel: user.networkLabel,
       })),
     );
 

@@ -85,4 +85,11 @@ export class User {
     nullable: true,
   })
   avatarUrl!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  networkLabel!: string | null;
 }

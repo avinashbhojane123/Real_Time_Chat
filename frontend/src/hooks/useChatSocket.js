@@ -43,6 +43,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         deviceModel: clientDevice.deviceModel,
         browser: clientDevice.browser,
         os: clientDevice.os,
+        networkLabel: clientDevice.network?.label,
       });
       socket.emit('getStatuses', { passcode });
       socket.emit('getUsers', { passcode });
