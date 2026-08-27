@@ -1,5 +1,88 @@
 .job-app-form-container {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
+}
+
+.job-app-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--m3-primary);
+  margin-top: 8px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--m3-outline-variant);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.job-app-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .job-app-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+.job-app-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.job-app-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.job-app-select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--m3-radius-s);
+  border: 1px solid var(--m3-outline-variant);
+  background-color: var(--m3-surface-container-low);
+  color: var(--m3-on-surface);
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.job-app-select:focus {
+  border-color: var(--m3-primary);
+  box-shadow: 0 0 0 3px rgba(208, 188, 255, 0.18);
+}
+
+.job-app-file-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px dashed var(--m3-outline);
+  border-radius: var(--m3-radius-s);
+  background-color: var(--m3-surface-container-low);
+  color: var(--m3-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.job-app-file-dropzone:hover {
+  border-color: var(--m3-primary);
+  background-color: var(--m3-surface-container-high);
 }
