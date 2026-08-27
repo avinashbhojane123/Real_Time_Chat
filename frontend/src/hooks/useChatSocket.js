@@ -119,24 +119,24 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     // Reaction & Edit & Delete Listeners
     socket.on('messageReactionsUpdated', ({ messageId, reactions }) => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+        prev.map((m) => (String(m.id) === String(messageId) ? { ...m, reactions } : m))
       );
     });
 
     socket.on('messageReaction', ({ messageId, reactions }) => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+        prev.map((m) => (String(m.id) === String(messageId) ? { ...m, reactions } : m))
       );
     });
 
     socket.on('messageUpdated', (updatedMsg) => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m))
+        prev.map((m) => (String(m.id) === String(updatedMsg.id) ? { ...m, ...updatedMsg } : m))
       );
     });
 
     socket.on('messageDeleted', ({ messageId }) => {
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setMessages((prev) => prev.filter((m) => String(m.id) !== String(messageId)));
     });
 
     socket.on('historyCleared', () => {
@@ -261,16 +261,55 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   };
 
   const handleReactToMessage = (messageId, emoji) => {
+    const numericId = typeof messageId === 'number' ? messageId : (parseInt(messageId, 10) || messageId);
+
+    // Optimistic UI state update (0ms instant visual feedback)
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (String(m.id) !== String(messageId)) return m;
+        let reactions = m.reactions;
+
+        if (!reactions || typeof reactions !== 'object') {
+          reactions = {};
+        }
+
+        let newReactions;
+        if (Array.isArray(reactions)) {
+          const hasReacted = reactions.some((r) => r.nickname === nickname && r.emoji === emoji);
+          if (hasReacted) {
+            newReactions = reactions.filter((r) => !(r.nickname === nickname && r.emoji === emoji));
+          } else {
+            newReactions = [...reactions, { nickname, emoji }];
+          }
+        } else {
+          const map = { ...reactions };
+          let users = Array.isArray(map[emoji]) ? [...map[emoji]] : [];
+          if (users.includes(nickname)) {
+            users = users.filter((u) => u !== nickname);
+          } else {
+            users.push(nickname);
+          }
+          if (users.length === 0) {
+            delete map[emoji];
+          } else {
+            map[emoji] = users;
+          }
+          newReactions = Object.keys(map).length > 0 ? map : null;
+        }
+        return { ...m, reactions: newReactions };
+      })
+    );
+
     socketRef.current?.emit('reactToMessage', {
       passcode,
       nickname,
-      messageId,
+      messageId: numericId,
       emoji,
     });
     socketRef.current?.emit('reactMessage', {
       passcode,
       nickname,
-      messageId,
+      messageId: numericId,
       emoji,
     });
   };
