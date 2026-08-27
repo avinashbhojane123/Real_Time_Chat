@@ -161,8 +161,8 @@ export default function ChatRoom() {
   const headerBgOpacity = useTransform(scrollY, [0, 80], ['rgba(32, 44, 51, 0.85)', 'rgba(32, 44, 51, 0.98)']);
 
   const EMOJI_LIST = [
-    '😀', '😂', '😍', '😎', '🙏', '👍', '🔥', '❤️', '🎉', '✨', 
-    '🥳', '🙌', '😊', '🤔', '💩', '😭', '🤩', '👀', '💯', '👏', 
+    '😀', '😂', '😍', '😎', '🙏', '👍', '🔥', '❤️', '🎉', '✨',
+    '🥳', '🙌', '😊', '🤔', '💩', '😭', '🤩', '👀', '💯', '👏',
     '💡', '🚀', '⭐', '👎', '👋', '💖', '💔', '🙈', '🎂', '🥰', '🤣'
   ];
   const QUICK_REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🙏'];
@@ -232,10 +232,10 @@ export default function ChatRoom() {
       message: inputText.trim(),
       replyTo: replyingTo
         ? {
-            id: replyingTo.id,
-            nickname: replyingTo.nickname,
-            message: replyingTo.message || 'Media / Attachment',
-          }
+          id: replyingTo.id,
+          nickname: replyingTo.nickname,
+          message: replyingTo.message || 'Media / Attachment',
+        }
         : null,
       expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
     };
@@ -437,11 +437,9 @@ export default function ChatRoom() {
         messages={messages}
         typingUsers={typingUsers}
         statusUserList={statusUserList}
-        setChatMessage={setChatMessage}
-        chatInputRef={chatInputRef}
+
 
         renderStatusAvatar={renderStatusAvatar}
-
         setActiveStatusUser={setActiveStatusUser}
         setShowStatusCreator={setShowStatusCreator}
         setShowLogoutConfirm={setShowLogoutConfirm}

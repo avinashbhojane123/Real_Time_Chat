@@ -35,14 +35,10 @@ export default function ChatRoster({
   messages = [],
   typingUsers = [],
   renderStatusAvatar,
-  setChatMessage,
-  chatInputRef,
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
-  const [selectedMedia, setSelectedMedia] = useState(null); // Motion Feature #3 (Lightbox modal)
-  const [selectedUserAction, setSelectedUserAction] = useState(null); // Motion Feature #5 (Action Sheet overlay)
 
   // Group Users into Online and Offline
   const onlineUsers = users.filter((u) => u.isOnline);
@@ -167,7 +163,7 @@ export default function ChatRoster({
         touchAction: 'pan-y',
       }}
     >
-      {/* Header Bar with Motion Feature #4 (Scroll-Driven Backdrop Blur) */}
+      {/* Header Bar */}
       <div
         style={{
           height: '60px',
@@ -177,7 +173,6 @@ export default function ChatRoster({
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
-          backdropFilter: 'blur(12px)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -331,6 +326,7 @@ export default function ChatRoster({
                   <span>ONLINE ({onlineUsers.length})</span>
                 </div>
 
+                {/* Motion Feature #3: Accordion Chevron Spring Rotation */}
                 <motion.div
                   animate={{ rotate: showOnlineGroup ? 0 : -90 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -367,13 +363,11 @@ export default function ChatRoster({
                           const isTyping = typingUsers && typingUsers.includes(u.nickname);
 
                           return (
-                            /* Motion Feature #5: Click triggers Context Action Sheet */
                             <motion.div
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
-                              whileTap={{ scale: 0.96 }}
-                              onClick={() => setSelectedUserAction(u)}
+                              whileTap={{ scale: 0.97 }}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -444,6 +438,7 @@ export default function ChatRoster({
                     <span>OFFLINE / AWAY ({offlineUsers.length})</span>
                   </div>
 
+                  {/* Motion Feature #3: Accordion Chevron Spring Rotation */}
                   <motion.div
                     animate={{ rotate: showOfflineGroup ? 0 : -90 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -474,8 +469,7 @@ export default function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
-                              whileTap={{ scale: 0.96 }}
-                              onClick={() => setSelectedUserAction(u)}
+                              whileTap={{ scale: 0.97 }}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -532,13 +526,11 @@ export default function ChatRoster({
                 style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
               >
                 {mediaMessages.map((m, idx) => (
-                  /* Motion Feature #3: Media Card click opens Lightbox Modal */
                   <motion.div
                     key={idx}
                     variants={itemVariants}
-                    layoutId={`media-card-${idx}`}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => setSelectedMedia({ ...m, idx })}
+                    layout
+                    whileTap={{ scale: 0.97 }}
                     style={{
                       backgroundColor: '#202c33',
                       borderRadius: '10px',
@@ -547,7 +539,6 @@ export default function ChatRoster({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '12px',
-                      cursor: 'pointer',
                     }}
                     className="media-item-card"
                   >
@@ -570,10 +561,10 @@ export default function ChatRoster({
                           m.type === 'image'
                             ? 'solar:gallery-bold-duotone'
                             : m.type === 'video'
-                            ? 'solar:videocamera-record-bold-duotone'
-                            : m.type === 'audio'
-                            ? 'solar:microphone-bold-duotone'
-                            : 'solar:document-bold-duotone'
+                              ? 'solar:videocamera-record-bold-duotone'
+                              : m.type === 'audio'
+                                ? 'solar:microphone-bold-duotone'
+                                : 'solar:document-bold-duotone'
                         }
                         width="22"
                         height="22"
@@ -596,7 +587,6 @@ export default function ChatRoster({
                         href={m.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
                         style={{ color: '#00a884', display: 'flex', alignItems: 'center', padding: '6px' }}
                         title="Download / Open File"
                       >
@@ -611,214 +601,7 @@ export default function ChatRoster({
         )}
       </AnimatePresence>
 
-      {/* Motion Feature #3: 3D Lightbox Preview Modal */}
-      <AnimatePresence>
-        {selectedMedia && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedMedia(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(11, 20, 26, 0.85)',
-              backdropFilter: 'blur(16px)',
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '24px',
-            }}
-          >
-            <motion.div
-              layoutId={`media-card-${selectedMedia.idx}`}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: '#202c33',
-                borderRadius: '16px',
-                padding: '24px',
-                maxWidth: '440px',
-                width: '100%',
-                border: '1px solid rgba(0, 168, 132, 0.3)',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Icon icon="solar:folder-with-files-bold-duotone" width="26" height="26" style={{ color: '#00a884' }} />
-                  <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#e9edef' }}>
-                    Media File Preview
-                  </span>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setSelectedMedia(null)}
-                  style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}
-                >
-                  <Icon icon="solar:close-circle-bold-duotone" width="24" height="24" />
-                </motion.button>
-              </div>
-
-              {selectedMedia.fileUrl && selectedMedia.type === 'image' && (
-                <img
-                  src={selectedMedia.fileUrl}
-                  alt="Attachment Preview"
-                  style={{ width: '100%', maxHeight: '240px', objectFit: 'cover', borderRadius: '12px' }}
-                />
-              )}
-
-              <div style={{ fontSize: '0.88rem', color: '#e9edef', fontWeight: 600 }}>
-                {selectedMedia.fileName || selectedMedia.message || 'Shared Attachment File'}
-              </div>
-
-              <div style={{ fontSize: '0.78rem', color: '#8696a0' }}>
-                Shared by <strong>{selectedMedia.nickname}</strong> • {selectedMedia.timestamp || 'Just now'}
-              </div>
-
-              {selectedMedia.fileUrl && (
-                <motion.a
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  href={selectedMedia.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    backgroundColor: '#00a884',
-                    color: '#111b21',
-                    fontWeight: 700,
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    textAlign: 'center',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    marginTop: '8px',
-                  }}
-                >
-                  <Icon icon="solar:download-minimalistic-bold-duotone" width="20" height="20" />
-                  <span>Download / Open Media</span>
-                </motion.a>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Motion Feature #5: Native Participant Quick Action Sheet Overlay */}
-      <AnimatePresence>
-        {selectedUserAction && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedUserAction(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(11, 20, 26, 0.75)',
-              backdropFilter: 'blur(10px)',
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'center',
-            }}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: '#1f2c34',
-                borderTopLeftRadius: '20px',
-                borderTopRightRadius: '20px',
-                padding: '20px',
-                maxWidth: '420px',
-                width: '100%',
-                border: '1px solid rgba(134, 150, 160, 0.2)',
-                boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', paddingBottom: '12px' }}>
-                {renderStatusAvatar(selectedUserAction.nickname, '42px', selectedUserAction.isOnline, {}, selectedUserAction.avatarUrl)}
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#e9edef' }}>
-                    {selectedUserAction.nickname}
-                  </div>
-                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
-                    {selectedUserAction.isOnline ? '🟢 Currently Online' : '⚪ Offline / Away'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action 1: @Mention User */}
-              <motion.button
-                whileHover={{ scale: 1.02, x: 4 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  if (setChatMessage) {
-                    setChatMessage((prev) => `@${selectedUserAction.nickname} ` + prev);
-                  }
-                  if (chatInputRef && chatInputRef.current) {
-                    chatInputRef.current.focus();
-                  }
-                  setSelectedUserAction(null);
-                }}
-                style={{
-                  backgroundColor: '#2a3942',
-                  border: 'none',
-                  color: '#00a884',
-                  fontWeight: 700,
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontSize: '0.86rem',
-                  textAlign: 'left',
-                }}
-              >
-                <Icon icon="solar:user-bold-duotone" width="20" height="20" />
-                <span>@Mention {selectedUserAction.nickname} in Chat</span>
-              </motion.button>
-
-              {/* Action 2: Close Sheet */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedUserAction(null)}
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(134, 150, 160, 0.2)',
-                  color: '#8696a0',
-                  fontWeight: 600,
-                  padding: '10px 16px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '0.84rem',
-                  marginTop: '4px',
-                }}
-              >
-                Dismiss
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Encrypted Session Badge Footer */}
+      {/* Encrypted Session Badge Footer with Feature #4 Heartbeat Scale Pulse */}
       <div className="e2ee-footer-badge">
         <motion.div
           animate={{ scale: [1, 1.12, 1] }}
