@@ -3,16 +3,6 @@ import { formatUserPresence } from '../../../utils/chatUtils';
 import { renderDeviceBadge } from '../../../utils/deviceUtils';
 import './ChatRoster.css';
 
-// Preset Mood Status Options
-const MOOD_OPTIONS = [
-  '🚀 Coding',
-  '⚡ In a Meeting',
-  '☕ Coffee Break',
-  '🎧 Listening to Music',
-  '🎯 Deep Work',
-  '🌴 Away',
-];
-
 export default function ChatRoster({
   isMobileDevice,
   showRosterPanel,
@@ -23,8 +13,6 @@ export default function ChatRoster({
   renderStatusAvatar,
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'media'
-  const [myCustomStatus, setMyCustomStatus] = useState('🚀 Coding');
-  const [showMoodSelector, setShowMoodSelector] = useState(false);
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
 
@@ -155,7 +143,7 @@ export default function ChatRoster({
         </button>
       </div>
 
-      {/* Feature 7: Tab Selector Bar (People vs Shared Media & Docs) */}
+      {/* Tab Selector Bar (People vs Shared Media & Docs) */}
       <div
         style={{
           display: 'flex',
@@ -210,78 +198,11 @@ export default function ChatRoster({
         </button>
       </div>
 
-      {/* TAB 1: PEOPLE (Online & Offline Grouping + Custom Status Messages) */}
+      {/* TAB 1: PEOPLE (Online & Offline Grouping) */}
       {activeTab === 'people' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
           
-          {/* Feature 5: Set My Mood / Custom Status Bar */}
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid rgba(134, 150, 160, 0.1)', marginBottom: '8px' }}>
-            <div style={{ fontSize: '0.7rem', color: '#8696a0', fontWeight: 600, marginBottom: '4px' }}>YOUR STATUS MOOD</div>
-            <button
-              type="button"
-              onClick={() => setShowMoodSelector(!showMoodSelector)}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                backgroundColor: '#202c33',
-                border: '1px solid rgba(134, 150, 160, 0.2)',
-                color: '#00a884',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                textAlign: 'left',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span>{myCustomStatus}</span>
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_drop_down</span>
-            </button>
-
-            {/* Quick Mood Dropdown */}
-            {showMoodSelector && (
-              <div
-                style={{
-                  marginTop: '6px',
-                  backgroundColor: '#182229',
-                  borderRadius: '6px',
-                  border: '1px solid #00a884',
-                  padding: '4px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                }}
-              >
-                {MOOD_OPTIONS.map((mood, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setMyCustomStatus(mood);
-                      setShowMoodSelector(false);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#e9edef',
-                      fontSize: '0.78rem',
-                      padding: '6px 8px',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      borderRadius: '4px',
-                    }}
-                    className="hover:bg-[#202c33]"
-                  >
-                    {mood}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Feature 2: Group 1 - ONLINE PARTICIPANTS */}
+          {/* Group 1 - ONLINE PARTICIPANTS */}
           <div style={{ marginBottom: '12px' }}>
             <div
               onClick={() => setShowOnlineGroup(!showOnlineGroup)}
@@ -332,9 +253,8 @@ export default function ChatRoster({
                             {u.nickname} {isMe && '(You)'}
                           </span>
                         </div>
-                        {/* Feature 5: Custom Status Mood underneath nickname */}
                         <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px' }}>
-                          {isMe ? myCustomStatus : presence.text}
+                          {presence.text}
                         </div>
                         <div>{renderDeviceBadge(u)}</div>
                       </div>
@@ -344,7 +264,7 @@ export default function ChatRoster({
               ))}
           </div>
 
-          {/* Feature 2: Group 2 - OFFLINE PARTICIPANTS */}
+          {/* Group 2 - OFFLINE PARTICIPANTS */}
           {offlineUsers.length > 0 && (
             <div>
               <div
@@ -403,7 +323,7 @@ export default function ChatRoster({
         </div>
       )}
 
-      {/* TAB 2: MEDIA & DOCS GALLERY (Feature 7) */}
+      {/* TAB 2: MEDIA & DOCS GALLERY */}
       {activeTab === 'media' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
           {mediaMessages.length === 0 ? (
