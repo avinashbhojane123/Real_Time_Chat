@@ -51,21 +51,13 @@ export default function ChatHeader({
             <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>menu</span>
           </button>
 
-          {renderStatusAvatar(recipientUser ? recipientUser.nickname : 'Participant', '40px', isRecipientOnline, {}, recipientUser?.avatarUrl)}
-
-
-
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
-              {recipientUser ? recipientUser.nickname : 'Waiting for participant...'}
+          {typingUsers && typingUsers.length > 0 && (
+            <div style={{ fontSize: '0.74rem', color: '#00a884' }}>
+              {typingUsers.join(', ')} is typing...
             </div>
-            {typingUsers && typingUsers.length > 0 && (
-              <div style={{ fontSize: '0.74rem', color: '#00a884', marginTop: '1px' }}>
-                {typingUsers.join(', ')} is typing...
-              </div>
-            )}
-          </div>
+          )}
         </div>
+
 
         {/* Action Icons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

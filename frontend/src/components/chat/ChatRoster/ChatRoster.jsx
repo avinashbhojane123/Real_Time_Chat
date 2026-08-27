@@ -64,14 +64,9 @@ export default function ChatRoster({
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
           )}
-          {renderStatusAvatar(nickname, '36px', true)}
-          <div>
-            <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>
-              {nickname}
-            </h2>
-          </div>
         </div>
       </div>
+
 
 
 
