@@ -223,7 +223,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         statusMediaUrl: status.mediaUrl || null,
         statusBgColor: status.bgColor || null,
       },
-      expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+      expiresIn: null,
     };
 
     socketRef.current?.emit('sendMessage', replyMsg);
@@ -327,14 +327,33 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       const res = await axios.post(`${cleanApiUrl}/upload`, formData);
 
       if (res.data && res.data.fileUrl) {
+        let fullFileUrl = res.data.fileUrl;
+        if (
+          !fullFileUrl.startsWith('http://') &&
+          !fullFileUrl.startsWith('https://') &&
+          !fullFileUrl.startsWith('data:')
+        ) {
+          fullFileUrl = `${cleanApiUrl}${fullFileUrl.startsWith('/') ? '' : '/'}${fullFileUrl}`;
+        }
+
+        const derivedFileType = file.type || (
+          /\.(jpg|jpeg|png|gif|webp|svg|avif|heic|bmp)$/i.test(file.name)
+            ? 'image/jpeg'
+            : /\.(mp4|webm|mov|m4v)$/i.test(file.name)
+            ? 'video/mp4'
+            : /\.(mp3|wav|ogg|aac|m4a)$/i.test(file.name)
+            ? 'audio/mpeg'
+            : 'application/octet-stream'
+        );
+
         const payload = {
           passcode,
           nickname,
           message: '',
-          fileUrl: res.data.fileUrl,
+          fileUrl: fullFileUrl,
           fileName: file.name,
-          fileType: file.type,
-          expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+          fileType: derivedFileType,
+          expiresIn: null,
         };
         socketRef.current?.emit('sendMessage', payload);
         showToast('File attached & sent');

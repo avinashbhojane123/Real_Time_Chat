@@ -61,6 +61,27 @@ export default function ChatMessagesFeed({
     return [];
   };
 
+  const isImageFile = (msg) => {
+    if (!msg?.fileUrl) return false;
+    if (msg.fileType && msg.fileType.startsWith('image/')) return true;
+    const target = `${msg.fileUrl} ${msg.fileName || ''}`.toLowerCase();
+    return /\.(jpg|jpeg|png|gif|webp|svg|avif|heic|bmp)($|\?)/i.test(target) || msg.fileUrl.startsWith('data:image/');
+  };
+
+  const isVideoFile = (msg) => {
+    if (!msg?.fileUrl) return false;
+    if (msg.fileType && msg.fileType.startsWith('video/')) return true;
+    const target = `${msg.fileUrl} ${msg.fileName || ''}`.toLowerCase();
+    return /\.(mp4|webm|mov|m4v|mkv|avi)($|\?)/i.test(target);
+  };
+
+  const isAudioFile = (msg) => {
+    if (!msg?.fileUrl) return false;
+    if (msg.fileType && msg.fileType.startsWith('audio/')) return true;
+    const target = `${msg.fileUrl} ${msg.fileName || ''}`.toLowerCase();
+    return /\.(mp3|wav|ogg|aac|m4a|flac)($|\?)/i.test(target);
+  };
+
   const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
 
   return (
@@ -243,33 +264,44 @@ export default function ChatMessagesFeed({
                     <div>
                       {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
 
-                      {/* Feature 8 & 5 (Set 2): Image Attachment Preview with M3 Media Card & Motion layoutId */}
-                      {msg.fileUrl && msg.fileType?.startsWith('image/') && (
-                        <div className="m3-media-card" style={{ marginTop: '6px' }}>
+                      {/* Image Attachment Preview with M3 Media Card & Lightbox */}
+                      {isImageFile(msg) && (
+                        <div className="m3-media-card" style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden' }}>
                           <motion.img
                             layoutId={`chat-img-${msg.id}`}
                             src={msg.fileUrl}
-                            alt="Attachment"
-                            style={{ maxWidth: '100%', maxHeight: '280px', cursor: 'pointer', objectFit: 'cover', display: 'block' }}
+                            alt={msg.fileName || 'Photo attachment'}
+                            style={{ maxWidth: '100%', maxHeight: '280px', cursor: 'pointer', objectFit: 'cover', display: 'block', borderRadius: '12px' }}
                             onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName, id: msg.id })}
                           />
                         </div>
                       )}
 
+                      {/* Video Attachment Player */}
+                      {isVideoFile(msg) && (
+                        <div className="m3-media-card" style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden' }}>
+                          <video
+                            controls
+                            src={msg.fileUrl}
+                            style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '12px', display: 'block' }}
+                          />
+                        </div>
+                      )}
+
                       {/* Audio Voice Note Player */}
-                      {msg.fileUrl && msg.fileType?.startsWith('audio/') && (
-                        <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px' }}>
+                      {isAudioFile(msg) && (
+                        <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px', borderRadius: '12px' }}>
                           <Icon icon="solar:volume-loud-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
                           <audio controls src={msg.fileUrl} style={{ height: '30px', flex: 1, outline: 'none' }} />
                         </div>
                       )}
 
                       {/* Document & File Attachment Card */}
-                      {msg.fileUrl && !msg.fileType?.startsWith('image/') && !msg.fileType?.startsWith('audio/') && (
+                      {msg.fileUrl && !isImageFile(msg) && !isVideoFile(msg) && !isAudioFile(msg) && (
                         <div
                           className="m3-media-card"
                           onClick={() => setDocumentViewerFile({ url: msg.fileUrl, name: msg.fileName, type: msg.fileType })}
-                          style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', cursor: 'pointer' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', cursor: 'pointer', borderRadius: '12px' }}
                         >
                           <Icon icon="solar:document-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />
                           <div style={{ flex: 1, minWidth: 0 }}>

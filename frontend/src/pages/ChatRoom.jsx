@@ -239,7 +239,7 @@ export default function ChatRoom() {
           message: replyingTo.message || 'Media / Attachment',
         }
         : null,
-      expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+      expiresIn: null,
     };
 
     socketRef.current?.emit('sendMessage', payload);
