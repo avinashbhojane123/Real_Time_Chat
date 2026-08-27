@@ -31,7 +31,6 @@
     "class-validator": "^0.15.1",
     "multer": "^2.0.0",
     "pg": "^8.21.0",
-    "playwright": "^1.62.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
