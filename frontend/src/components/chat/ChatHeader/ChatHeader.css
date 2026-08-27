@@ -1,3 +1,11 @@
+/* Material Design 3 (M3) Design Tokens & Interaction Styles */
+:root {
+  --m3-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --m3-easing-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --m3-surface-container: #111b21;
+  --m3-surface-container-high: #202c33;
+}
+
 .wa-header-container {
   height: 60px;
   display: flex;
@@ -6,4 +14,51 @@
   padding: 10px 16px;
   border-bottom: 1px solid rgba(134, 150, 160, 0.15);
   z-index: 20;
+  transition: background-color 300ms var(--m3-easing-emphasized);
+}
+
+/* M3 48dp Touch Target & State Layer Overlay */
+.m3-action-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  transition: background-color 300ms var(--m3-easing-emphasized), transform 200ms var(--m3-easing-emphasized);
+}
+
+.m3-action-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0;
+  transition: opacity 200ms var(--m3-easing-emphasized);
+  pointer-events: none;
+}
+
+.m3-action-btn:hover::before {
+  opacity: 0.08;
+}
+
+.m3-action-btn:active::before {
+  opacity: 0.18;
+}
+
+/* M3 Avatar Presence 2.5dp Cutout Mask Stroke */
+.m3-presence-cutout {
+  box-shadow: 0 0 0 2.5px #111b21;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #111b21;
 }

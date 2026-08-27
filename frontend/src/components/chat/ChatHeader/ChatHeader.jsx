@@ -158,7 +158,7 @@ export default function ChatHeader({
                   <Icon icon="solar:shield-check-bold-duotone" width="16" height="16" style={{ color: '#00a884', opacity: 0.9 }} title="End-to-end encrypted chat" />
                 </div>
 
-                {/* Live Typing Status or Online/Offline Presence Indicator */}
+                {/* Live Typing Status or Online/Offline Presence Indicator with M3 2.5dp Cutout Mask */}
                 {typingUsers && typingUsers.length > 0 ? (
                   <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" />
@@ -166,12 +166,14 @@ export default function ChatHeader({
                   </div>
                 ) : (
                   <div style={{ fontSize: '0.72rem', color: isRecipientOnline ? '#00a884' : '#8696a0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Icon
-                      icon={isRecipientOnline ? 'solar:check-circle-bold-duotone' : 'solar:clock-circle-bold-duotone'}
-                      width="12"
-                      height="12"
-                      style={{ color: isRecipientOnline ? '#00a884' : '#8696a0' }}
-                    />
+                    <span className="m3-presence-cutout">
+                      <Icon
+                        icon={isRecipientOnline ? 'solar:check-circle-bold-duotone' : 'solar:clock-circle-bold-duotone'}
+                        width="12"
+                        height="12"
+                        style={{ color: isRecipientOnline ? '#00a884' : '#8696a0' }}
+                      />
+                    </span>
                     <span>{formatUserPresence(isRecipientOnline, recipientUser?.lastSeen).text}</span>
                   </div>
                 )}
@@ -200,7 +202,7 @@ export default function ChatHeader({
             key={latency}
             initial={{ scale: 0.88, opacity: 0.7 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 25, ease: [0.2, 0, 0, 1] }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -214,7 +216,7 @@ export default function ChatHeader({
               color: isSocketConnected ? '#00a884' : '#f15c6d',
               cursor: 'default',
               userSelect: 'none',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.2s cubic-bezier(0.2, 0, 0, 1)',
             }}
             title={`WebSocket Status: ${isSocketConnected ? 'Connected' : 'Reconnecting...'} | Latency: ${latency}ms`}
           >
@@ -226,12 +228,13 @@ export default function ChatHeader({
             <span>{isSocketConnected ? `${latency}ms` : 'Offline'}</span>
           </motion.div>
 
-          {/* WhatsApp Video Call Button with Tactile Motion Feedback */}
+          {/* WhatsApp Video Call Button with M3 State Layer & Tactile Motion Feedback */}
           <motion.button
-            whileHover={{ scale: 1.15 }}
+            whileHover={{ scale: 1.12 }}
             whileTap={{ scale: 0.88 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
             type="button"
+            className="m3-action-btn"
             disabled={!isRecipientOnline && callState === 'idle'}
             onClick={() => {
               if (!isRecipientOnline && callState === 'idle') {
@@ -244,17 +247,12 @@ export default function ChatHeader({
             style={{
               backgroundColor: callState === 'active' ? '#25d366' : 'transparent',
               color: callState === 'active' ? '#000000' : isRecipientOnline ? '#00a884' : '#8696a0',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '20px',
               fontWeight: 700,
               fontSize: '0.82rem',
               cursor: isRecipientOnline || callState !== 'idle' ? 'pointer' : 'not-allowed',
               opacity: !isRecipientOnline && callState === 'idle' ? 0.5 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
+              width: '38px',
+              height: '38px',
             }}
             title={
               callState === 'active'
@@ -271,12 +269,13 @@ export default function ChatHeader({
             />
           </motion.button>
 
-          {/* Voice Call Button with Tactile Motion Feedback */}
+          {/* Voice Call Button with M3 State Layer & Tactile Motion Feedback */}
           <motion.button
-            whileHover={{ scale: 1.15 }}
+            whileHover={{ scale: 1.12 }}
             whileTap={{ scale: 0.88 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
             type="button"
+            className="m3-action-btn"
             disabled={!isRecipientOnline && callState === 'idle'}
             onClick={() => {
               if (!isRecipientOnline && callState === 'idle') {
@@ -286,17 +285,11 @@ export default function ChatHeader({
               startCall();
             }}
             style={{
-              background: 'none',
-              border: 'none',
               color: isRecipientOnline ? '#00a884' : '#8696a0',
               cursor: isRecipientOnline ? 'pointer' : 'not-allowed',
               opacity: !isRecipientOnline ? 0.5 : 1,
-              padding: '6px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease',
+              width: '38px',
+              height: '38px',
             }}
             title={isRecipientOnline ? 'Start Voice Call' : 'User is offline - Voice call unavailable'}
           >
@@ -307,23 +300,18 @@ export default function ChatHeader({
             />
           </motion.button>
 
-          {/* Search Icon Button with Tactile Motion Feedback */}
+          {/* Search Icon Button with M3 State Layer & Tactile Motion Feedback */}
           <motion.button
-            whileHover={{ scale: 1.15 }}
+            whileHover={{ scale: 1.12 }}
             whileTap={{ scale: 0.88 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
             type="button"
+            className="m3-action-btn"
             onClick={() => setShowSearch(!showSearch)}
             style={{
-              background: 'none',
-              border: 'none',
               color: showSearch ? '#00a884' : '#8696a0',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              width: '38px',
+              height: '38px',
             }}
             title="Search Messages"
           >
