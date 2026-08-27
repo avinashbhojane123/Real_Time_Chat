@@ -82,6 +82,20 @@ export default function ChatMessagesFeed({
     return /\.(mp3|wav|ogg|aac|m4a|flac)($|\?)/i.test(target);
   };
 
+  const resolveMediaUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+      return url;
+    }
+    const cleanUrl = url.replace(/^\/?api\//, '/');
+    const storedBase = localStorage.getItem('baseUrl') || import.meta.env.VITE_API_URL || import.meta.env.VITE_DEFAULT_API_URL || '';
+    const serverBase = storedBase.replace(/\/api\/?$/, '').replace(/\/+$/, '');
+    if (serverBase) {
+      return `${serverBase}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
+    }
+    return cleanUrl;
+  };
+
   const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
 
   return (
@@ -269,10 +283,16 @@ export default function ChatMessagesFeed({
                         <div className="m3-media-card" style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden' }}>
                           <motion.img
                             layoutId={`chat-img-${msg.id}`}
-                            src={msg.fileUrl}
+                            src={resolveMediaUrl(msg.fileUrl)}
                             alt={msg.fileName || 'Photo attachment'}
                             style={{ maxWidth: '100%', maxHeight: '280px', cursor: 'pointer', objectFit: 'cover', display: 'block', borderRadius: '12px' }}
-                            onClick={() => setLightboxImage({ url: msg.fileUrl, name: msg.fileName, id: msg.id })}
+                            onClick={() => setLightboxImage({ url: resolveMediaUrl(msg.fileUrl), name: msg.fileName, id: msg.id })}
+                            onError={(e) => {
+                              if (msg.fileUrl && !e.target.dataset.retried) {
+                                e.target.dataset.retried = 'true';
+                                e.target.src = msg.fileUrl;
+                              }
+                            }}
                           />
                         </div>
                       )}
@@ -282,7 +302,7 @@ export default function ChatMessagesFeed({
                         <div className="m3-media-card" style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden' }}>
                           <video
                             controls
-                            src={msg.fileUrl}
+                            src={resolveMediaUrl(msg.fileUrl)}
                             style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '12px', display: 'block' }}
                           />
                         </div>
@@ -292,7 +312,7 @@ export default function ChatMessagesFeed({
                       {isAudioFile(msg) && (
                         <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px', borderRadius: '12px' }}>
                           <Icon icon="solar:volume-loud-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
-                          <audio controls src={msg.fileUrl} style={{ height: '30px', flex: 1, outline: 'none' }} />
+                          <audio controls src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
                         </div>
                       )}
 
@@ -300,7 +320,7 @@ export default function ChatMessagesFeed({
                       {msg.fileUrl && !isImageFile(msg) && !isVideoFile(msg) && !isAudioFile(msg) && (
                         <div
                           className="m3-media-card"
-                          onClick={() => setDocumentViewerFile({ url: msg.fileUrl, name: msg.fileName, type: msg.fileType })}
+                          onClick={() => setDocumentViewerFile({ url: resolveMediaUrl(msg.fileUrl), name: msg.fileName, type: msg.fileType })}
                           style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', cursor: 'pointer', borderRadius: '12px' }}
                         >
                           <Icon icon="solar:document-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />

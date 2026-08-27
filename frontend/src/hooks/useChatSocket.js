@@ -333,7 +333,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
           !fullFileUrl.startsWith('https://') &&
           !fullFileUrl.startsWith('data:')
         ) {
-          fullFileUrl = `${cleanApiUrl}${fullFileUrl.startsWith('/') ? '' : '/'}${fullFileUrl}`;
+          const serverBaseUrl = cleanApiUrl.replace(/\/api\/?$/, '');
+          fullFileUrl = `${serverBaseUrl}${fullFileUrl.startsWith('/') ? '' : '/'}${fullFileUrl}`;
         }
 
         const derivedFileType = file.type || (
