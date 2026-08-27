@@ -273,48 +273,6 @@ export default function ChatInputBar({
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff9800' }}>timer</span>
                     <span>Disappearing Messages {disappearingTimer > 0 ? `(${disappearingTimer}s)` : ''}</span>
                   </button>
-
-                  {/* 5. Change Theme & Wallpaper */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowThemeModal(true);
-                      setShowActionMenu(false);
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#0070f3' }}>palette</span>
-                    <span>Change Theme & Wallpaper</span>
-                  </button>
-
-                  {/* 6. Clear Room History */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowClearConfirm(true);
-                      setShowActionMenu(false);
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#f44336' }}>delete_sweep</span>
-                    <span>Clear Room History</span>
-                  </button>
-
-                  {/* 7. Log Out */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowLogoutConfirm(true);
-                      setShowActionMenu(false);
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#ff4e4e', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff4e4e' }}>logout</span>
-                    <span>Log Out</span>
-                  </button>
                 </div>
               )}
             </div>

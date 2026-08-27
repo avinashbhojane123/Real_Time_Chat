@@ -444,6 +444,8 @@ export default function ChatRoom() {
         setActiveStatusUser={setActiveStatusUser}
         setShowStatusCreator={setShowStatusCreator}
         setShowLogoutConfirm={setShowLogoutConfirm}
+        setShowThemeModal={setShowThemeModal}
+        setShowClearConfirm={setShowClearConfirm}
       />
 
       {/* 2. Main Chat Panel */}

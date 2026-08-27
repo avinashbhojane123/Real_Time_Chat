@@ -38,6 +38,8 @@ export default function ChatRoster({
   setChatMessage,
   chatInputRef,
   setShowLogoutConfirm,
+  setShowThemeModal,
+  setShowClearConfirm,
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
@@ -104,9 +106,10 @@ export default function ChatRoster({
           zIndex: 30,
           flexShrink: 0,
           paddingTop: '12px',
+          paddingBottom: '12px',
         }}
       >
-        {/* Participants Button */}
+        {/* 1. Participants Button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
@@ -150,7 +153,59 @@ export default function ChatRoster({
           )}
         </motion.button>
 
-        {/* Log Out Button below Participants on Left Rail Sidebar */}
+        {/* 2. Change Theme & Wallpaper Button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={() => setShowThemeModal && setShowThemeModal(true)}
+          style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(0, 112, 243, 0.12)',
+            border: '1px solid rgba(0, 112, 243, 0.3)',
+            color: '#0070f3',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '14px',
+          }}
+          className="media-item-card"
+          title="Change Theme & Wallpaper"
+        >
+          <Icon icon="solar:palette-bold-duotone" width="22" height="22" style={{ color: '#0070f3' }} />
+        </motion.button>
+
+        {/* 3. Clear Room History Button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          type="button"
+          onClick={() => setShowClearConfirm && setShowClearConfirm(true)}
+          style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 152, 0, 0.12)',
+            border: '1px solid rgba(255, 152, 0, 0.3)',
+            color: '#ff9800',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '14px',
+          }}
+          className="media-item-card"
+          title="Clear Room History"
+        >
+          <Icon icon="solar:trash-bin-trash-bold-duotone" width="22" height="22" style={{ color: '#ff9800' }} />
+        </motion.button>
+
+        <div style={{ flex: 1 }} />
+
+        {/* 4. Log Out Button at Bottom of Left Rail Sidebar */}
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
