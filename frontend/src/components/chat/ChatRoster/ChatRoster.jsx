@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
 import { renderDeviceBadge } from '../../../utils/deviceUtils';
 import './ChatRoster.css';
@@ -61,9 +63,10 @@ export default function ChatRoster({
             position: 'relative',
             transition: 'all 0.2s ease',
           }}
+          className="media-item-card"
           title={`${onlineUsers.length} Online Participants`}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>group</span>
+          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="24" height="24" />
           {onlineUsers.length > 0 && (
             <span
               style={{
@@ -117,7 +120,7 @@ export default function ChatRoster({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '22px' }}>group</span>
+          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />
           <span style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
             Participants ({users.length})
           </span>
@@ -136,14 +139,15 @@ export default function ChatRoster({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            transition: 'all 0.2s ease',
           }}
           title="Close Panel"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+          <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
         </button>
       </div>
 
-      {/* Tab Selector Bar (People vs Shared Media & Docs) */}
+      {/* Tab Selector Bar (Iconify Participants Tab vs Media & Docs Tab) */}
       <div
         style={{
           display: 'flex',
@@ -167,11 +171,12 @@ export default function ChatRoster({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
+            gap: '8px',
+            transition: 'all 0.2s ease',
           }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>group</span>
-          People ({users.length})
+          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="18" height="18" />
+          <span>People ({users.length})</span>
         </button>
 
         <button
@@ -190,90 +195,35 @@ export default function ChatRoster({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
+            gap: '8px',
+            transition: 'all 0.2s ease',
           }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>folder_open</span>
-          Media & Docs ({mediaMessages.length})
+          <Icon icon="solar:folder-with-files-bold-duotone" width="18" height="18" />
+          <span>Media & Docs ({mediaMessages.length})</span>
         </button>
       </div>
 
-      {/* TAB 1: PEOPLE (Online & Offline Grouping) */}
-      {activeTab === 'people' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-          
-          {/* Group 1 - ONLINE PARTICIPANTS */}
-          <div style={{ marginBottom: '12px' }}>
-            <div
-              onClick={() => setShowOnlineGroup(!showOnlineGroup)}
-              style={{
-                padding: '6px 16px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                color: '#00a884',
-                letterSpacing: '0.5px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-              }}
-            >
-              <span>🟢 ONLINE ({onlineUsers.length})</span>
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                {showOnlineGroup ? 'expand_more' : 'chevron_right'}
-              </span>
-            </div>
-
-            {showOnlineGroup &&
-              (onlineUsers.length === 0 ? (
-                <div style={{ padding: '8px 16px', fontSize: '0.78rem', color: '#8696a0' }}>
-                  No participants online
-                </div>
-              ) : (
-                onlineUsers.map((u, idx) => {
-                  const presence = formatUserPresence(u.isOnline, u.lastSeen);
-                  const isMe = u.nickname === nickname;
-                  return (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.15s ease',
-                      }}
-                      className="hover:bg-[#202c33]"
-                    >
-                      {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
-                            {u.nickname} {isMe && '(You)'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px' }}>
-                          {presence.text}
-                        </div>
-                        <div>{renderDeviceBadge(u)}</div>
-                      </div>
-                    </div>
-                  );
-                })
-              ))}
-          </div>
-
-          {/* Group 2 - OFFLINE PARTICIPANTS */}
-          {offlineUsers.length > 0 && (
-            <div>
+      {/* Animation #3: Framer Motion Smooth Tab Transitions */}
+      <AnimatePresence mode="wait">
+        {activeTab === 'people' ? (
+          <motion.div
+            key="people-tab"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2 }}
+            style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}
+          >
+            {/* Group 1 - ONLINE PARTICIPANTS */}
+            <div style={{ marginBottom: '12px' }}>
               <div
-                onClick={() => setShowOfflineGroup(!showOfflineGroup)}
+                onClick={() => setShowOnlineGroup(!showOnlineGroup)}
                 style={{
                   padding: '6px 16px',
-                  fontSize: '0.72rem',
+                  fontSize: '0.74rem',
                   fontWeight: 700,
-                  color: '#8696a0',
+                  color: '#00a884',
                   letterSpacing: '0.5px',
                   display: 'flex',
                   alignItems: 'center',
@@ -281,103 +231,205 @@ export default function ChatRoster({
                   cursor: 'pointer',
                 }}
               >
-                <span>⚪ OFFLINE / AWAY ({offlineUsers.length})</span>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                  {showOfflineGroup ? 'expand_more' : 'chevron_right'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {/* Iconify Online Status Dot */}
+                  <Icon icon="solar:check-circle-bold-duotone" width="16" height="16" style={{ color: '#00a884' }} />
+                  <span>ONLINE ({onlineUsers.length})</span>
+                </div>
+                <Icon icon={showOnlineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
               </div>
 
-              {showOfflineGroup &&
-                offlineUsers.map((u, idx) => {
-                  const presence = formatUserPresence(u.isOnline, u.lastSeen);
-                  return (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        opacity: 0.6,
-                        transition: 'background-color 0.15s ease',
-                      }}
-                      className="hover:bg-[#202c33]"
-                    >
-                      {renderStatusAvatar(u.nickname, '38px', false, {}, u.avatarUrl)}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
-                            {u.nickname}
-                          </span>
+              {showOnlineGroup &&
+                (onlineUsers.length === 0 ? (
+                  <div style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Animation #1: Line-MD Animated Loop Spinner */}
+                    <Icon icon="line-md:loading-twotone-loop" width="18" height="18" style={{ color: '#00a884' }} />
+                    <span>Connecting participants...</span>
+                  </div>
+                ) : (
+                  onlineUsers.map((u, idx) => {
+                    const presence = formatUserPresence(u.isOnline, u.lastSeen);
+                    const isMe = u.nickname === nickname;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                        }}
+                        className="roster-item-card"
+                      >
+                        {/* Animation #2: Online Voice Pulsing Aura Ring */}
+                        <div className="online-avatar-pulse">
+                          {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
                         </div>
-                        <div style={{ fontSize: '0.7rem', color: '#8696a0', marginTop: '2px' }}>
-                          {presence.text}
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
+                              {u.nickname} {isMe && '(You)'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" />
+                            <span>{presence.text}</span>
+                          </div>
+                          <div>{renderDeviceBadge(u)}</div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ))}
             </div>
-          )}
-        </div>
-      )}
 
-      {/* TAB 2: MEDIA & DOCS GALLERY */}
-      {activeTab === 'media' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-          {mediaMessages.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#8696a0', fontSize: '0.85rem', marginTop: '40px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '36px', color: '#8696a0', marginBottom: '8px' }}>
-                folder_off
-              </span>
-              <div>No media or documents shared yet in this room session.</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {mediaMessages.map((m, idx) => (
+            {/* Group 2 - OFFLINE PARTICIPANTS */}
+            {offlineUsers.length > 0 && (
+              <div>
                 <div
-                  key={idx}
+                  onClick={() => setShowOfflineGroup(!showOfflineGroup)}
                   style={{
-                    backgroundColor: '#202c33',
-                    borderRadius: '8px',
-                    padding: '10px 12px',
-                    border: '1px solid rgba(134, 150, 160, 0.15)',
+                    padding: '6px 16px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#8696a0',
+                    letterSpacing: '0.5px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '24px' }}>
-                    {m.type === 'image' ? 'image' : m.type === 'video' ? 'videocam' : m.type === 'audio' ? 'mic' : 'description'}
-                  </span>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {m.fileName || m.message || 'Shared Media File'}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#8696a0' }}>
-                      By {m.nickname} • {m.timestamp || 'Just now'}
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {/* Iconify Offline Status Dot (Clock Icon) */}
+                    <Icon icon="solar:clock-circle-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                    <span>OFFLINE / AWAY ({offlineUsers.length})</span>
                   </div>
-
-                  {m.fileUrl && (
-                    <a
-                      href={m.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: '#00a884', display: 'flex', alignItems: 'center' }}
-                      title="Open / Download File"
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>download</span>
-                    </a>
-                  )}
+                  <Icon icon={showOfflineGroup ? "lucide:chevron-down" : "lucide:chevron-right"} width="16" height="16" />
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+
+                {showOfflineGroup &&
+                  offlineUsers.map((u, idx) => {
+                    const presence = formatUserPresence(u.isOnline, u.lastSeen);
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          opacity: 0.65,
+                        }}
+                        className="roster-item-card"
+                      >
+                        {renderStatusAvatar(u.nickname, '38px', false, {}, u.avatarUrl)}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
+                              {u.nickname}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#8696a0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" />
+                            <span>{presence.text}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          /* TAB 2: MEDIA & DOCS GALLERY */
+          <motion.div
+            key="media-tab"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+            style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}
+          >
+            {mediaMessages.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#8696a0', fontSize: '0.85rem', marginTop: '40px' }}>
+                <Icon icon="solar:folder-with-files-bold-duotone" width="48" height="48" style={{ color: '#8696a0', marginBottom: '8px', opacity: 0.5 }} />
+                <div>No media or documents shared yet in this room session.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {mediaMessages.map((m, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      backgroundColor: '#202c33',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      border: '1px solid rgba(134, 150, 160, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                    className="media-item-card"
+                  >
+                    <div
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(0, 168, 132, 0.15)',
+                        color: '#00a884',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon
+                        icon={
+                          m.type === 'image'
+                            ? 'solar:gallery-bold-duotone'
+                            : m.type === 'video'
+                            ? 'solar:videocamera-record-bold-duotone'
+                            : m.type === 'audio'
+                            ? 'solar:microphone-bold-duotone'
+                            : 'solar:document-bold-duotone'
+                        }
+                        width="22"
+                        height="22"
+                      />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.fileName || m.message || 'Shared Media File'}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#8696a0', marginTop: '2px' }}>
+                        By {m.nickname} • {m.timestamp || 'Just now'}
+                      </div>
+                    </div>
+
+                    {m.fileUrl && (
+                      <a
+                        href={m.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#00a884', display: 'flex', alignItems: 'center', padding: '6px' }}
+                        title="Download / Open File"
+                      >
+                        <Icon icon="solar:download-minimalistic-bold-duotone" width="22" height="22" />
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </aside>
   );
 }
