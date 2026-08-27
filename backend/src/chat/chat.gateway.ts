@@ -262,6 +262,8 @@ export class ChatGateway
           os: user.os,
           avatarUrl: user.avatarUrl,
           networkLabel: user.networkLabel,
+          batteryLabel: user.batteryLabel,
+          batteryIsCharging: user.batteryIsCharging,
         })),
       );
     }
@@ -339,6 +341,8 @@ export class ChatGateway
         os: data.os,
         avatarUrl: data.avatarUrl,
         networkLabel: data.networkLabel,
+        batteryLabel: data.batteryLabel,
+        batteryIsCharging: Boolean(data.batteryIsCharging),
       });
     } else {
       user.isOnline = true;
@@ -349,6 +353,12 @@ export class ChatGateway
       user.os = data.os || user.os;
       if (data.networkLabel) {
         user.networkLabel = data.networkLabel;
+      }
+      if (data.batteryLabel) {
+        user.batteryLabel = data.batteryLabel;
+      }
+      if (typeof data.batteryIsCharging === 'boolean') {
+        user.batteryIsCharging = data.batteryIsCharging;
       }
       if (data.avatarUrl) {
         user.avatarUrl = data.avatarUrl;
@@ -400,6 +410,8 @@ export class ChatGateway
         os: user.os,
         avatarUrl: user.avatarUrl,
         networkLabel: user.networkLabel,
+        batteryLabel: user.batteryLabel,
+        batteryIsCharging: user.batteryIsCharging,
       })),
     );
 

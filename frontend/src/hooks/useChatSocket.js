@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { getSocketBaseUrl } from '../utils/apiConfig';
-import { detectClientDevice } from '../utils/deviceUtils';
+import { detectClientDevice, getBatteryInfo } from '../utils/deviceUtils';
 
 export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [messages, setMessages] = useState([]);
@@ -34,8 +34,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    socket.on('connect', async () => {
       const clientDevice = detectClientDevice();
+      const battery = await getBatteryInfo();
       socket.emit('joinRoom', {
         nickname,
         passcode,
@@ -44,6 +45,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         browser: clientDevice.browser,
         os: clientDevice.os,
         networkLabel: clientDevice.network?.label,
+        batteryLabel: battery.label,
+        batteryIsCharging: battery.isCharging,
       });
       socket.emit('getStatuses', { passcode });
       socket.emit('getUsers', { passcode });

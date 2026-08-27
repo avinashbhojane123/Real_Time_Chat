@@ -92,4 +92,16 @@ export class User {
     nullable: true,
   })
   networkLabel!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  batteryLabel!: string | null;
+
+  @Column({
+    default: false,
+  })
+  batteryIsCharging!: boolean;
 }

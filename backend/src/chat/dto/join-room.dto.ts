@@ -43,4 +43,12 @@ export class JoinRoomDto {
   @IsOptional()
   @MaxLength(100)
   networkLabel?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  batteryLabel?: string;
+
+  @IsOptional()
+  batteryIsCharging?: boolean;
 }

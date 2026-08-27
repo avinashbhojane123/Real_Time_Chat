@@ -1,6 +1,31 @@
 import React from 'react';
 
 /**
+ * Detects live Battery Status using the Battery Status API (navigator.getBattery)
+ */
+export async function getBatteryInfo() {
+  if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+    try {
+      const battery = await navigator.getBattery();
+      const level = Math.round(battery.level * 100);
+      const isCharging = battery.charging;
+      const label = `${isCharging ? '⚡' : '🔋'} ${level}%`;
+      return { level, isCharging, label };
+    } catch (e) {
+      // Fallback if Battery API throws
+    }
+  }
+  return { level: 100, isCharging: false, label: '🔋 100%' };
+}
+
+/**
+ * Synchronous fallback battery helper
+ */
+export function detectBatteryInfoSync() {
+  return { level: 100, isCharging: false, label: '🔋 100%' };
+}
+
+/**
  * Detects live Network Connection metrics using Network Information API
  */
 export function detectNetworkInfo() {
@@ -22,7 +47,6 @@ export function detectNetworkInfo() {
     saveData = Boolean(connection.saveData);
   }
 
-  // Format human-readable connection label (e.g., '📶 4G • 25ms')
   const label = isOnline
     ? `${effectiveType.toUpperCase()} • ${rtt}ms`
     : '🔴 Offline';
@@ -77,8 +101,9 @@ export function detectClientDevice() {
   }
 
   const network = detectNetworkInfo();
+  const battery = detectBatteryInfoSync();
 
-  return { deviceType, deviceModel, browser, os, network };
+  return { deviceType, deviceModel, browser, os, network, battery };
 }
 
 export function renderDeviceBadge(user) {
@@ -110,9 +135,12 @@ export function renderDeviceBadge(user) {
   if (browser) label += ` • ${browser}`;
 
   const networkLabel = user.network?.label || user.networkLabel || '4G • 18ms';
+  const batteryLabel = user.battery?.label || user.batteryLabel || '🔋 92%';
+  const isCharging = user.battery?.isCharging || user.batteryIsCharging;
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '3px' }}>
+      {/* Device Platform Badge */}
       <span
         style={{
           display: 'inline-flex',
@@ -150,6 +178,27 @@ export function renderDeviceBadge(user) {
           wifi
         </span>
         <span>{networkLabel}</span>
+      </span>
+
+      {/* Battery Status Badge */}
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '0.68rem',
+          color: isCharging ? '#00a884' : '#8696a0',
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(134, 150, 160, 0.2)',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontWeight: 600,
+        }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '13px', color: isCharging ? '#00a884' : '#8696a0' }}>
+          {isCharging ? 'battery_charging_full' : 'battery_full'}
+        </span>
+        <span>{batteryLabel}</span>
       </span>
     </div>
   );
