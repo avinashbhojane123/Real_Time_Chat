@@ -368,6 +368,8 @@ export default function ChatMessagesFeed({
                     {/* Message 3 Dots Button Trigger */}
                     <button
                       type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
                         setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
@@ -381,21 +383,24 @@ export default function ChatMessagesFeed({
                         border: 'none',
                         color: '#8696a0',
                         cursor: 'pointer',
-                        padding: '2px',
+                        padding: '4px',
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        zIndex: 15,
+                        zIndex: 25,
                       }}
                       className="group-hover:opacity-100 opacity-60 hover:opacity-100"
                       title="Message options"
                     >
                       <Icon icon="solar:alt-arrow-down-bold-duotone" width="16" height="16" />
                     </button>
+
                     {/* 3 Dots Context Dropdown Menu */}
                     {activeMenuMsgId === msg.id && (
                       <div
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
                         style={{
                           position: 'absolute',
                           top: '26px',
@@ -405,77 +410,87 @@ export default function ChatMessagesFeed({
                           borderRadius: '10px',
                           boxShadow: '0 6px 20px rgba(0,0,0,0.7)',
                           border: '1px solid rgba(134, 150, 160, 0.2)',
-                          padding: '4px 0',
-                          zIndex: 60,
+                          padding: '6px 0',
+                          zIndex: 100,
                           minWidth: '150px',
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
                           type="button"
-                          onClick={() => {
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setActiveReactionMsgId(msg.id);
                             setActiveMenuMsgId(null);
                           }}
                           style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                           className="hover:bg-[#182229]"
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>add_reaction</span>
+                          <Icon icon="solar:smile-circle-bold-duotone" width="18" height="18" style={{ color: '#00a884' }} />
                           <span>React</span>
                         </button>
 
                         <button
                           type="button"
-                          onClick={() => {
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setReplyingTo(msg);
                             setActiveMenuMsgId(null);
                           }}
                           style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                           className="hover:bg-[#182229]"
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>reply</span>
+                          <Icon icon="solar:reply-bold-duotone" width="18" height="18" style={{ color: '#8696a0' }} />
                           <span>Reply</span>
                         </button>
 
                         {isMe && (
                           <button
                             type="button"
-                            onClick={() => {
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
                               startEditing(msg);
                               setActiveMenuMsgId(null);
                             }}
                             style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                             className="hover:bg-[#182229]"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>edit</span>
+                            <Icon icon="solar:pen-new-square-bold-duotone" width="18" height="18" style={{ color: '#8696a0' }} />
                             <span>Edit</span>
                           </button>
                         )}
 
                         <button
                           type="button"
-                          onClick={() => {
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleTogglePinMessage(msg);
                             setActiveMenuMsgId(null);
                           }}
                           style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                           className="hover:bg-[#182229]"
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#8696a0' }}>push_pin</span>
+                          <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#8696a0' }} />
                           <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
                         </button>
 
                         {isMe && (
                           <button
                             type="button"
-                            onClick={() => {
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleDeleteMessage(msg.id);
                               setActiveMenuMsgId(null);
                             }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f44336', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f15c6d', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                             className="hover:bg-[#182229]"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f44336' }}>delete</span>
+                            <Icon icon="solar:trash-bin-trash-bold-duotone" width="18" height="18" style={{ color: '#f15c6d' }} />
                             <span>Delete</span>
                           </button>
                         )}
@@ -486,6 +501,9 @@ export default function ChatMessagesFeed({
                     {activeReactionMsgId === msg.id && (
                       <div
                         className="reactions-popover"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                         style={{
                           right: isMe ? '0px' : 'auto',
                           left: !isMe ? '0px' : 'auto',
@@ -496,6 +514,7 @@ export default function ChatMessagesFeed({
                             key={i}
                             type="button"
                             className="reaction-item-btn"
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => handleReactToMessage(msg.id, emoji, e)}
                           >
                             {emoji}
@@ -504,14 +523,16 @@ export default function ChatMessagesFeed({
                         <button
                           type="button"
                           className="reaction-item-btn"
-                          onClick={() => {
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setShowCustomReactionForMsgId(showCustomReactionForMsgId === msg.id ? null : msg.id);
                             setActiveReactionMsgId(null);
                           }}
                           title="More Emojis"
                           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8696a0', padding: '4px' }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span>
+                          <Icon icon="solar:add-circle-bold-duotone" width="18" height="18" />
                         </button>
                       </div>
                     )}
