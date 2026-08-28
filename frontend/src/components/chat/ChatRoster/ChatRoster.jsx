@@ -48,8 +48,8 @@ export default function ChatRoster({
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'status' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
-  const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState(null); // Motion Lightbox Modal
+  const [showStatusDrawer, setShowStatusDrawer] = useState(false); // Status Stories Modal Drawer
 
   // Group Users into Online and Offline
   const onlineUsers = users.filter((u) => u.isOnline);
@@ -162,13 +162,7 @@ export default function ChatRoster({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           type="button"
-          onClick={() => {
-            if (statusUserList.length > 0) {
-              setActiveStatusUser && setActiveStatusUser(statusUserList[0]);
-            } else {
-              setShowStatusCreator && setShowStatusCreator(true);
-            }
-          }}
+          onClick={() => setShowStatusDrawer(true)}
           style={{
             width: '44px',
             height: '44px',
@@ -883,6 +877,148 @@ export default function ChatRoster({
                   <Icon icon="solar:download-minimalistic-bold-duotone" width="20" height="20" />
                   <span>Download / Open Media</span>
                 </motion.a>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Status Stories & Creator Modal Drawer (Triggered by Status Rail Button) */}
+      <AnimatePresence>
+        {showStatusDrawer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowStatusDrawer(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(11, 20, 26, 0.8)',
+              backdropFilter: 'blur(12px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#1f2c34',
+                borderRadius: '16px',
+                padding: '20px',
+                maxWidth: '420px',
+                width: '100%',
+                border: '1px solid rgba(0, 168, 132, 0.3)',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', paddingBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 700, color: '#00a884' }}>
+                  <Icon icon="solar:play-circle-bold-duotone" width="22" height="22" />
+                  <span>Status Updates ({statusUserList.length})</span>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.15, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowStatusDrawer(false)}
+                  style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}
+                >
+                  <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
+                </motion.button>
+              </div>
+
+              {/* 1. Add / My Status Button */}
+              <motion.div
+                whileHover={{ backgroundColor: '#182229', x: 3 }}
+                onClick={() => {
+                  setShowStatusDrawer(false);
+                  setShowStatusCreator && setShowStatusCreator(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  backgroundColor: '#111b21',
+                  border: '1px solid rgba(0, 168, 132, 0.3)',
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#005c4b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>
+                    {nickname ? nickname.slice(0, 2).toUpperCase() : 'ME'}
+                  </div>
+                  <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', backgroundColor: '#00a884', color: '#111b21', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #111b21' }}>
+                    <Icon icon="solar:add-square-bold-duotone" width="12" height="12" />
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>My Status</div>
+                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>Tap to add status update</div>
+                </div>
+                <Icon icon="solar:add-circle-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
+              </motion.div>
+
+              {/* 2. Contact Status Stories List */}
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px', marginTop: '4px' }}>
+                RECENT CONTACT UPDATES ({statusUserList.length})
+              </div>
+
+              {statusUserList.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#8696a0', padding: '20px 8px', fontSize: '0.8rem' }}>
+                  No recent status updates from your contacts yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
+                  {statusUserList.map((stUser) => (
+                    <motion.div
+                      key={stUser.nickname}
+                      whileHover={{ backgroundColor: '#182229', x: 3 }}
+                      onClick={() => {
+                        setShowStatusDrawer(false);
+                        setActiveStatusUser && setActiveStatusUser(stUser);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '8px 10px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        backgroundColor: '#111b21',
+                        border: '1px solid rgba(134, 150, 160, 0.15)',
+                      }}
+                    >
+                      {renderStatusAvatar ? renderStatusAvatar(stUser.nickname, '40px') : (
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                            {stUser.nickname.slice(0, 2).toUpperCase()}
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {stUser.nickname}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
+                          {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      <Icon icon="solar:alt-arrow-right-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                    </motion.div>
+                  ))}
+                </div>
               )}
             </motion.div>
           </motion.div>
