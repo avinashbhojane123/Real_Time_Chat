@@ -204,8 +204,9 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
         ) : (
           <AnimatePresence initial={false}>
             {visibleMessages.map((msg, idx) => {
-              const isMe = msg.nickname === nickname;
-              const isNearBottom = idx >= visibleMessages.length - 3;
+              const isMe = Boolean(msg.nickname && nickname && msg.nickname.trim().toLowerCase() === nickname.trim().toLowerCase());
+              const isNearTop = idx < 2;
+              const isNearBottom = !isNearTop && visibleMessages.length > 4 && idx >= visibleMessages.length - 2;
               const showDate =
                 idx === 0 ||
                 formatDateHeader(msg.createdAt) !== formatDateHeader(visibleMessages[idx - 1].createdAt);
