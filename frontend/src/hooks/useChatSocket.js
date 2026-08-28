@@ -175,9 +175,26 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       );
     });
 
-    socket.on('messageUpdated', (updatedMsg) => {
+    socket.on('messageEdited', ({ messageId, id, newMessage, message, fileUrl, isEdited }) => {
+      const targetId = messageId ?? id;
       setMessages((prev) =>
-        prev.map((m) => (String(m.id) === String(updatedMsg.id) ? { ...m, ...updatedMsg } : m))
+        prev.map((m) =>
+          String(m.id) === String(targetId)
+            ? {
+                ...m,
+                message: newMessage !== undefined ? newMessage : (message !== undefined ? message : m.message),
+                fileUrl: fileUrl !== undefined ? fileUrl : m.fileUrl,
+                isEdited: isEdited !== undefined ? isEdited : true,
+              }
+            : m
+        )
+      );
+    });
+
+    socket.on('messageUpdated', (updatedMsg) => {
+      const targetId = updatedMsg.id ?? updatedMsg.messageId;
+      setMessages((prev) =>
+        prev.map((m) => (String(m.id) === String(targetId) ? { ...m, ...updatedMsg } : m))
       );
     });
 

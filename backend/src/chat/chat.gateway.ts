@@ -863,11 +863,17 @@ export class ChatGateway
     msg.isEdited = true;
     await this.messageRepo.save(msg);
 
-    this.server.to(data.passcode).emit('messageEdited', {
+    const updatedPayload = {
+      id: msg.id,
       messageId: msg.id,
       newMessage: msg.message,
+      message: msg.message,
       fileUrl: msg.fileUrl,
-    });
+      isEdited: true,
+    };
+
+    this.server.to(data.passcode).emit('messageEdited', updatedPayload);
+    this.server.to(data.passcode).emit('messageUpdated', updatedPayload);
   }
 
   @SubscribeMessage('deleteMessage')

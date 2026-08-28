@@ -222,10 +222,18 @@ export default function ChatRoom() {
     if (!inputText.trim() && !editingMsg) return;
 
     if (editingMsg) {
+      const updatedText = inputText.trim();
+      setMessages((prev) =>
+        prev.map((m) =>
+          String(m.id) === String(editingMsg.id)
+            ? { ...m, message: updatedText, isEdited: true }
+            : m
+        )
+      );
       socketRef.current?.emit('editMessage', {
         passcode,
         messageId: editingMsg.id,
-        newMessage: inputText.trim(),
+        newMessage: updatedText,
       });
       setEditingMsg(null);
       setInputText('');
