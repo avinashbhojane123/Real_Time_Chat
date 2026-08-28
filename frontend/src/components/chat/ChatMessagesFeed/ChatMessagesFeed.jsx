@@ -109,7 +109,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
     const handleScroll = () => {
       const distanceFromBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight;
-      const isAtBottom = distanceFromBottom <= 150;
+      const isAtBottom = distanceFromBottom <= 60;
 
       if (setShowScrollToBottom) {
         setShowScrollToBottom(!isAtBottom);
@@ -133,16 +133,28 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     const currentLength = filteredMessages.length;
     prevMessagesLengthRef.current = currentLength;
 
+    if (currentLength === 0) return;
+
     const distanceFromBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight;
-    const isNearBottom = distanceFromBottom <= 200;
+    const isAtBottom = distanceFromBottom <= 60;
     const lastMsg = filteredMessages[filteredMessages.length - 1];
     const isOwnMessage = lastMsg?.nickname === nickname;
 
-    if (prevLength === 0 || isOwnMessage || isNearBottom) {
-      chatBottomRef?.current?.scrollIntoView({ behavior: prevLength === 0 ? 'auto' : 'smooth' });
+    // Initial load: scroll to bottom immediately
+    if (prevLength === 0) {
+      chatBottomRef?.current?.scrollIntoView({ behavior: 'auto' });
       if (setUnreadCount) setUnreadCount(0);
-    } else if (currentLength > prevLength) {
-      if (setUnreadCount) setUnreadCount((prev) => prev + 1);
+      return;
+    }
+
+    // Only scroll if a NEW message was added to the feed
+    if (currentLength > prevLength) {
+      if (isOwnMessage || isAtBottom) {
+        chatBottomRef?.current?.scrollIntoView({ behavior: 'smooth' });
+        if (setUnreadCount) setUnreadCount(0);
+      } else {
+        if (setUnreadCount) setUnreadCount((prev) => prev + 1);
+      }
     }
   }, [filteredMessages, nickname, chatFeedRef, chatBottomRef, setUnreadCount]);
 
