@@ -47,6 +47,7 @@ export default function ChatRoom() {
   // Socket & Chat State Hook
   const {
     messages,
+    setMessages,
     users,
     statuses,
     typingUsers,
