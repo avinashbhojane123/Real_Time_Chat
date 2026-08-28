@@ -169,7 +169,13 @@ const ChatRoster = memo(function ChatRoster({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setShowStatusDrawer((prev) => !prev);
+            if (statusUserList && statusUserList.length > 0 && setActiveStatusUser) {
+              setActiveStatusUser(statusUserList[0]);
+            } else if (setShowStatusCreator) {
+              setShowStatusCreator(true);
+            } else {
+              setShowStatusDrawer((prev) => !prev);
+            }
           }}
           style={{
             width: '44px',
@@ -329,8 +335,15 @@ const ChatRoster = memo(function ChatRoster({
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            type="button"
-            onClick={() => setShowStatusDrawer(true)}
+            onClick={() => {
+              if (statusUserList && statusUserList.length > 0 && setActiveStatusUser) {
+                setActiveStatusUser(statusUserList[0]);
+              } else if (setShowStatusCreator) {
+                setShowStatusCreator(true);
+              } else {
+                setShowStatusDrawer(true);
+              }
+            }}
             style={{
               width: '32px',
               height: '32px',

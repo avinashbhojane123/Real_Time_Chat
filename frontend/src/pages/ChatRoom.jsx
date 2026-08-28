@@ -26,8 +26,7 @@ import PollModal from '../components/modals/PollModal/PollModal';
 import DisappearingMessagesModal from '../components/modals/DisappearingMessagesModal/DisappearingMessagesModal';
 import DocumentViewerModal from '../components/modals/DocumentViewerModal/DocumentViewerModal';
 import ImageLightboxModal from '../components/modals/ImageLightboxModal/ImageLightboxModal';
-import StatusViewerModal from '../components/StatusViewerModal';
-import StatusCreatorModal from '../components/StatusCreatorModal';
+import StatusModal from '../components/StatusModal';
 
 export default function ChatRoom() {
   const navigate = useNavigate();
@@ -673,25 +672,28 @@ export default function ChatRoom() {
         }}
       />
 
-      {/* Status Creator Modal */}
-      {showStatusCreator && (
-        <StatusCreatorModal
-          baseUrl={baseUrl}
-          onClose={() => setShowStatusCreator(false)}
-          onSubmitStatus={handleCreateStatus}
-        />
-      )}
-
-      {/* Status Story Viewer Modal */}
-      {activeStatusUser && (
-        <StatusViewerModal
-          statuses={activeStatusUser.statuses}
-          initialIndex={0}
+      {/* Unified Status Story & Creator Modal */}
+      {(showStatusCreator || activeStatusUser) && (
+        <StatusModal
+          isOpen={true}
+          onClose={() => {
+            setShowStatusCreator(false);
+            setActiveStatusUser(null);
+          }}
+          statuses={statuses}
+          statusUserList={statusUserList}
+          initialUserIndex={
+            activeStatusUser
+              ? Math.max(0, statusUserList.findIndex((u) => u.nickname === activeStatusUser.nickname))
+              : 0
+          }
+          initialMode={showStatusCreator ? 'create' : 'view'}
           currentNickname={nickname}
-          onClose={() => setActiveStatusUser(null)}
+          baseUrl={baseUrl}
           onViewStatus={handleViewStatus}
           onDeleteStatus={handleDeleteStatus}
           onReplyStatus={(data) => handleReplyStatus(data, disappearingTimer)}
+          onSubmitStatus={handleCreateStatus}
         />
       )}
 
