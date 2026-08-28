@@ -63,7 +63,7 @@ export default function StatusModal({
     return Date.now() - new Date(timeVal).getTime() <= 24 * 60 * 60 * 1000;
   };
 
-  // Flattened users list for viewer
+  // Flattened users list for viewer (My Status first, then contact statuses)
   const effectiveUserList = (() => {
     const rawList = statusUserList && statusUserList.length > 0
       ? statusUserList
@@ -78,13 +78,24 @@ export default function StatusModal({
           return Object.values(map);
         })();
 
-    return rawList
+    const validList = rawList
       .map((u) => ({
         ...u,
         statuses: (u.statuses || []).filter(is24hValid),
       }))
       .filter((u) => u.statuses.length > 0);
+
+    validList.sort((a, b) => {
+      if (a.nickname === currentNickname) return -1;
+      if (b.nickname === currentNickname) return 1;
+      return a.nickname.localeCompare(b.nickname);
+    });
+
+    return validList;
   })();
+
+  const myStatusObj = effectiveUserList.find((u) => u.nickname === currentNickname);
+  const contactStatusList = effectiveUserList.filter((u) => u.nickname !== currentNickname);
 
   const currentUserObj = effectiveUserList[userIndex];
   const currentUserStories = currentUserObj?.statuses || [];
@@ -351,6 +362,30 @@ export default function StatusModal({
                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
                       {isPaused ? 'play_arrow' : 'pause'}
                     </span>
+                  </button>
+
+                  {/* Header List View Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPaused(true);
+                      setMode('list');
+                    }}
+                    title="View All Status Stories"
+                    style={{
+                      background: 'rgba(0,0,0,0.4)',
+                      border: 'none',
+                      color: '#fff',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Icon icon="solar:list-bold-duotone" width="18" height="18" />
                   </button>
 
                   {/* Header "+ Add Status" Action Button */}
@@ -639,6 +674,137 @@ export default function StatusModal({
               </button>
             </div>
           )
+        )}
+
+        {/* =========================================================================
+            MODE 2: WHATSAPP STATUS HUB LIST VIEW
+           ========================================================================= */}
+        {mode === 'list' && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#111b21', color: '#e9edef' }}>
+            <div style={{ height: '56px', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', backgroundColor: '#202c33' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 700, color: '#00a884' }}>
+                <Icon icon="solar:play-circle-bold-duotone" width="22" height="22" />
+                <span>Status Updates</span>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+              </button>
+            </div>
+
+            <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* SECTION 1: MY STATUS (First Person) */}
+              <div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  MY STATUS
+                </div>
+                <div
+                  onClick={() => {
+                    if (myStatusObj) {
+                      const idx = effectiveUserList.findIndex((u) => u.nickname === currentNickname);
+                      setUserIndex(Math.max(0, idx));
+                      setStoryIndex(0);
+                      setMode('view');
+                    } else {
+                      setMode('create');
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    backgroundColor: '#182229',
+                    border: '1px solid rgba(0, 168, 132, 0.3)',
+                  }}
+                >
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#005c4b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>
+                      {currentNickname ? currentNickname.slice(0, 2).toUpperCase() : 'ME'}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', backgroundColor: '#00a884', color: '#111b21', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #111b21' }}>
+                      <Icon icon="solar:add-square-bold-duotone" width="12" height="12" />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e9edef' }}>My Status (You)</div>
+                    <div style={{ fontSize: '0.76rem', color: '#00a884', fontWeight: 600 }}>
+                      {myStatusObj ? `${myStatusObj.statuses.length} active story updates` : 'Tap to add status update'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMode('create');
+                    }}
+                    style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Icon icon="solar:add-circle-bold-duotone" width="16" height="16" />
+                    <span>Add</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 2: RECENT CONTACT UPDATES (Second Person) */}
+              <div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  RECENT CONTACT UPDATES ({contactStatusList.length})
+                </div>
+
+                {contactStatusList.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#8696a0', padding: '24px 8px', fontSize: '0.82rem', backgroundColor: '#182229', borderRadius: '12px' }}>
+                    No recent status updates from your contacts yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {contactStatusList.map((stUser) => {
+                      const idx = effectiveUserList.findIndex((u) => u.nickname === stUser.nickname);
+                      const latestStatus = stUser.statuses[stUser.statuses.length - 1];
+                      return (
+                        <div
+                          key={stUser.nickname}
+                          onClick={() => {
+                            setUserIndex(Math.max(0, idx));
+                            setStoryIndex(0);
+                            setMode('view');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            backgroundColor: '#182229',
+                            border: '1px solid rgba(134, 150, 160, 0.15)',
+                          }}
+                        >
+                          <div style={{ width: '42px', height: '42px', borderRadius: '50%', border: '2.5px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                              {stUser.nickname.slice(0, 2).toUpperCase()}
+                            </div>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>{stUser.nickname}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#8696a0' }}>
+                              {formatStatusTime(latestStatus)} • {stUser.statuses.length} {stUser.statuses.length === 1 ? 'story' : 'stories'}
+                            </div>
+                          </div>
+                          <Icon icon="solar:alt-arrow-right-bold" width="18" height="18" style={{ color: '#00a884' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* =========================================================================

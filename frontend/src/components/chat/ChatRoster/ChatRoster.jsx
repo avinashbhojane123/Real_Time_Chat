@@ -941,12 +941,20 @@ const ChatRoster = memo(function ChatRoster({
                 </motion.button>
               </div>
 
-              {/* 1. Add / My Status Button */}
+              {/* 1. Add / My Status Button (First Person) */}
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px' }}>
+                MY STATUS
+              </div>
               <motion.div
                 whileHover={{ backgroundColor: '#182229', x: 3 }}
                 onClick={() => {
                   setShowStatusDrawer(false);
-                  setShowStatusCreator && setShowStatusCreator(true);
+                  const myStatusObj = statusUserList.find((u) => u.nickname === nickname);
+                  if (myStatusObj && setActiveStatusUser) {
+                    setActiveStatusUser(myStatusObj);
+                  } else if (setShowStatusCreator) {
+                    setShowStatusCreator(true);
+                  }
                 }}
                 style={{
                   display: 'flex',
@@ -968,62 +976,85 @@ const ChatRoster = memo(function ChatRoster({
                   </div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>My Status</div>
-                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>Tap to add status update</div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>My Status (You)</div>
+                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
+                    {(() => {
+                      const myObj = statusUserList.find((u) => u.nickname === nickname);
+                      return myObj ? `${myObj.statuses.length} active story updates` : 'Tap to add status update';
+                    })()}
+                  </div>
                 </div>
-                <Icon icon="solar:add-circle-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowStatusDrawer(false);
+                    if (setShowStatusCreator) setShowStatusCreator(true);
+                  }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#00a884', padding: '4px' }}
+                  title="Add Status"
+                >
+                  <Icon icon="solar:add-circle-bold-duotone" width="24" height="24" />
+                </button>
               </motion.div>
 
-              {/* 2. Contact Status Stories List */}
-              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px', marginTop: '4px' }}>
-                RECENT CONTACT UPDATES ({statusUserList.length})
-              </div>
+              {/* 2. Contact Status Stories List (Second Person) */}
+              {(() => {
+                const contactList = statusUserList.filter((u) => u.nickname !== nickname);
+                return (
+                  <>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px', marginTop: '6px' }}>
+                      RECENT CONTACT UPDATES ({contactList.length})
+                    </div>
 
-              {statusUserList.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#8696a0', padding: '20px 8px', fontSize: '0.8rem' }}>
-                  No recent status updates from your contacts yet.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
-                  {statusUserList.map((stUser) => (
-                    <motion.div
-                      key={stUser.nickname}
-                      whileHover={{ backgroundColor: '#182229', x: 3 }}
-                      onClick={() => {
-                        setShowStatusDrawer(false);
-                        setActiveStatusUser && setActiveStatusUser(stUser);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '8px 10px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        backgroundColor: '#111b21',
-                        border: '1px solid rgba(134, 150, 160, 0.15)',
-                      }}
-                    >
-                      {renderStatusAvatar ? renderStatusAvatar(stUser.nickname, '40px') : (
-                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                            {stUser.nickname.slice(0, 2).toUpperCase()}
-                          </div>
-                        </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {stUser.nickname}
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
-                          {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
-                        </div>
+                    {contactList.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: '#8696a0', padding: '20px 8px', fontSize: '0.8rem' }}>
+                        No recent status updates from your contacts yet.
                       </div>
-                      <Icon icon="solar:alt-arrow-right-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '240px', overflowY: 'auto' }}>
+                        {contactList.map((stUser) => (
+                          <motion.div
+                            key={stUser.nickname}
+                            whileHover={{ backgroundColor: '#182229', x: 3 }}
+                            onClick={() => {
+                              setShowStatusDrawer(false);
+                              setActiveStatusUser && setActiveStatusUser(stUser);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              padding: '8px 10px',
+                              borderRadius: '12px',
+                              cursor: 'pointer',
+                              backgroundColor: '#111b21',
+                              border: '1px solid rgba(134, 150, 160, 0.15)',
+                            }}
+                          >
+                            {renderStatusAvatar ? renderStatusAvatar(stUser.nickname, '40px') : (
+                              <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                                  {stUser.nickname.slice(0, 2).toUpperCase()}
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {stUser.nickname}
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
+                                {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
+                              </div>
+                            </div>
+                            <Icon icon="solar:alt-arrow-right-bold" width="18" height="18" style={{ color: '#00a884' }} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}
