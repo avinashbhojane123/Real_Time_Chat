@@ -270,7 +270,7 @@ export default function ChatRoom() {
 
       mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        if (audioBlob.size > 0 && recDuration > 0) {
+        if (audioBlob.size > 0 && audioChunksRef.current.length > 0) {
           showToast('Uploading voice note...');
           try {
             const formData = new FormData();
