@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import AnimatedMessageBubble from '../../animated/AnimatedMessageBubble';
 import AnimatedTypingIndicator from '../../animated/AnimatedTypingIndicator';
-import ScrollToBottomPill from '../../animated/ScrollToBottomPill';
 import YouTubePreview from '../../YouTubePreview';
 import InstagramPreview from '../../InstagramPreview';
 import { formatDateHeader, formatMessageTime } from '../../../utils/chatUtils';
