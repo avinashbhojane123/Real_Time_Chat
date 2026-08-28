@@ -120,7 +120,10 @@ export default function ChatRoster({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           type="button"
-          onClick={() => setShowRosterPanel(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowRosterPanel((prev) => !prev);
+          }}
           style={{
             width: '44px',
             height: '44px',
@@ -164,7 +167,10 @@ export default function ChatRoster({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           type="button"
-          onClick={() => setShowStatusDrawer(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowStatusDrawer((prev) => !prev);
+          }}
           style={{
             width: '44px',
             height: '44px',
@@ -280,28 +286,23 @@ export default function ChatRoster({
 
       {showRosterPanel && (
         <motion.aside
-      drag={isMobileDevice ? 'x' : false}
-      dragSnapToOrigin={true}
-      dragElastic={0.15}
-      onDragEnd={(e, info) => {
-        if (info.offset.x < -80 || info.offset.x > 80) {
-          setShowRosterPanel(false);
-        }
-      }}
-      style={{
-        width: isMobileDevice ? '100%' : '320px',
-        position: isMobileDevice ? 'absolute' : 'relative',
-        inset: isMobileDevice ? 0 : 'auto',
-        backgroundColor: 'var(--chat-roster-bg, #111b21)',
-        borderRight: '1px solid rgba(134, 150, 160, 0.15)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        zIndex: isMobileDevice ? 100 : 30,
-        flexShrink: 0,
-        touchAction: 'pan-y',
-      }}
-    >
+          initial={{ opacity: 0, x: isMobileDevice ? '100%' : -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: isMobileDevice ? '100%' : -10 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            width: isMobileDevice ? '100%' : '320px',
+            position: isMobileDevice ? 'absolute' : 'relative',
+            inset: isMobileDevice ? 0 : 'auto',
+            backgroundColor: 'var(--chat-roster-bg, #111b21)',
+            borderRight: '1px solid rgba(134, 150, 160, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            zIndex: isMobileDevice ? 100 : 30,
+            flexShrink: 0,
+          }}
+        >
       {/* Header Bar */}
       <div
         style={{
