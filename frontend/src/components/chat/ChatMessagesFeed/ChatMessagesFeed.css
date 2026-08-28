@@ -12,7 +12,18 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  scroll-behavior: smooth;
 }
+
+.wa-feed-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100%;
+  gap: 6px;
+  width: 100%;
+}
+
 
 /* Feature 1: M3 Asymmetrical Corner Radii for Message Bubbles */
 .wa-bubble-out {

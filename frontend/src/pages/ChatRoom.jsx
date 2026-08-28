@@ -498,7 +498,9 @@ export default function ChatRoom() {
           chatFeedRef={chatFeedRef}
           chatBottomRef={chatBottomRef}
           showScrollToBottom={showScrollToBottom}
+          setShowScrollToBottom={setShowScrollToBottom}
           unreadCount={unreadCount}
+          setUnreadCount={setUnreadCount}
           typingUsers={typingUsers}
           particles={particles}
           activeDragId={activeDragId}

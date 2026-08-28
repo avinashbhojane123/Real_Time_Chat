@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import AnimatedMessageBubble from '../../animated/AnimatedMessageBubble';
@@ -16,7 +16,9 @@ export default function ChatMessagesFeed({
   chatFeedRef,
   chatBottomRef,
   showScrollToBottom,
+  setShowScrollToBottom,
   unreadCount,
+  setUnreadCount,
   typingUsers,
   particles,
   activeDragId,
@@ -97,12 +99,58 @@ export default function ChatMessagesFeed({
   };
 
   const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
+  const prevMessagesLengthRef = useRef(filteredMessages.length);
+
+  // Scroll listener to toggle showScrollToBottom & clear unreadCount when scrolled to bottom
+  useEffect(() => {
+    const feedEl = chatFeedRef?.current;
+    if (!feedEl) return;
+
+    const handleScroll = () => {
+      const distanceFromBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight;
+      const isAtBottom = distanceFromBottom <= 150;
+
+      if (setShowScrollToBottom) {
+        setShowScrollToBottom(!isAtBottom);
+      }
+      if (isAtBottom && setUnreadCount) {
+        setUnreadCount(0);
+      }
+    };
+
+    feedEl.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => feedEl.removeEventListener('scroll', handleScroll);
+  }, [chatFeedRef, setShowScrollToBottom, setUnreadCount]);
+
+  // Auto-scroll effect on initial mount & new messages
+  useEffect(() => {
+    const feedEl = chatFeedRef?.current;
+    if (!feedEl) return;
+
+    const prevLength = prevMessagesLengthRef.current;
+    const currentLength = filteredMessages.length;
+    prevMessagesLengthRef.current = currentLength;
+
+    const distanceFromBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight;
+    const isNearBottom = distanceFromBottom <= 200;
+    const lastMsg = filteredMessages[filteredMessages.length - 1];
+    const isOwnMessage = lastMsg?.nickname === nickname;
+
+    if (prevLength === 0 || isOwnMessage || isNearBottom) {
+      chatBottomRef?.current?.scrollIntoView({ behavior: prevLength === 0 ? 'auto' : 'smooth' });
+      if (setUnreadCount) setUnreadCount(0);
+    } else if (currentLength > prevLength) {
+      if (setUnreadCount) setUnreadCount((prev) => prev + 1);
+    }
+  }, [filteredMessages, nickname, chatFeedRef, chatBottomRef, setUnreadCount]);
 
   return (
     <div
       ref={chatFeedRef}
       className="wa-doodle-wallpaper wa-feed-container"
     >
+      <div className="wa-feed-inner">
       {visibleMessages.length === 0 ? (
         <div style={{ margin: 'auto', textAlign: 'center', color: '#8696a0', padding: '32px 16px', maxWidth: '380px' }}>
           <div
@@ -738,6 +786,7 @@ export default function ChatMessagesFeed({
         <AnimatedTypingIndicator typingUsers={typingUsers} />
       </AnimatePresence>
       <div ref={chatBottomRef} />
+      </div>
       {/* Feature 4: M3 Small Extended FAB with Unread Numerical Badge */}
       <AnimatePresence>
         {showScrollToBottom && (
