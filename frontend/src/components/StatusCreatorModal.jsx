@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { getApiBaseUrl } from '../utils/apiConfig';
+import { compressImageFile } from '../utils/imageUtils';
 import AnimatedModal from './animated/AnimatedModal';
 import MagneticButton from './animated/MagneticButton';
 
@@ -44,14 +45,15 @@ export default function StatusCreatorModal({ baseUrl, onClose, onSubmitStatus })
   const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
 
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
-
+    setUploading(true);
     try {
-      setUploading(true);
+      const file = await compressImageFile(rawFile);
+      const formData = new FormData();
+      formData.append('file', file);
+
       const res = await axios.post(`${cleanApiUrl}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });

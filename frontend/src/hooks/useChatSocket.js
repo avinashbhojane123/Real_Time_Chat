@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { getSocketBaseUrl } from '../utils/apiConfig';
 import { detectClientDevice, getBatteryInfo } from '../utils/deviceUtils';
+import { compressImageFile } from '../utils/imageUtils';
 
 export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [messages, setMessages] = useState([]);
@@ -379,11 +380,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   };
 
   const handleFileUpload = async (e, disappearingTimer) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const rawFile = e.target.files[0];
+    if (!rawFile) return;
 
     setIsUploadingFile(true);
     try {
+      const file = await compressImageFile(rawFile);
       const formData = new FormData();
       formData.append('file', file);
 
