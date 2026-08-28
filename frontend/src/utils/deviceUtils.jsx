@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * Detects live Battery Status using the Battery Status API (navigator.getBattery)
  */
