@@ -68,6 +68,7 @@ export default function ChatRoom() {
     handleFileUpload: socketFileUpload,
     handleShareLocation: socketShareLocation,
     handleCreatePoll: socketCreatePoll,
+    handleMarkAsRead,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User Calculation
@@ -498,6 +499,7 @@ export default function ChatRoom() {
           users={users}
           chatFeedRef={chatFeedRef}
           chatBottomRef={chatBottomRef}
+          handleMarkAsRead={handleMarkAsRead}
           showScrollToBottom={showScrollToBottom}
           setShowScrollToBottom={setShowScrollToBottom}
           unreadCount={unreadCount}

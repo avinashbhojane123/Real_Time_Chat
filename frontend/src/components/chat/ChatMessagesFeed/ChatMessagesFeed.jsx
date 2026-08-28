@@ -15,6 +15,7 @@ export default function ChatMessagesFeed({
   users,
   chatFeedRef,
   chatBottomRef,
+  handleMarkAsRead,
   showScrollToBottom,
   setShowScrollToBottom,
   unreadCount,
@@ -144,6 +145,19 @@ export default function ChatMessagesFeed({
       if (setUnreadCount) setUnreadCount((prev) => prev + 1);
     }
   }, [filteredMessages, nickname, chatFeedRef, chatBottomRef, setUnreadCount]);
+
+  // Auto-mark visible messages from contacts as read (triggers Double Blue Ticks)
+  useEffect(() => {
+    if (!handleMarkAsRead || !visibleMessages || visibleMessages.length === 0) return;
+
+    const unreadIds = visibleMessages
+      .filter((m) => m.nickname !== nickname && (!m.readBy || !m.readBy.includes(nickname)))
+      .map((m) => m.id);
+
+    if (unreadIds.length > 0) {
+      handleMarkAsRead(unreadIds);
+    }
+  }, [visibleMessages, nickname, handleMarkAsRead]);
 
   return (
     <div

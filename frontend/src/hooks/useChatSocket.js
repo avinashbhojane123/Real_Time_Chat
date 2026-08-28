@@ -129,6 +129,21 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       setTypingUsers((prev) => prev.filter((u) => u !== typingUser));
     });
 
+    // Read Receipts Listener (Double Blue Ticks)
+    socket.on('messagesRead', ({ messageIds, readByNick }) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (messageIds && messageIds.includes(m.id)) {
+            const currentReadBy = Array.isArray(m.readBy) ? m.readBy : [m.nickname];
+            if (!currentReadBy.includes(readByNick)) {
+              return { ...m, readBy: [...currentReadBy, readByNick] };
+            }
+          }
+          return m;
+        })
+      );
+    });
+
     // Reaction & Edit & Delete Listeners
     socket.on('messageReactionsUpdated', ({ messageId, reactions }) => {
       setMessages((prev) =>
@@ -180,6 +195,16 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
     };
   }, [nickname, passcode]);
+
+  const handleMarkAsRead = (messageIds) => {
+    if (socketRef.current && messageIds && messageIds.length > 0) {
+      socketRef.current.emit('markRead', {
+        passcode,
+        nickname,
+        messageIds,
+      });
+    }
+  };
 
   const handleInputChangeEmitter = (val) => {
     if (socketRef.current) {
@@ -463,5 +488,6 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     handleFileUpload,
     handleShareLocation,
     handleCreatePoll,
+    handleMarkAsRead,
   };
 }
