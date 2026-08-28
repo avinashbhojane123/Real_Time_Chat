@@ -23,11 +23,119 @@ export default function VideoCallPanel({
   toggleCamera,
   flipCamera,
   toggleScreenShare,
+  isPipMinimized,
+  setIsPipMinimized,
+  togglePipMinimized,
+  toggleNativePip,
   acceptCall,
   declineCall,
   endCall,
 }) {
   if (!showVideoPanel) return null;
+
+  // Render Compact In-App Floating PiP Window when minimized
+  if (isPipMinimized && callState === 'active') {
+    return (
+      <motion.div
+        drag
+        dragElastic={0.1}
+        initial={{ scale: 0.8, opacity: 0, y: 50 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '320px',
+          height: '210px',
+          borderRadius: '16px',
+          backgroundColor: '#0b141a',
+          border: '2px solid rgba(0, 168, 132, 0.5)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.85)',
+          zIndex: 99999,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          cursor: 'grab',
+        }}
+      >
+        {/* Floating PiP Header */}
+        <div style={{ height: '36px', padding: '0 10px', backgroundColor: 'rgba(17, 27, 33, 0.9)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#e9edef', fontSize: '0.78rem', fontWeight: 700, zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span className="material-symbols-outlined" style={{ color: '#00a884', fontSize: '16px' }}>videocam</span>
+            <span>{remoteUserName || callerName}</span>
+            <span style={{ fontSize: '0.7rem', color: '#00a884', marginLeft: '4px' }}>({formatTimer ? formatTimer(callDuration) : `${callDuration}s`})</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* Native OS PiP Button */}
+            <button
+              type="button"
+              onClick={toggleNativePip}
+              title="OS Native Picture-in-Picture"
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>picture_in_picture_alt</span>
+            </button>
+            {/* Expand / Maximize Full Screen */}
+            <button
+              type="button"
+              onClick={togglePipMinimized}
+              title="Expand to Full Screen Call"
+              style={{ background: 'none', border: 'none', color: '#00a884', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>open_in_full</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Floating PiP Streams */}
+        <div style={{ flex: 1, position: 'relative', backgroundColor: '#000' }}>
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+
+          <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '70px', height: '95px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.3)', backgroundColor: '#111b21' }}>
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+
+          {/* Quick Floating Action Controls */}
+          <div style={{ position: 'absolute', bottom: '8px', left: '8px', display: 'flex', gap: '6px', zIndex: 10 }}>
+            <button
+              onClick={toggleMic}
+              style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: micMuted ? '#ea0038' : 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title={micMuted ? 'Unmute' : 'Mute'}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{micMuted ? 'mic_off' : 'mic'}</span>
+            </button>
+            <button
+              onClick={toggleCamera}
+              style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: cameraOff ? '#ea0038' : 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{cameraOff ? 'videocam_off' : 'videocam'}</span>
+            </button>
+            <button
+              onClick={endCall}
+              style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#ea0038', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="End Call"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>call_end</span>
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: '#0b141a', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
@@ -47,7 +155,59 @@ export default function VideoCallPanel({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* OS Native Picture-in-Picture Button */}
+          {callState === 'active' && toggleNativePip && (
+            <button
+              type="button"
+              onClick={toggleNativePip}
+              title="OS Native Picture-in-Picture (Float over Desktop)"
+              style={{
+                backgroundColor: '#202c33',
+                color: '#00a884',
+                border: '1px solid rgba(0, 168, 132, 0.35)',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>picture_in_picture_alt</span>
+              <span>Desktop PiP</span>
+            </button>
+          )}
+
+          {/* In-App Floating Window PiP Button */}
+          {callState === 'active' && togglePipMinimized && (
+            <button
+              type="button"
+              onClick={togglePipMinimized}
+              title="Minimize to Floating Window in Chat"
+              style={{
+                backgroundColor: '#202c33',
+                color: '#00a884',
+                border: '1px solid rgba(0, 168, 132, 0.35)',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>picture_in_picture</span>
+              <span>In-App PiP</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setVideoFit((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
@@ -72,6 +232,7 @@ export default function VideoCallPanel({
             </span>
             <span>{videoFit === 'contain' ? 'Fit Frame' : 'Fill Screen'}</span>
           </button>
+
           <button
             type="button"
             onClick={() => setShowVideoPanel(false)}

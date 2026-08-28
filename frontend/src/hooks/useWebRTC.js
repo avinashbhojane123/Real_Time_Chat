@@ -492,6 +492,23 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     }
   };
 
+  const [isPipMinimized, setIsPipMinimized] = useState(false);
+
+  const togglePipMinimized = () => setIsPipMinimized((prev) => !prev);
+
+  const toggleNativePip = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (remoteVideoRef.current && document.pictureInPictureEnabled) {
+        await remoteVideoRef.current.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.warn('Native Picture-in-Picture failed:', err);
+      if (showToast) showToast('Native Picture-in-Picture unavailable');
+    }
+  };
+
   return {
     callState,
     callerName,
@@ -509,6 +526,10 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     callDuration,
     showVideoPanel,
     setShowVideoPanel,
+    isPipMinimized,
+    setIsPipMinimized,
+    togglePipMinimized,
+    toggleNativePip,
     remoteVideoRef,
     localVideoRef,
     startCall,

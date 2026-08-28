@@ -610,7 +610,10 @@ export default function ChatRoom() {
         toggleMic={webRTC.toggleMic}
         toggleCamera={webRTC.toggleCamera}
         flipCamera={webRTC.flipCamera}
-        toggleScreenShare={webRTC.toggleScreenShare}
+        isPipMinimized={webRTC.isPipMinimized}
+        setIsPipMinimized={webRTC.setIsPipMinimized}
+        togglePipMinimized={webRTC.togglePipMinimized}
+        toggleNativePip={webRTC.toggleNativePip}
         acceptCall={webRTC.acceptCall}
         declineCall={webRTC.declineCall}
         endCall={webRTC.endCall}
