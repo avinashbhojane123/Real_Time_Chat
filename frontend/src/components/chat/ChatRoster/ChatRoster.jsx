@@ -562,53 +562,57 @@ export default function ChatRoster({
             </div>
 
             {/* Group 2 - OFFLINE PARTICIPANTS */}
-            {offlineUsers.length > 0 && (
-              <div>
-                <div
-                  onClick={() => setShowOfflineGroup(!showOfflineGroup)}
-                  style={{
-                    padding: '6px 16px',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    color: '#8696a0',
-                    letterSpacing: '0.5px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <motion.div whileHover={{ scale: 1.2, rotate: 10 }}>
-                      <Icon icon="solar:clock-circle-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
-                    </motion.div>
-                    <span>OFFLINE / AWAY ({offlineUsers.length})</span>
-                  </div>
-
-                  <motion.div
-                    animate={{ rotate: showOfflineGroup ? 0 : -90 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    style={{ display: 'flex', alignItems: 'center' }}
-                  >
-                    <Icon icon="lucide:chevron-down" width="16" height="16" />
+            <div>
+              <div
+                onClick={() => setShowOfflineGroup(!showOfflineGroup)}
+                style={{
+                  padding: '6px 16px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: '#8696a0',
+                  letterSpacing: '0.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <motion.div whileHover={{ scale: 1.2, rotate: 10 }}>
+                    <Icon icon="solar:clock-circle-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
                   </motion.div>
+                  <span>OFFLINE / AWAY ({offlineUsers.length})</span>
                 </div>
 
-                <AnimatePresence>
-                  {showOfflineGroup && (
+                <motion.div
+                  animate={{ rotate: showOfflineGroup ? 0 : -90 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  <Icon icon="lucide:chevron-down" width="16" height="16" />
+                </motion.div>
+              </div>
+
+              <AnimatePresence>
+                {showOfflineGroup && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    style={{ overflow: 'hidden' }}
+                  >
                     <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: 'easeInOut' }}
-                      style={{ overflow: 'hidden' }}
+                      variants={listContainerVariants}
+                      initial="hidden"
+                      animate="show"
                     >
-                      <motion.div
-                        variants={listContainerVariants}
-                        initial="hidden"
-                        animate="show"
-                      >
-                        {offlineUsers.map((u, idx) => {
+                      {offlineUsers.length === 0 ? (
+                        <div style={{ padding: '10px 16px', fontSize: '0.78rem', color: '#8696a0' }}>
+                          No offline participants.
+                        </div>
+                      ) : (
+                        offlineUsers.map((u, idx) => {
                           const presence = formatUserPresence(u.isOnline, u.lastSeen);
                           return (
                             <motion.div
@@ -647,13 +651,13 @@ export default function ChatRoster({
                               </div>
                             </motion.div>
                           );
-                        })}
-                      </motion.div>
+                        })
+                      )}
                     </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
         ) : (
           /* TAB 2: MEDIA & DOCS GALLERY */
