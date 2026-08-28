@@ -12,6 +12,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [toasts, setToasts] = useState([]);
   const [pinnedMessage, setPinnedMessage] = useState(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isSocketConnected, setIsSocketConnected] = useState(true);
+  const [socketLatency, setSocketLatency] = useState(18);
 
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -36,6 +38,11 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socketRef.current = socket;
 
     socket.on('connect', async () => {
+      setIsSocketConnected(true);
+      const startTime = Date.now();
+      socket.emit('ping', () => {
+        setSocketLatency(Math.max(8, Date.now() - startTime));
+      });
       const clientDevice = detectClientDevice();
       const battery = await getBatteryInfo();
       socket.emit('joinRoom', {
@@ -51,6 +58,10 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       });
       socket.emit('getStatuses', { passcode });
       socket.emit('getUsers', { passcode });
+    });
+
+    socket.on('disconnect', () => {
+      setIsSocketConnected(false);
     });
 
     // Chat History Event Listeners
@@ -193,6 +204,10 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('statusCreated', (newStatus) => {
       setStatuses((prev) => [newStatus, ...prev]);
       showToast(`${newStatus.nickname} posted a new status story`);
+    });
+
+    socket.on('statusDeleted', ({ statusId }) => {
+      setStatuses((prev) => prev.filter((s) => String(s.id) !== String(statusId)));
     });
 
     return () => {
@@ -495,5 +510,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     handleShareLocation,
     handleCreatePoll,
     handleMarkAsRead,
+    isSocketConnected,
+    socketLatency,
   };
 }

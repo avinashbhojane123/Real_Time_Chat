@@ -70,6 +70,8 @@ export default function ChatRoom() {
     handleShareLocation: socketShareLocation,
     handleCreatePoll: socketCreatePoll,
     handleMarkAsRead,
+    isSocketConnected,
+    socketLatency,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User Calculation
@@ -488,6 +490,8 @@ export default function ChatRoom() {
           setShowRosterPanel={setShowRosterPanel}
           showRailSidebar={showRailSidebar}
           setShowRailSidebar={setShowRailSidebar}
+          socketLatency={socketLatency}
+          isSocketConnected={isSocketConnected}
           renderStatusAvatar={renderStatusAvatar}
           recipientUser={recipientUser}
           isRecipientOnline={isRecipientOnline}
