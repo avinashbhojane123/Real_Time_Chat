@@ -8,7 +8,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const [remoteStream, setRemoteStream] = useState(null);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
-  const [videoFit, setVideoFit] = useState('cover');
+  const [videoFit, setVideoFit] = useState('contain');
   const [facingMode, setFacingMode] = useState('user');
   const [isStreamSwapped, setIsStreamSwapped] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);

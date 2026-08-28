@@ -50,11 +50,12 @@ export default function VideoCallPanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             type="button"
-            onClick={() => setVideoFit((prev) => (prev === 'cover' ? 'contain' : 'cover'))}
+            onClick={() => setVideoFit((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
+            title={videoFit === 'contain' ? 'Current: Fit Frame (Click for Fill Screen)' : 'Current: Fill Screen (Click for Fit Frame)'}
             style={{
-              backgroundColor: '#202c33',
+              backgroundColor: videoFit === 'contain' ? 'rgba(0, 168, 132, 0.15)' : '#202c33',
               color: '#00a884',
-              border: '1px solid rgba(0, 168, 132, 0.3)',
+              border: '1px solid rgba(0, 168, 132, 0.35)',
               padding: '6px 14px',
               borderRadius: '20px',
               fontSize: '0.78rem',
@@ -63,12 +64,13 @@ export default function VideoCallPanel({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              transition: 'all 0.2s ease',
             }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-              {videoFit === 'cover' ? 'crop_free' : 'fullscreen'}
+              {videoFit === 'contain' ? 'aspect_ratio' : 'crop_free'}
             </span>
-            <span>{videoFit === 'cover' ? 'Fit Frame' : 'Fill Screen'}</span>
+            <span>{videoFit === 'contain' ? 'Fit Frame' : 'Fill Screen'}</span>
           </button>
           <button
             type="button"
