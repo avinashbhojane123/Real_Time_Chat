@@ -243,6 +243,17 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       setStatuses((prev) => prev.filter((s) => String(s.id) !== String(statusId)));
     });
 
+    socket.on('statusViewed', ({ statusId, viewers }) => {
+      setStatuses((prev) =>
+        prev.map((s) => {
+          if (String(s.id) === String(statusId)) {
+            return { ...s, viewers: viewers || [], viewedBy: viewers || [] };
+          }
+          return s;
+        })
+      );
+    });
+
     return () => {
       if (socket.connected) {
         socket.disconnect();

@@ -538,7 +538,7 @@ export default function StatusModal({
                       style={{ background: 'none', border: 'none', color: '#00a884', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>visibility</span>
-                      <span>{currentStatus.viewedBy ? currentStatus.viewedBy.length : 0} Views</span>
+                      <span>{(currentStatus?.viewers || currentStatus?.viewedBy || []).length} Views</span>
                     </button>
                     {onDeleteStatus && (
                       <button
@@ -613,7 +613,7 @@ export default function StatusModal({
                     <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', backgroundColor: '#202c33' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e9edef', fontWeight: 700, fontSize: '0.9rem' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>visibility</span>
-                        <span>Viewed by ({currentStatus.viewedBy ? currentStatus.viewedBy.length : 0})</span>
+                        <span>Viewed by ({(currentStatus?.viewers || currentStatus?.viewedBy || []).length})</span>
                       </div>
                       <button
                         type="button"
@@ -625,8 +625,16 @@ export default function StatusModal({
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {currentStatus.viewedBy && currentStatus.viewedBy.length > 0 ? (
-                        currentStatus.viewedBy.map((viewer, idx) => {
+                      {(() => {
+                        const viewers = currentStatus?.viewers || currentStatus?.viewedBy || [];
+                        if (viewers.length === 0) {
+                          return (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#8696a0', fontSize: '0.85rem' }}>
+                              No views on this status story yet.
+                            </div>
+                          );
+                        }
+                        return viewers.map((viewer, idx) => {
                           const viewerName = typeof viewer === 'string' ? viewer : viewer.nickname || 'Contact';
                           return (
                             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 8px', borderRadius: '8px', backgroundColor: '#1d272d' }}>
@@ -639,12 +647,8 @@ export default function StatusModal({
                               </div>
                             </div>
                           );
-                        })
-                      ) : (
-                        <div style={{ padding: '24px', textAlign: 'center', color: '#8696a0', fontSize: '0.85rem' }}>
-                          No views on this status story yet.
-                        </div>
-                      )}
+                        });
+                      })()}
                     </div>
                   </motion.div>
                 )}
