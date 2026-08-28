@@ -15,6 +15,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const typingTimersRef = useRef({});
 
   const showToast = (msg) => {
     const id = Date.now() + Math.random();
@@ -109,10 +110,22 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('userTyping', ({ nickname: typingUser }) => {
       if (typingUser && typingUser !== nickname) {
         setTypingUsers((prev) => (prev.includes(typingUser) ? prev : [...prev, typingUser]));
+
+        if (typingTimersRef.current[typingUser]) {
+          clearTimeout(typingTimersRef.current[typingUser]);
+        }
+        typingTimersRef.current[typingUser] = setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((u) => u !== typingUser));
+          delete typingTimersRef.current[typingUser];
+        }, 2500);
       }
     });
 
     socket.on('userStopTyping', ({ nickname: typingUser }) => {
+      if (typingTimersRef.current[typingUser]) {
+        clearTimeout(typingTimersRef.current[typingUser]);
+        delete typingTimersRef.current[typingUser];
+      }
       setTypingUsers((prev) => prev.filter((u) => u !== typingUser));
     });
 
@@ -170,11 +183,16 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
   const handleInputChangeEmitter = (val) => {
     if (socketRef.current) {
-      socketRef.current.emit('typing', { passcode, nickname });
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        socketRef.current?.emit('stopTyping', { passcode, nickname });
-      }, 2000);
+      if (val && val.trim() !== '') {
+        socketRef.current.emit('typing', { passcode, nickname });
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+          socketRef.current?.emit('stopTyping', { passcode, nickname });
+        }, 2000);
+      } else {
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        socketRef.current.emit('stopTyping', { passcode, nickname });
+      }
     }
   };
 

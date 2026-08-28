@@ -243,6 +243,7 @@ export default function ChatRoom() {
     };
 
     socketRef.current?.emit('sendMessage', payload);
+    socketRef.current?.emit('stopTyping', { passcode, nickname });
     setInputText('');
     setReplyingTo(null);
     setShowEmojiPicker(false);
