@@ -654,7 +654,13 @@ export default function ChatRoster({
                               className="roster-item-card"
                             >
                               <div className="online-avatar-pulse">
-                                {renderStatusAvatar(u.nickname, '38px', u.isOnline, {}, u.avatarUrl)}
+                                {u.avatarUrl ? (
+                                  <img src={u.avatarUrl} alt={u.nickname} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#005c4b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                                    {(u.nickname || 'U').slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
                               </div>
 
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -755,7 +761,13 @@ export default function ChatRoster({
                               }}
                               className="roster-item-card"
                             >
-                              {renderStatusAvatar(u.nickname, '38px', false, {}, u.avatarUrl)}
+                              {u.avatarUrl ? (
+                                <img src={u.avatarUrl} alt={u.nickname} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#202c33', color: '#8696a0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                                  {(u.nickname || 'U').slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
