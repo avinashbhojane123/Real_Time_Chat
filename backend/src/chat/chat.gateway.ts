@@ -849,6 +849,23 @@ export class ChatGateway
     });
   }
 
+  @SubscribeMessage('screenShareStatus')
+  screenShareStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { passcode: string; isSharing: boolean },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode !== data.passcode) return;
+
+    console.log(
+      `[ScreenShareStatus] ${session.nickname} screen sharing: ${data.isSharing} in room: ${data.passcode}`,
+    );
+    client.to(data.passcode).emit('screenShareStatus', {
+      from: session.nickname,
+      isSharing: data.isSharing,
+    });
+  }
+
   @SubscribeMessage('editMessage')
   async editMessage(
     @ConnectedSocket() client: Socket,

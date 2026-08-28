@@ -144,8 +144,8 @@ export default function VideoCallPanel({
       >
         {/* Floating PiP Header */}
         <div className="wa-pip-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            <span className="material-symbols-outlined" style={{ color: '#25d366', fontSize: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+            <span className="material-symbols-outlined" style={{ color: '#25d366', fontSize: '16px', flexShrink: 0 }}>
               videocam
             </span>
             <span
@@ -159,12 +159,12 @@ export default function VideoCallPanel({
             >
               {displayName}
             </span>
-            <span style={{ fontSize: '0.7rem', color: '#25d366', marginLeft: '2px', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.7rem', color: '#25d366', marginLeft: '2px', fontWeight: 600, flexShrink: 0 }}>
               ({displayTimer})
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             {/* Cycle PiP Sizes (Compact -> Standard -> Expanded) */}
             <button
               type="button"
@@ -389,100 +389,75 @@ export default function VideoCallPanel({
   // =========================================================================
   return (
     <div className="wa-call-container">
-      {/* Top Header Bar */}
-      <div
-        style={{
-          height: '60px',
-          padding: '0 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#111b21',
-          borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
-          color: '#e9edef',
-          zIndex: 10,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span className="material-symbols-outlined" style={{ color: '#25d366', fontSize: '24px' }}>
+      {/* Top Header Navbar */}
+      <div className="wa-call-header">
+        <div className="wa-call-header-left">
+          {/* Back/Minimize Icon for Mobile */}
+          <button
+            type="button"
+            className="wa-header-icon-btn mobile-only"
+            onClick={() => (openInAppPip ? openInAppPip() : setShowVideoPanel(false))}
+            title="Minimize Call to In-App PiP"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+              expand_more
+            </span>
+          </button>
+
+          <span className="material-symbols-outlined desktop-only" style={{ color: '#25d366', fontSize: '22px' }}>
             videocam
           </span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '1rem' }}>
+
+          <div className="wa-call-header-info">
+            <div className="wa-call-header-title">
               {callState === 'calling'
                 ? `Calling ${remoteUserName}...`
                 : callState === 'incoming'
                 ? `Incoming call from ${callerName}`
-                : `WhatsApp Video Call • ${displayName}`}
+                : displayName}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#00a884' }}>
-                lock
+            <div className="wa-call-header-sub">
+              {callState === 'active' && (
+                <span className="wa-header-timer-chip">
+                  <span className="wa-pulse-dot" />
+                  <span>{displayTimer}</span>
+                </span>
+              )}
+              <span className="wa-header-lock-text">
+                <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#00a884' }}>
+                  lock
+                </span>
+                <span>End-to-End Encrypted</span>
               </span>
-              <span>End-to-End Encrypted</span>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-          {/* Unified Picture-in-Picture Control Button with Dropdown Selector */}
+        <div className="wa-call-header-right">
+          {/* Unified Picture-in-Picture Button */}
           {callState === 'active' && (
-            <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: '#202c33',
-                  border: '1px solid rgba(0, 168, 132, 0.4)',
-                  borderRadius: '20px',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                }}
-              >
-                {/* Primary PiP Button (Click for instant smart Desktop/In-App PiP) */}
+            <div className="wa-pip-dropdown-wrapper">
+              <div className="wa-pip-btn-group">
                 <button
                   type="button"
+                  className="wa-pip-main-btn"
                   onClick={() => (openDesktopPip ? openDesktopPip() : toggleNativePip ? toggleNativePip() : openInAppPip())}
-                  title="Float Video (Picture-in-Picture)"
-                  style={{
-                    backgroundColor: 'transparent',
-                    color: '#00a884',
-                    border: 'none',
-                    padding: '7px 12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease',
-                  }}
+                  title="Picture-in-Picture"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
                     picture_in_picture_alt
                   </span>
-                  <span>Picture-in-Picture</span>
+                  <span className="desktop-only">Picture-in-Picture</span>
                 </button>
 
-                {/* Dropdown Chevron for mode selection */}
                 <button
                   type="button"
+                  className="wa-pip-chevron-btn desktop-only"
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowPipMenu((prev) => !prev);
                   }}
                   title="Choose Picture-in-Picture Mode"
-                  style={{
-                    backgroundColor: 'rgba(0, 168, 132, 0.15)',
-                    color: '#00a884',
-                    border: 'none',
-                    borderLeft: '1px solid rgba(0, 168, 132, 0.3)',
-                    padding: '7px 8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
                     arrow_drop_down
@@ -547,32 +522,32 @@ export default function VideoCallPanel({
           {/* Video Fit Button */}
           <button
             type="button"
+            className="wa-header-action-btn"
             onClick={() => setVideoFit((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
             title={videoFit === 'contain' ? 'Current: Fit Frame (Click for Fill Screen)' : 'Current: Fill Screen (Click for Fit Frame)'}
-            style={{
-              backgroundColor: videoFit === 'contain' ? 'rgba(0, 168, 132, 0.15)' : '#202c33',
-              color: '#00a884',
-              border: '1px solid rgba(0, 168, 132, 0.35)',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
-            }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
               {videoFit === 'contain' ? 'aspect_ratio' : 'crop_free'}
             </span>
-            <span>{videoFit === 'contain' ? 'Fit Frame' : 'Fill Screen'}</span>
+            <span className="desktop-only">{videoFit === 'contain' ? 'Fit Frame' : 'Fill Screen'}</span>
           </button>
 
-          {/* Close Panel Button */}
+          {/* Flip Camera button on mobile header */}
           <button
             type="button"
+            className="wa-header-icon-btn mobile-only"
+            onClick={flipCamera}
+            title="Flip Camera"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+              flip_camera_ios
+            </span>
+          </button>
+
+          {/* Close / Minimize Button */}
+          <button
+            type="button"
+            className="wa-header-icon-btn"
             onClick={() => {
               if (callState === 'active' && openInAppPip) {
                 openInAppPip();
@@ -581,19 +556,10 @@ export default function VideoCallPanel({
               }
             }}
             title="Minimize Panel"
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#8696a0',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+              close
+            </span>
           </button>
         </div>
       </div>
@@ -612,6 +578,7 @@ export default function VideoCallPanel({
               justifyContent: 'center',
               color: '#fff',
               backgroundColor: '#0b141a',
+              padding: '20px',
             }}
           >
             <div
@@ -633,7 +600,9 @@ export default function VideoCallPanel({
             >
               {initialLetter}
             </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px' }}>Calling {remoteUserName}...</h3>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px', textAlign: 'center' }}>
+              Calling {remoteUserName}...
+            </h3>
             <p style={{ color: '#8696a0', fontSize: '0.9rem', marginBottom: '32px' }}>Waiting for response</p>
             <button
               onClick={endCall}
@@ -670,6 +639,7 @@ export default function VideoCallPanel({
               justifyContent: 'center',
               color: '#fff',
               backgroundColor: '#0b141a',
+              padding: '20px',
             }}
           >
             <div
@@ -691,18 +661,20 @@ export default function VideoCallPanel({
             >
               {(callerName || 'C').slice(0, 2).toUpperCase()}
             </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px' }}>{callerName}</h3>
-            <p style={{ color: '#25d366', fontSize: '0.95rem', fontWeight: 600, marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px', textAlign: 'center' }}>
+              {callerName}
+            </h3>
+            <p style={{ color: '#25d366', fontSize: '0.95rem', fontWeight: 600, marginBottom: '32px', textAlign: 'center' }}>
               Incoming WhatsApp Video Call...
             </p>
-            <div style={{ display: 'flex', gap: '24px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={acceptCall}
                 style={{
                   backgroundColor: '#25d366',
                   color: '#0b141a',
                   border: 'none',
-                  padding: '14px 32px',
+                  padding: '14px 28px',
                   borderRadius: '30px',
                   fontWeight: 700,
                   fontSize: '0.95rem',
@@ -722,7 +694,7 @@ export default function VideoCallPanel({
                   backgroundColor: '#ea0038',
                   color: '#fff',
                   border: 'none',
-                  padding: '14px 32px',
+                  padding: '14px 28px',
                   borderRadius: '30px',
                   fontWeight: 700,
                   fontSize: '0.95rem',
@@ -743,40 +715,6 @@ export default function VideoCallPanel({
         {/* Active Call View */}
         {callState === 'active' && (
           <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-            {/* Live Call Duration & HD Badge */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '16px',
-                left: '16px',
-                zIndex: 20,
-                backgroundColor: 'rgba(11, 20, 26, 0.78)',
-                backdropFilter: 'blur(10px)',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                color: '#25d366',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-              }}
-            >
-              <span
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: '#25d366',
-                  boxShadow: '0 0 8px #25d366',
-                  display: 'inline-block',
-                }}
-              />
-              <span>{displayTimer}</span>
-              <span style={{ color: '#8696a0', fontSize: '0.75rem' }}>• HD</span>
-            </div>
-
             {/* Remote Stream Video */}
             <video
               ref={remoteVideoRef}
@@ -796,24 +734,15 @@ export default function VideoCallPanel({
             {/* Floating PIP Local Stream */}
             <motion.div
               drag
-              dragConstraints={{ top: 0, left: -280, right: 0, bottom: 380 }}
+              dragConstraints={{ top: 0, left: -260, right: 0, bottom: 380 }}
               dragElastic={0.15}
               whileDrag={{ scale: 1.06, boxShadow: '0 16px 36px rgba(0,0,0,0.8)' }}
               onClick={() => setIsStreamSwapped((prev) => !prev)}
               title="Click to swap main and PIP video views"
+              className="wa-mini-pip"
               style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                width: '140px',
-                height: '210px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
-                border: '2px solid rgba(0, 168, 132, 0.6)',
-                backgroundColor: '#111b21',
-                zIndex: 30,
-                cursor: 'grab',
+                width: '130px',
+                height: '190px',
               }}
             >
               <video
@@ -877,11 +806,11 @@ export default function VideoCallPanel({
                 <span className="material-symbols-outlined">{isScreenSharing ? 'stop_screen_share' : 'screen_share'}</span>
               </button>
 
-              {/* Pop to Desktop OS PiP button in controls */}
+              {/* Pop to Desktop OS PiP */}
               <button
                 type="button"
                 onClick={openDesktopPip || toggleNativePip}
-                className="wa-control-btn"
+                className="wa-control-btn desktop-only"
                 title="Pop out to Desktop OS PiP"
                 style={{ color: '#00a884' }}
               >

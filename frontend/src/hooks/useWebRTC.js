@@ -27,6 +27,28 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const localVideoRef = useRef(null);
   const screenStreamRef = useRef(null);
 
+  const isScreenSharingRef = useRef(false);
+  const facingModeRef = useRef('user');
+  const cameraOffRef = useRef(false);
+  const micMutedRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    facingModeRef.current = facingMode;
+  }, [facingMode]);
+
+  useEffect(() => {
+    cameraOffRef.current = cameraOff;
+  }, [cameraOff]);
+
+  useEffect(() => {
+    micMutedRef.current = micMuted;
+  }, [micMuted]);
+
+  useEffect(() => {
+    isScreenSharingRef.current = isScreenSharing;
+  }, [isScreenSharing]);
+
   const callStateRef = useRef('idle');
   const pendingIceCandidatesRef = useRef([]);
   const callTimerRef = useRef(null);
@@ -72,6 +94,16 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     lastCallEndedAtRef.current = Date.now();
 
     closeAllPipWindows();
+
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((t) => {
+        t.onended = null;
+        t.stop();
+      });
+      screenStreamRef.current = null;
+    }
+    isScreenSharingRef.current = false;
+    setIsScreenSharing(false);
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -178,6 +210,14 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       }
       remoteStreamRef.current = stream;
       setRemoteStream(stream);
+
+      // Handle track mute/unmute so receiver responds immediately when sender changes video tracks
+      e.track.onunmute = () => {
+        if (remoteVideoRef.current && remoteStreamRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      };
 
       if (remoteVideoRef.current && stream) {
         remoteVideoRef.current.srcObject = stream;
@@ -319,6 +359,14 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       addIceCandidateSafely(candidate);
     };
 
+    const handleScreenShareStatus = ({ isSharing }) => {
+      console.log('[WebRTC] Remote peer screen share status changed:', isSharing);
+      if (remoteVideoRef.current && remoteStreamRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        remoteVideoRef.current.play().catch(() => {});
+      }
+    };
+
     const handleCallEnd = () => {
       if (showToast) showToast('Call ended');
       cleanUpCall();
@@ -339,6 +387,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     socket.on('webrtcAnswerRelay', handleWebrtcAnswer);
     socket.on('webrtcCandidate', handleWebrtcCandidate);
     socket.on('webrtcCandidateRelay', handleWebrtcCandidate);
+    socket.on('screenShareStatus', handleScreenShareStatus);
     socket.on('callEnded', handleCallEnd);
     socket.on('endCall', handleCallEnd);
     socket.on('callDeclined', handleCallDeclined);
@@ -354,6 +403,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       socket.off('webrtcAnswerRelay', handleWebrtcAnswer);
       socket.off('webrtcCandidate', handleWebrtcCandidate);
       socket.off('webrtcCandidateRelay', handleWebrtcCandidate);
+      socket.off('screenShareStatus', handleScreenShareStatus);
       socket.off('callEnded', handleCallEnd);
       socket.off('endCall', handleCallEnd);
       socket.off('callDeclined', handleCallDeclined);
@@ -443,8 +493,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   }, []);
 
   const flipCamera = async () => {
-    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    const nextMode = facingModeRef.current === 'user' ? 'environment' : 'user';
     setFacingMode(nextMode);
+    facingModeRef.current = nextMode;
 
     if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
@@ -453,7 +504,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: nextMode },
-        audio: !micMuted,
+        audio: !micMutedRef.current,
       });
       localStreamRef.current = newStream;
       setLocalStream(newStream);
@@ -463,7 +514,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         const videoSender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
         const newVideoTrack = newStream.getVideoTracks()[0];
         if (videoSender && newVideoTrack) {
-          videoSender.replaceTrack(newVideoTrack);
+          await videoSender.replaceTrack(newVideoTrack);
         }
       }
     } catch (err) {
@@ -471,49 +522,106 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     }
   };
 
-  const toggleScreenShare = async () => {
-    if (isScreenSharing) {
+  // =========================================================================
+  // SCREEN SHARING CONTROLLER (Robust start & stop with camera restoration)
+  // =========================================================================
+
+  const stopScreenShare = useCallback(async () => {
+    if (!isScreenSharingRef.current) return;
+    isScreenSharingRef.current = false;
+    setIsScreenSharing(false);
+
+    try {
+      // 1. First get user camera stream with the current facing mode
+      const camStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingModeRef.current || 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      const newCamTrack = camStream.getVideoTracks()[0];
+      if (newCamTrack) {
+        newCamTrack.enabled = !cameraOffRef.current;
+      }
+
+      // 2. Replace track on peer connection
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        const senders = pc.getSenders();
+        const videoSender = senders.find((s) => s.track?.kind === 'video' || (s.track === null && s.dtlsTransport));
+        if (videoSender && newCamTrack) {
+          await videoSender.replaceTrack(newCamTrack);
+        }
+      }
+
+      // 3. Stop old screen stream tracks AFTER new track is attached
       if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+        screenStreamRef.current.getTracks().forEach((t) => {
+          t.onended = null;
+          t.stop();
+        });
         screenStreamRef.current = null;
       }
-      setIsScreenSharing(false);
 
-      try {
-        const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const camTrack = camStream.getVideoTracks()[0];
-        const pc = peerConnectionRef.current;
-        if (pc) {
-          const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
-          if (sender) sender.replaceTrack(camTrack);
-        }
-        setLocalStream(camStream);
-        localStreamRef.current = camStream;
-      } catch (e) {}
-    } else {
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        screenStreamRef.current = screenStream;
-        setIsScreenSharing(true);
+      // 4. Combine existing audio with new camera track
+      const existingAudioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
+      const combinedStream = new MediaStream(newCamTrack ? [newCamTrack, ...existingAudioTracks] : existingAudioTracks);
+      localStreamRef.current = combinedStream;
+      setLocalStream(combinedStream);
 
-        const screenTrack = screenStream.getVideoTracks()[0];
-        const pc = peerConnectionRef.current;
-        if (pc) {
-          const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
-          if (sender) sender.replaceTrack(screenTrack);
-        }
-
-        screenTrack.onended = () => {
-          setIsScreenSharing(false);
-          toggleScreenShare();
-        };
-
-        setLocalStream(screenStream);
-      } catch (err) {
-        console.warn('Screen share cancelled or failed:', err);
-      }
+      // 5. Notify peer that screen share stopped
+      socketRef.current?.emit('screenShareStatus', { passcode, isSharing: false });
+    } catch (err) {
+      console.warn('[WebRTC] Error reverting from screen share to camera:', err);
     }
-  };
+  }, [passcode, socketRef]);
+
+  const startScreenShare = useCallback(async () => {
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      if (!screenTrack) return;
+
+      screenStreamRef.current = screenStream;
+      isScreenSharingRef.current = true;
+      setIsScreenSharing(true);
+
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        const senders = pc.getSenders();
+        const videoSender = senders.find((s) => s.track?.kind === 'video' || (s.track === null && s.dtlsTransport));
+        if (videoSender) {
+          await videoSender.replaceTrack(screenTrack);
+        }
+      }
+
+      // Handle browser native "Stop sharing" blue floating bar
+      screenTrack.onended = () => {
+        stopScreenShare();
+      };
+
+      const existingAudioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
+      const combinedStream = new MediaStream([screenTrack, ...existingAudioTracks]);
+      localStreamRef.current = combinedStream;
+      setLocalStream(combinedStream);
+
+      socketRef.current?.emit('screenShareStatus', { passcode, isSharing: true });
+    } catch (err) {
+      console.warn('[WebRTC] Screen share cancelled or failed:', err);
+      isScreenSharingRef.current = false;
+      setIsScreenSharing(false);
+    }
+  }, [passcode, socketRef, stopScreenShare]);
+
+  const toggleScreenShare = useCallback(() => {
+    if (isScreenSharingRef.current) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
+  }, [startScreenShare, stopScreenShare]);
 
   // =========================================================================
   // UNIFIED PICTURE-IN-PICTURE (In-App + Desktop OS PiP)
