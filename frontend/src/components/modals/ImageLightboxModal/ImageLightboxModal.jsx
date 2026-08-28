@@ -24,10 +24,6 @@ export default function ImageLightboxModal({ lightboxImage, onClose }) {
           />
           <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{lightboxImage.name}</span>
-            <a href={lightboxImage.url} download target="_blank" rel="noreferrer" style={{ backgroundColor: '#00a884', color: '#fff', textDecoration: 'none', padding: '6px 18px', borderRadius: '20px', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
-              Download
-            </a>
           </div>
         </motion.div>
       )}

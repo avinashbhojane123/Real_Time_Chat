@@ -173,6 +173,7 @@ export default function VideoLightboxModal({
               poster={posterSrc}
               autoPlay
               controls
+              controlsList="nodownload"
               playsInline
               loop
               style={{

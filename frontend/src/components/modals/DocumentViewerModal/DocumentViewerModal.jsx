@@ -11,10 +11,6 @@ export default function DocumentViewerModal({ documentFile, onClose }) {
           <span>{documentFile.name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <a href={documentFile.url} download target="_blank" rel="noreferrer" style={{ backgroundColor: '#00a884', color: '#fff', textDecoration: 'none', padding: '6px 16px', borderRadius: '18px', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
-            Download
-          </a>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
             <span className="material-symbols-outlined">close</span>
           </button>

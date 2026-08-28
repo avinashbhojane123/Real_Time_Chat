@@ -763,20 +763,7 @@ const ChatRoster = memo(function ChatRoster({
                       </div>
                     </div>
 
-                    {m.fileUrl && (
-                      <motion.a
-                        whileHover={{ scale: 1.2, rotate: -10 }}
-                        whileTap={{ scale: 0.9 }}
-                        href={m.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ color: '#00a884', display: 'flex', alignItems: 'center', padding: '6px' }}
-                        title="Download / Open File"
-                      >
-                        <Icon icon="solar:download-minimalistic-bold-duotone" width="22" height="22" />
-                      </motion.a>
-                    )}
+
                   </motion.div>
                 ))}
               </motion.div>
@@ -881,32 +868,7 @@ const ChatRoster = memo(function ChatRoster({
                 Shared by <strong>{selectedMedia.nickname}</strong> • {selectedMedia.timestamp || 'Just now'}
               </div>
 
-              {selectedMedia.fileUrl && (
-                <motion.a
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  href={selectedMedia.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    backgroundColor: '#00a884',
-                    color: '#111b21',
-                    fontWeight: 700,
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    textAlign: 'center',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    marginTop: '8px',
-                  }}
-                >
-                  <Icon icon="solar:download-minimalistic-bold-duotone" width="20" height="20" />
-                  <span>Download / Open Media</span>
-                </motion.a>
-              )}
+
             </motion.div>
           </motion.div>
         )}

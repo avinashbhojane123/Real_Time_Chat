@@ -365,6 +365,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                         <div className="m3-media-card" style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden' }}>
                           <video
                             controls
+                            controlsList="nodownload"
                             src={resolveMediaUrl(msg.fileUrl)}
                             style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '12px', display: 'block' }}
                           />
@@ -375,7 +376,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       {isAudioFile(msg) && (
                         <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px', borderRadius: '12px' }}>
                           <Icon icon="solar:volume-loud-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
-                          <audio controls src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
+                          <audio controls controlsList="nodownload" src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
                         </div>
                       )}
 
