@@ -399,43 +399,7 @@ export default function ChatRoster({
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('status')}
-          style={{
-            flex: 1,
-            padding: '10px 4px',
-            background: 'none',
-            border: 'none',
-            color: activeTab === 'status' ? '#00a884' : '#8696a0',
-            fontWeight: 700,
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '5px',
-            position: 'relative',
-            transition: 'color 0.2s ease',
-          }}
-        >
-          <Icon icon="solar:play-circle-bold-duotone" width="16" height="16" />
-          <span>Status ({statusUserList.length})</span>
-          {activeTab === 'status' && (
-            <motion.div
-              layoutId="activeTabUnderline"
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: '2px',
-                backgroundColor: '#00a884',
-              }}
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-            />
-          )}
-        </button>
+
 
         <button
           type="button"
@@ -478,88 +442,7 @@ export default function ChatRoster({
 
       {/* Motion Tab Transitions */}
       <AnimatePresence mode="wait">
-        {activeTab === 'status' ? (
-          <motion.div
-            key="status-tab"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 10 }}
-            transition={{ duration: 0.2 }}
-            style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}
-          >
-            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', marginBottom: '10px', letterSpacing: '0.5px' }}>
-              STATUS UPDATES
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {/* 1. Add / My Status Item */}
-              <motion.div
-                whileHover={{ backgroundColor: '#182229', x: 3 }}
-                onClick={() => setShowStatusCreator && setShowStatusCreator(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '8px 10px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  backgroundColor: '#111b21',
-                  border: '1px solid rgba(0, 168, 132, 0.25)',
-                }}
-              >
-                <div style={{ position: 'relative' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#005c4b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1rem' }}>
-                    {nickname ? nickname.slice(0, 2).toUpperCase() : 'ME'}
-                  </div>
-                  <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', backgroundColor: '#00a884', color: '#111b21', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #111b21' }}>
-                    <Icon icon="solar:add-square-bold-duotone" width="12" height="12" />
-                  </div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>My Status</div>
-                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>Tap to add status update</div>
-                </div>
-                <Icon icon="solar:add-circle-bold-duotone" width="20" height="20" style={{ color: '#00a884' }} />
-              </motion.div>
-
-              {/* 2. Contact Status Updates */}
-              {statusUserList.map((stUser) => (
-                <motion.div
-                  key={stUser.nickname}
-                  whileHover={{ backgroundColor: '#182229', x: 3 }}
-                  onClick={() => setActiveStatusUser && setActiveStatusUser(stUser)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '8px 10px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    backgroundColor: '#111b21',
-                    border: '1px solid rgba(134, 150, 160, 0.15)',
-                  }}
-                >
-                  {renderStatusAvatar ? renderStatusAvatar(stUser.nickname, '42px') : (
-                    <div style={{ width: '42px', height: '42px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                        {stUser.nickname.slice(0, 2).toUpperCase()}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {stUser.nickname}
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
-                      {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
-                    </div>
-                  </div>
-                  <Icon icon="solar:alt-arrow-right-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        ) : activeTab === 'people' ? (
+        {activeTab === 'people' ? (
           <motion.div
             key="people-tab"
             initial={{ opacity: 0, x: -10 }}
