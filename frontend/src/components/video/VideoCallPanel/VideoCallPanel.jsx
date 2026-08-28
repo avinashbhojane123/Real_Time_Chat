@@ -22,6 +22,7 @@ export default function VideoCallPanel({
   micMuted,
   cameraOff,
   isScreenSharing,
+  isScreenShareSupported = true,
   toggleMic,
   toggleCamera,
   flipCamera,
@@ -389,22 +390,10 @@ export default function VideoCallPanel({
   // =========================================================================
   return (
     <div className="wa-call-container">
-      {/* Top Header Navbar */}
+      {/* Top Header Navbar (Clean, uncluttered, no redundant buttons) */}
       <div className="wa-call-header">
         <div className="wa-call-header-left">
-          {/* Back/Minimize Icon for Mobile */}
-          <button
-            type="button"
-            className="wa-header-icon-btn mobile-only"
-            onClick={() => (openInAppPip ? openInAppPip() : setShowVideoPanel(false))}
-            title="Minimize Call to In-App PiP"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-              expand_more
-            </span>
-          </button>
-
-          <span className="material-symbols-outlined desktop-only" style={{ color: '#25d366', fontSize: '22px' }}>
+          <span className="material-symbols-outlined" style={{ color: '#25d366', fontSize: '24px', flexShrink: 0 }}>
             videocam
           </span>
 
@@ -465,7 +454,7 @@ export default function VideoCallPanel({
                 </button>
               </div>
 
-              {/* PiP Mode Selector Dropdown */}
+              {/* PiP Mode Selector Dropdown (Desktop) */}
               <AnimatePresence>
                 {showPipMenu && (
                   <motion.div
@@ -530,36 +519,6 @@ export default function VideoCallPanel({
               {videoFit === 'contain' ? 'aspect_ratio' : 'crop_free'}
             </span>
             <span className="desktop-only">{videoFit === 'contain' ? 'Fit Frame' : 'Fill Screen'}</span>
-          </button>
-
-          {/* Flip Camera button on mobile header */}
-          <button
-            type="button"
-            className="wa-header-icon-btn mobile-only"
-            onClick={flipCamera}
-            title="Flip Camera"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              flip_camera_ios
-            </span>
-          </button>
-
-          {/* Close / Minimize Button */}
-          <button
-            type="button"
-            className="wa-header-icon-btn"
-            onClick={() => {
-              if (callState === 'active' && openInAppPip) {
-                openInAppPip();
-              } else {
-                setShowVideoPanel(false);
-              }
-            }}
-            title="Minimize Panel"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              close
-            </span>
           </button>
         </div>
       </div>
@@ -791,7 +750,7 @@ export default function VideoCallPanel({
                 <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
               </button>
 
-              {/* Flip Camera */}
+              {/* Flip Camera (Convenient in bottom controls) */}
               <button type="button" onClick={flipCamera} className="wa-control-btn" title="Flip Camera">
                 <span className="material-symbols-outlined">flip_camera_ios</span>
               </button>
@@ -801,12 +760,18 @@ export default function VideoCallPanel({
                 type="button"
                 onClick={toggleScreenShare}
                 className={`wa-control-btn ${isScreenSharing ? 'active' : ''}`}
-                title={isScreenSharing ? 'Stop Screen Sharing' : 'Share Screen'}
+                title={
+                  !isScreenShareSupported
+                    ? 'Screen sharing not supported on this browser'
+                    : isScreenSharing
+                    ? 'Stop Screen Sharing'
+                    : 'Share Screen'
+                }
               >
                 <span className="material-symbols-outlined">{isScreenSharing ? 'stop_screen_share' : 'screen_share'}</span>
               </button>
 
-              {/* Pop to Desktop OS PiP */}
+              {/* Pop to Desktop OS PiP (on desktop screens) */}
               <button
                 type="button"
                 onClick={openDesktopPip || toggleNativePip}

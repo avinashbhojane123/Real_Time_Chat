@@ -32,6 +32,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const cameraOffRef = useRef(false);
   const micMutedRef = useRef(false);
 
+  // Screen sharing capability check
+  const isScreenShareSupported =
+    typeof navigator !== 'undefined' &&
+    Boolean(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function');
+
   // Keep refs in sync with state
   useEffect(() => {
     facingModeRef.current = facingMode;
@@ -523,7 +528,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   };
 
   // =========================================================================
-  // SCREEN SHARING CONTROLLER (Robust start & stop with camera restoration)
+  // SCREEN SHARING CONTROLLER (Mobile / Desktop Compatible)
   // =========================================================================
 
   const stopScreenShare = useCallback(async () => {
@@ -579,8 +584,13 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   }, [passcode, socketRef]);
 
   const startScreenShare = useCallback(async () => {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+      if (showToast) showToast('Screen sharing is not supported by your device or browser');
+      return;
+    }
+
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = screenStream.getVideoTracks()[0];
       if (!screenTrack) return;
 
@@ -597,7 +607,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         }
       }
 
-      // Handle browser native "Stop sharing" blue floating bar
+      // Handle browser native "Stop sharing" floating bar
       screenTrack.onended = () => {
         stopScreenShare();
       };
@@ -609,11 +619,18 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
       socketRef.current?.emit('screenShareStatus', { passcode, isSharing: true });
     } catch (err) {
-      console.warn('[WebRTC] Screen share cancelled or failed:', err);
+      console.warn('[WebRTC] Screen share error/cancel:', err);
       isScreenSharingRef.current = false;
       setIsScreenSharing(false);
+      if (err.name === 'NotAllowedError') {
+        if (showToast) showToast('Screen sharing was cancelled or denied permission');
+      } else if (err.name === 'NotSupportedError') {
+        if (showToast) showToast('Screen sharing is not supported on this device/browser');
+      } else {
+        if (showToast) showToast('Unable to start screen share: ' + (err.message || 'Error'));
+      }
     }
-  }, [passcode, socketRef, stopScreenShare]);
+  }, [passcode, socketRef, stopScreenShare, showToast]);
 
   const toggleScreenShare = useCallback(() => {
     if (isScreenSharingRef.current) {
@@ -789,6 +806,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     isStreamSwapped,
     setIsStreamSwapped,
     isScreenSharing,
+    isScreenShareSupported,
     callDuration,
     showVideoPanel,
     setShowVideoPanel,

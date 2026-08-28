@@ -609,6 +609,7 @@ export default function ChatRoom() {
         micMuted={webRTC.micMuted}
         cameraOff={webRTC.cameraOff}
         isScreenSharing={webRTC.isScreenSharing}
+        isScreenShareSupported={webRTC.isScreenShareSupported}
         toggleMic={webRTC.toggleMic}
         toggleCamera={webRTC.toggleCamera}
         flipCamera={webRTC.flipCamera}
