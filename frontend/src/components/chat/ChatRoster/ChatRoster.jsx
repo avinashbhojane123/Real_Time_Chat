@@ -48,6 +48,7 @@ export default function ChatRoster({
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'status' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
+  const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState(null); // Motion Lightbox Modal
   const [showStatusDrawer, setShowStatusDrawer] = useState(false); // Status Stories Modal Drawer
 
@@ -94,11 +95,12 @@ export default function ChatRoster({
   };
 
   // Collapsed Rail View (60px)
-  if (!showRosterPanel) {
-    if (!showRailSidebar) return null;
+  if (!showRosterPanel && !showRailSidebar && !showStatusDrawer) return null;
 
-    return (
-      <aside
+  return (
+    <>
+      {!showRosterPanel && showRailSidebar && (
+        <aside
         style={{
           width: '60px',
           backgroundColor: 'var(--chat-roster-bg, #111b21)',
@@ -274,12 +276,10 @@ export default function ChatRoster({
           <Icon icon="solar:logout-2-bold-duotone" width="22" height="22" style={{ color: '#f44336' }} />
         </motion.button>
       </aside>
-    );
-  }
+      )}
 
-  // Expanded Panel View (320px)
-  return (
-    <motion.aside
+      {showRosterPanel && (
+        <motion.aside
       drag={isMobileDevice ? 'x' : false}
       dragSnapToOrigin={true}
       dragElastic={0.15}
@@ -1043,5 +1043,7 @@ export default function ChatRoster({
         <span>E2E Encrypted Session • Zero Trace</span>
       </div>
     </motion.aside>
+    )}
+    </>
   );
 }
