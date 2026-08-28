@@ -15,6 +15,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const [callDuration, setCallDuration] = useState(0);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
 
+  // Unified PiP State: 'none' | 'in-app' | 'desktop-os'
+  const [pipMode, setPipMode] = useState('none');
+  const [pipWindow, setPipWindow] = useState(null);
+  const pipWindowRef = useRef(null);
+
   const localStreamRef = useRef(null);
   const remoteStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
@@ -36,6 +41,20 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     callStateRef.current = state;
   };
 
+  // Close any active OS PiP window / exit video PiP
+  const closeAllPipWindows = useCallback(() => {
+    if (pipWindowRef.current && !pipWindowRef.current.closed) {
+      try {
+        pipWindowRef.current.close();
+      } catch (e) {}
+      pipWindowRef.current = null;
+      setPipWindow(null);
+    }
+    if (typeof document !== 'undefined' && document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => {});
+    }
+  }, []);
+
   const cleanUpCall = useCallback(() => {
     if (callTimerRef.current) {
       clearInterval(callTimerRef.current);
@@ -51,6 +70,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     lastInboundBytesRef.current = 0;
     stalledCountRef.current = 0;
     lastCallEndedAtRef.current = Date.now();
+
+    closeAllPipWindows();
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -75,7 +96,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setMicMuted(false);
     setCameraOff(false);
     setShowVideoPanel(false);
-  }, []);
+    setPipMode('none');
+  }, [closeAllPipWindows]);
 
   const triggerIceRestart = useCallback(() => {
     const pc = peerConnectionRef.current;
@@ -179,7 +201,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     return pc;
   }, [passcode, socketRef, triggerIceRestart]);
 
-  // Sync localStream and remoteStream to video nodes
+  // Sync localStream and remoteStream to main video nodes
   useEffect(() => {
     const mainNode = isStreamSwapped ? localVideoRef.current : remoteVideoRef.current;
     const pipNode = isStreamSwapped ? remoteVideoRef.current : localVideoRef.current;
@@ -195,7 +217,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       pipNode.srcObject = pipStream;
       pipNode.play().catch((err) => console.warn('[WebRTC] PIP video play error:', err));
     }
-  }, [localStream, remoteStream, callState, showVideoPanel, isStreamSwapped]);
+  }, [localStream, remoteStream, callState, showVideoPanel, isStreamSwapped, pipMode]);
 
   // Active call duration timer & watchdog
   useEffect(() => {
@@ -341,6 +363,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const startCall = async () => {
     updateCallState('calling');
     setShowVideoPanel(true);
+    setPipMode('none');
     setRemoteUserName(recipientUser ? recipientUser.nickname : 'Participant');
 
     try {
@@ -394,12 +417,12 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     cleanUpCall();
   };
 
-  const endCall = () => {
+  const endCall = useCallback(() => {
     socketRef.current?.emit('endCall', { passcode });
     cleanUpCall();
-  };
+  }, [passcode, socketRef, cleanUpCall]);
 
-  const toggleMic = () => {
+  const toggleMic = useCallback(() => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
@@ -407,9 +430,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         setMicMuted(!audioTrack.enabled);
       }
     }
-  };
+  }, []);
 
-  const toggleCamera = () => {
+  const toggleCamera = useCallback(() => {
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0];
       if (videoTrack) {
@@ -417,7 +440,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         setCameraOff(!videoTrack.enabled);
       }
     }
-  };
+  }, []);
 
   const flipCamera = async () => {
     const nextMode = facingMode === 'user' ? 'environment' : 'user';
@@ -492,22 +515,157 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     }
   };
 
-  const [isPipMinimized, setIsPipMinimized] = useState(false);
+  // =========================================================================
+  // UNIFIED PICTURE-IN-PICTURE (In-App + Desktop OS PiP)
+  // =========================================================================
 
-  const togglePipMinimized = () => setIsPipMinimized((prev) => !prev);
+  const isDocPipSupported = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+  const isNativeVideoPipSupported = typeof document !== 'undefined' && Boolean(document.pictureInPictureEnabled);
+  const isPipSupported = isDocPipSupported || isNativeVideoPipSupported;
 
-  const toggleNativePip = async () => {
+  // Open In-App Floating PiP
+  const openInAppPip = useCallback(() => {
+    closeAllPipWindows();
+    setPipMode('in-app');
+  }, [closeAllPipWindows]);
+
+  // Open Desktop OS PiP (Always on top across Windows/OS)
+  const openDesktopPip = useCallback(async () => {
     try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-      } else if (remoteVideoRef.current && document.pictureInPictureEnabled) {
-        await remoteVideoRef.current.requestPictureInPicture();
+      // Priority 1: Modern Chromium Document Picture-in-Picture API
+      if (typeof window !== 'undefined' && 'documentPictureInPicture' in window) {
+        if (pipWindowRef.current && !pipWindowRef.current.closed) {
+          pipWindowRef.current.focus();
+          setPipMode('desktop-os');
+          return;
+        }
+
+        const pipWin = await window.documentPictureInPicture.requestWindow({
+          width: 380,
+          height: 250,
+          disallowReturnToOpener: false,
+        });
+
+        // Copy styles into new window
+        try {
+          [...document.styleSheets].forEach((styleSheet) => {
+            try {
+              const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+              const style = document.createElement('style');
+              style.textContent = cssRules;
+              pipWin.document.head.appendChild(style);
+            } catch (e) {
+              const link = document.createElement('link');
+              link.rel = 'stylesheet';
+              link.type = styleSheet.type || 'text/css';
+              link.media = styleSheet.media;
+              link.href = styleSheet.href;
+              pipWin.document.head.appendChild(link);
+            }
+          });
+        } catch (e) {
+          console.warn('[WebRTC PiP] Stylesheet copy error:', e);
+        }
+
+        // Copy fonts & link elements
+        try {
+          document.querySelectorAll('link[rel="stylesheet"], link[rel="preconnect"]').forEach((el) => {
+            pipWin.document.head.appendChild(el.cloneNode(true));
+          });
+        } catch (e) {}
+
+        pipWin.document.body.style.margin = '0';
+        pipWin.document.body.style.backgroundColor = '#0b141a';
+        pipWin.document.body.style.overflow = 'hidden';
+
+        pipWindowRef.current = pipWin;
+        setPipWindow(pipWin);
+        setPipMode('desktop-os');
+
+        pipWin.addEventListener('pagehide', () => {
+          pipWindowRef.current = null;
+          setPipWindow(null);
+          // Seamless fallback to In-App PiP without closing call
+          setPipMode((prev) => (prev === 'desktop-os' ? 'in-app' : prev));
+        });
+        return;
+      }
+
+      // Priority 2: Standard HTML5 Video RequestPictureInPicture fallback
+      const targetVideo = isStreamSwapped ? localVideoRef.current : remoteVideoRef.current;
+      if (targetVideo && document.pictureInPictureEnabled) {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        }
+        await targetVideo.requestPictureInPicture();
+        setPipMode('desktop-os');
+
+        const onLeavePip = () => {
+          targetVideo.removeEventListener('leavepictureinpicture', onLeavePip);
+          setPipMode((prev) => (prev === 'desktop-os' ? 'in-app' : prev));
+        };
+        targetVideo.addEventListener('leavepictureinpicture', onLeavePip);
+      } else {
+        // Fallback to In-App PiP if Desktop PiP is unsupported
+        setPipMode('in-app');
+        if (showToast) showToast('Desktop PiP not supported on this browser. Switched to In-App PiP.');
       }
     } catch (err) {
-      console.warn('Native Picture-in-Picture failed:', err);
-      if (showToast) showToast('Native Picture-in-Picture unavailable');
+      console.warn('[WebRTC] Desktop PiP launch failed:', err);
+      setPipMode('in-app');
+      if (showToast) showToast('Desktop PiP unavailable, switched to In-App PiP');
     }
-  };
+  }, [isStreamSwapped, showToast]);
+
+  // Close any PiP and return to Fullscreen
+  const closePip = useCallback(() => {
+    closeAllPipWindows();
+    setPipMode('none');
+  }, [closeAllPipWindows]);
+
+  // Master PiP Toggle: Switches between Fullscreen and preferred PiP mode
+  const togglePip = useCallback(
+    (mode = null) => {
+      if (pipMode !== 'none') {
+        closePip();
+      } else {
+        if (mode === 'desktop' || (!mode && (isDocPipSupported || isNativeVideoPipSupported))) {
+          openDesktopPip();
+        } else {
+          openInAppPip();
+        }
+      }
+    },
+    [pipMode, closePip, openDesktopPip, openInAppPip, isDocPipSupported, isNativeVideoPipSupported]
+  );
+
+  // Backward compatibility helpers
+  const isPipMinimized = pipMode === 'in-app';
+  const setIsPipMinimized = (val) => setPipMode(val ? 'in-app' : 'none');
+  const togglePipMinimized = () => (pipMode === 'in-app' ? closePip() : openInAppPip());
+  const toggleNativePip = () => (pipMode === 'desktop-os' ? closePip() : openDesktopPip());
+
+  // MediaSession API Integration for OS Overlays and Action Keys
+  useEffect(() => {
+    if (callState === 'active' && 'mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new window.MediaMetadata({
+          title: `WhatsApp Video Call • ${remoteUserName || callerName || 'Contact'}`,
+          artist: 'Real-Time WebRTC Call',
+          album: 'End-to-End Encrypted',
+        });
+        navigator.mediaSession.setActionHandler('hangup', () => endCall());
+        navigator.mediaSession.setActionHandler('togglemicrophone', () => toggleMic());
+        navigator.mediaSession.setActionHandler('togglecamera', () => toggleCamera());
+      } catch (e) {}
+    } else if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('hangup', null);
+        navigator.mediaSession.setActionHandler('togglemicrophone', null);
+        navigator.mediaSession.setActionHandler('togglecamera', null);
+      } catch (e) {}
+    }
+  }, [callState, remoteUserName, callerName, endCall, toggleMic, toggleCamera]);
 
   return {
     callState,
@@ -526,6 +684,17 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     callDuration,
     showVideoPanel,
     setShowVideoPanel,
+    // Unified PiP System
+    pipMode,
+    setPipMode,
+    pipWindow,
+    isPipSupported,
+    isDocPipSupported,
+    openDesktopPip,
+    openInAppPip,
+    closePip,
+    togglePip,
+    // Backward compatibility
     isPipMinimized,
     setIsPipMinimized,
     togglePipMinimized,

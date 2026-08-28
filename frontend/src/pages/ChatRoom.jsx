@@ -598,6 +598,8 @@ export default function ChatRoom() {
         remoteUserName={webRTC.remoteUserName}
         remoteVideoRef={webRTC.remoteVideoRef}
         localVideoRef={webRTC.localVideoRef}
+        localStream={webRTC.localStream}
+        remoteStream={webRTC.remoteStream}
         videoFit={webRTC.videoFit}
         setVideoFit={webRTC.setVideoFit}
         callDuration={webRTC.callDuration}
@@ -610,6 +612,16 @@ export default function ChatRoom() {
         toggleMic={webRTC.toggleMic}
         toggleCamera={webRTC.toggleCamera}
         flipCamera={webRTC.flipCamera}
+        toggleScreenShare={webRTC.toggleScreenShare}
+        pipMode={webRTC.pipMode}
+        setPipMode={webRTC.setPipMode}
+        pipWindow={webRTC.pipWindow}
+        openDesktopPip={webRTC.openDesktopPip}
+        openInAppPip={webRTC.openInAppPip}
+        closePip={webRTC.closePip}
+        togglePip={webRTC.togglePip}
+        isPipSupported={webRTC.isPipSupported}
+        isDocPipSupported={webRTC.isDocPipSupported}
         isPipMinimized={webRTC.isPipMinimized}
         setIsPipMinimized={webRTC.setIsPipMinimized}
         togglePipMinimized={webRTC.togglePipMinimized}

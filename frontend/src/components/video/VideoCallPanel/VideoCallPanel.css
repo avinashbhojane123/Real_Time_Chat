@@ -1,3 +1,7 @@
+/* ==========================================================================
+   WhatsApp Video Call & Picture-in-Picture (PiP) Design System
+   ========================================================================== */
+
 .wa-call-container {
   position: fixed;
   inset: 0;
@@ -5,4 +9,230 @@
   z-index: 9999;
   display: flex;
   flex-direction: column;
+  user-select: none;
+  font-family: var(--m3-font, 'Plus Jakarta Sans', sans-serif);
+}
+
+/* Call Pulsing Avatar for Calling/Incoming */
+.wa-call-pulse {
+  animation: waPulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes waPulseRing {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 168, 132, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 20px rgba(0, 168, 132, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 168, 132, 0);
+  }
+}
+
+/* In-App Floating PiP Card */
+.wa-pip-card {
+  position: fixed;
+  background-color: #0b141a;
+  border-radius: 16px;
+  border: 1.5px solid rgba(0, 168, 132, 0.45);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85), 0 0 24px rgba(0, 168, 132, 0.2);
+  z-index: 99999;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(16px);
+  touch-action: none;
+  transition: width 0.22s ease, height 0.22s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wa-pip-card:hover {
+  border-color: rgba(37, 211, 102, 0.7);
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.9), 0 0 32px rgba(37, 211, 102, 0.3);
+}
+
+/* PiP Header */
+.wa-pip-header {
+  height: 38px;
+  padding: 0 10px;
+  background: linear-gradient(180deg, rgba(24, 34, 41, 0.98) 0%, rgba(17, 27, 33, 0.94) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e9edef;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: grab;
+  z-index: 15;
+}
+
+.wa-pip-header:active {
+  cursor: grabbing;
+}
+
+/* PiP Controls & Buttons */
+.wa-pip-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #aebac1;
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.wa-pip-btn:hover {
+  background: rgba(0, 168, 132, 0.2);
+  color: #25d366;
+  transform: scale(1.05);
+}
+
+.wa-pip-btn:active {
+  transform: scale(0.95);
+}
+
+/* Mini PIP Floating View inside main view */
+.wa-mini-pip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+  background-color: #111b21;
+  z-index: 20;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+}
+
+.wa-mini-pip:hover {
+  transform: scale(1.04);
+  border-color: #00a884;
+}
+
+/* Audio Visualizer Equalizer Waves */
+.wa-sound-waves {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+}
+
+.wa-sound-bar {
+  width: 3px;
+  border-radius: 2px;
+  background-color: #25d366;
+  animation: waEqualizer 1.2s ease-in-out infinite alternate;
+}
+
+.wa-sound-bar:nth-child(1) { height: 8px; animation-delay: 0.1s; }
+.wa-sound-bar:nth-child(2) { height: 16px; animation-delay: 0.3s; }
+.wa-sound-bar:nth-child(3) { height: 22px; animation-delay: 0.5s; }
+.wa-sound-bar:nth-child(4) { height: 14px; animation-delay: 0.2s; }
+.wa-sound-bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+
+@keyframes waEqualizer {
+  0% { transform: scaleY(0.3); opacity: 0.6; }
+  50% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(0.4); opacity: 0.7; }
+}
+
+/* Unified PiP Dropdown Menu */
+.wa-pip-menu {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 250px;
+  background: #182229;
+  border: 1px solid rgba(0, 168, 132, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+  padding: 6px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wa-pip-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: none;
+  border: none;
+  color: #e9edef;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+
+.wa-pip-menu-item:hover {
+  background: rgba(0, 168, 132, 0.18);
+  color: #25d366;
+}
+
+/* Bottom Floating Control Dock */
+.wa-floating-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: rgba(17, 27, 33, 0.88);
+  backdrop-filter: blur(18px);
+  padding: 10px 24px;
+  border-radius: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75);
+}
+
+.wa-control-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wa-control-btn:hover {
+  transform: scale(1.08);
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.wa-control-btn:active {
+  transform: scale(0.94);
+}
+
+.wa-control-btn.danger {
+  background-color: #ea0038;
+  box-shadow: 0 4px 14px rgba(234, 0, 56, 0.4);
+}
+
+.wa-control-btn.danger:hover {
+  background-color: #ff1a4f;
+  box-shadow: 0 6px 20px rgba(234, 0, 56, 0.6);
+}
+
+.wa-control-btn.active {
+  background-color: #00a884;
+  color: #fff;
 }
