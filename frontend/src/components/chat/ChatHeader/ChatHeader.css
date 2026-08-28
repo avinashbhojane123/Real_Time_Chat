@@ -62,3 +62,51 @@
   justify-content: center;
   background-color: #111b21;
 }
+
+/* Responsive Styles for Mobile Viewports */
+@media (max-width: 640px) {
+  .wa-header-container {
+    padding: 8px 10px !important;
+  }
+
+  .wa-header-left {
+    gap: 8px !important;
+  }
+
+  .wa-header-user-info {
+    gap: 8px !important;
+  }
+
+  .wa-header-actions {
+    gap: 4px !important;
+  }
+
+  .m3-action-btn {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .wa-header-latency-pill {
+    padding: 3px 7px !important;
+    font-size: 0.68rem !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .wa-header-left {
+    gap: 6px !important;
+  }
+
+  .wa-header-actions {
+    gap: 2px !important;
+  }
+
+  .wa-header-latency-pill span {
+    display: none !important;
+  }
+
+  .wa-header-latency-pill {
+    padding: 4px !important;
+    border-radius: 50% !important;
+  }
+}

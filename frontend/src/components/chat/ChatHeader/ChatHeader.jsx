@@ -46,6 +46,7 @@ const ChatHeader = memo(function ChatHeader({
     <>
       <motion.header
         layoutId="chat-header-surface"
+        className="wa-header-container"
         animate={
           callState === 'active' || callState === 'calling'
             ? {
@@ -84,7 +85,7 @@ const ChatHeader = memo(function ChatHeader({
         }}
       >
         {/* Header Info: Recipient Name, Avatar, Online/Offline Presence & Hamburger Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="wa-header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
           {/* 3-Line Hamburger Menu Toggle Button with 90-deg Spring Flip Animation */}
           <motion.button
             whileHover={{ scale: 1.15 }}
@@ -109,6 +110,7 @@ const ChatHeader = memo(function ChatHeader({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
               transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
             title="Toggle Left Action Sidebar (Participants, Theme, Clear, Logout)"
@@ -124,8 +126,8 @@ const ChatHeader = memo(function ChatHeader({
 
           {/* Recipient User Info & Avatar with Pulsing Status Aura & 3D Card Flip */}
           {recipientUser ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => setShowRosterPanel(true)}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="wa-header-user-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, overflow: 'hidden', flex: 1 }} onClick={() => setShowRosterPanel(true)}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {(recipientUser?.hasStatus || recipientUser?.statusUrl) && (
                   <motion.div
                     animate={{ scale: [1, 1.28, 1], opacity: [0.35, 0.85, 0.35] }}
@@ -152,21 +154,21 @@ const ChatHeader = memo(function ChatHeader({
                   {renderStatusAvatar && renderStatusAvatar(recipientUser.nickname, '38px', isRecipientOnline, {}, recipientUser.avatarUrl)}
                 </motion.div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>{recipientUser.nickname}</span>
-                  <Icon icon="solar:shield-check-bold-duotone" width="16" height="16" style={{ color: '#00a884', opacity: 0.9 }} title="End-to-end encrypted chat" />
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{recipientUser.nickname}</span>
+                  <Icon icon="solar:shield-check-bold-duotone" width="16" height="16" style={{ color: '#00a884', opacity: 0.9, flexShrink: 0 }} title="End-to-end encrypted chat" />
                 </div>
 
                 {/* Live Typing Status or Online/Offline Presence Indicator with M3 2.5dp Cutout Mask */}
                 {typingUsers && typingUsers.length > 0 ? (
-                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" />
-                    <span>{typingUsers.join(', ')} is typing...</span>
+                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                    <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{typingUsers.join(', ')} is typing...</span>
                   </div>
                 ) : (
-                  <div style={{ fontSize: '0.72rem', color: isRecipientOnline ? '#00a884' : '#8696a0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span className="m3-presence-cutout">
+                  <div style={{ fontSize: '0.72rem', color: isRecipientOnline ? '#00a884' : '#8696a0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                    <span className="m3-presence-cutout" style={{ flexShrink: 0 }}>
                       <Icon
                         icon={isRecipientOnline ? 'solar:check-circle-bold-duotone' : 'solar:clock-circle-bold-duotone'}
                         width="12"
@@ -174,21 +176,21 @@ const ChatHeader = memo(function ChatHeader({
                         style={{ color: isRecipientOnline ? '#00a884' : '#8696a0' }}
                       />
                     </span>
-                    <span>{formatUserPresence(isRecipientOnline, recipientUser?.lastSeen).text}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{formatUserPresence(isRecipientOnline, recipientUser?.lastSeen).text}</span>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef' }}>Group Chat Space</span>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', flex: 1 }}>
+              <span style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Group Chat Space</span>
               {typingUsers && typingUsers.length > 0 ? (
-                <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" />
-                  <span>{typingUsers.join(', ')} is typing...</span>
+                <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                  <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{typingUsers.join(', ')} is typing...</span>
                 </div>
               ) : (
-                <div style={{ fontSize: '0.72rem', color: '#8696a0' }}>Click to view room participants</div>
+                <div style={{ fontSize: '0.72rem', color: '#8696a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Click to view room participants</div>
               )}
             </div>
           )}
@@ -196,10 +198,11 @@ const ChatHeader = memo(function ChatHeader({
 
 
         {/* Action Icons & Connection Quality Meter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="wa-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           {/* WebSocket Signal & Latency Meter with Spring Pop */}
           <motion.div
             key={latency}
+            className="wa-header-latency-pill"
             initial={{ scale: 0.88, opacity: 0.7 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 500, damping: 25, ease: [0.2, 0, 0, 1] }}
@@ -217,6 +220,7 @@ const ChatHeader = memo(function ChatHeader({
               cursor: 'default',
               userSelect: 'none',
               transition: 'all 0.2s cubic-bezier(0.2, 0, 0, 1)',
+              flexShrink: 0,
             }}
             title={`WebSocket Status: ${isSocketConnected ? 'Connected' : 'Reconnecting...'} | Latency: ${latency}ms`}
           >
