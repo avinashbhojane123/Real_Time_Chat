@@ -205,6 +205,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
           <AnimatePresence initial={false}>
             {visibleMessages.map((msg, idx) => {
               const isMe = msg.nickname === nickname;
+              const isNearBottom = idx >= visibleMessages.length - 3;
               const showDate =
                 idx === 0 ||
                 formatDateHeader(msg.createdAt) !== formatDateHeader(visibleMessages[idx - 1].createdAt);
@@ -221,7 +222,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                     flexDirection: 'column',
                     gap: '4px',
                     position: 'relative',
-                    zIndex: isMenuActive ? 100 : 1,
+                    zIndex: isMenuActive ? 1000 : 1,
                   }}
                 >
                   {/* Feature 2: M3 Sticky Date Header Tonal Pill */}
@@ -254,7 +255,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       position: 'relative',
                       alignItems: 'center',
                       userSelect: 'none',
-                      zIndex: isMenuActive ? 100 : 1,
+                      zIndex: isMenuActive ? 1000 : 1,
                     }}
                     onPointerDown={(e) => handlePointerDown(e, msg.id)}
                     onPointerMove={(e) => handlePointerMove(e, msg.id)}
@@ -297,7 +298,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                     >
                       {/* Sender Nickname Header for Incoming Messages */}
                       {!isMe && (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px', paddingRight: '28px' }}>
                           {msg.nickname}
                         </div>
                       )}
@@ -547,25 +548,29 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                           }}
                           style={{
                             position: 'absolute',
-                            top: '4px',
-                            right: isMe ? '4px' : 'auto',
-                            left: !isMe ? '4px' : 'auto',
-                            background: 'rgba(0, 0, 0, 0.2)',
-                            border: 'none',
-                            color: '#e9edef',
+                            top: '6px',
+                            right: '6px',
+                            width: '28px',
+                            height: '28px',
+                            backgroundColor: 'rgba(32, 44, 51, 0.85)',
+                            border: '1px solid rgba(255, 255, 255, 0.25)',
+                            color: '#ffffff',
                             cursor: 'pointer',
-                            padding: '4px',
                             borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             zIndex: 25,
-                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
+                            backdropFilter: 'blur(4px)',
+                            transition: 'all 0.15s ease-in-out',
                           }}
-                          className="opacity-90 hover:opacity-100 hover:bg-black/40"
+                          className="opacity-95 hover:opacity-100 hover:scale-110 active:scale-95"
                           title="Message options"
                         >
-                          <Icon icon="solar:dots-three-vertical-bold" width="18" height="18" />
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" style={{ display: 'block' }}>
+                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                          </svg>
                         </button>
                       )}
 
@@ -576,17 +581,17 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                           onPointerUp={(e) => e.stopPropagation()}
                           style={{
                             position: 'absolute',
-                            bottom: '100%',
-                            marginBottom: '6px',
-                            right: isMe ? '0px' : 'auto',
-                            left: !isMe ? '0px' : 'auto',
+                            ...(isNearBottom
+                              ? { bottom: '100%', marginBottom: '8px' }
+                              : { top: '100%', marginTop: '8px' }),
+                            right: '0px',
                             backgroundColor: '#233138',
-                            borderRadius: '10px',
-                            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.75)',
-                            border: '1px solid rgba(134, 150, 160, 0.25)',
-                            padding: '6px 0',
-                            zIndex: 200,
-                            minWidth: '150px',
+                            borderRadius: '12px',
+                            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85)',
+                            border: '1px solid rgba(134, 150, 160, 0.35)',
+                            padding: '8px 0',
+                            zIndex: 1001,
+                            minWidth: '165px',
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -598,10 +603,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                               setActiveReactionMsgId(msg.id);
                               setActiveMenuMsgId(null);
                             }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                             className="hover:bg-[#182229]"
                           >
-                            <Icon icon="solar:smile-circle-bold-duotone" width="18" height="18" style={{ color: '#00a884' }} />
+                            <Icon icon="solar:smile-circle-bold-duotone" width="20" height="20" style={{ color: '#00a884' }} />
                             <span>React</span>
                           </button>
 
@@ -613,10 +618,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                               setReplyingTo(msg);
                               setActiveMenuMsgId(null);
                             }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                             className="hover:bg-[#182229]"
                           >
-                            <Icon icon="solar:reply-bold-duotone" width="18" height="18" style={{ color: '#8696a0' }} />
+                            <Icon icon="solar:reply-bold-duotone" width="20" height="20" style={{ color: '#8696a0' }} />
                             <span>Reply</span>
                           </button>
 
@@ -629,10 +634,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                                 startEditing(msg);
                                 setActiveMenuMsgId(null);
                               }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                               className="hover:bg-[#182229]"
                             >
-                              <Icon icon="solar:pen-new-square-bold-duotone" width="18" height="18" style={{ color: '#8696a0' }} />
+                              <Icon icon="solar:pen-new-square-bold-duotone" width="20" height="20" style={{ color: '#8696a0' }} />
                               <span>Edit</span>
                             </button>
                           )}
@@ -645,10 +650,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                               handleTogglePinMessage(msg);
                               setActiveMenuMsgId(null);
                             }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                             className="hover:bg-[#182229]"
                           >
-                            <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#8696a0' }} />
+                            <Icon icon="solar:pin-bold-duotone" width="20" height="20" style={{ color: '#8696a0' }} />
                             <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
                           </button>
 
@@ -661,10 +666,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                                 handleDeleteMessage(msg.id);
                                 setActiveMenuMsgId(null);
                               }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: '#f15c6d', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#f15c6d', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                               className="hover:bg-[#182229]"
                             >
-                              <Icon icon="solar:trash-bin-trash-bold-duotone" width="18" height="18" style={{ color: '#f15c6d' }} />
+                              <Icon icon="solar:trash-bin-trash-bold-duotone" width="20" height="20" style={{ color: '#f15c6d' }} />
                               <span>Delete</span>
                             </button>
                           )}
