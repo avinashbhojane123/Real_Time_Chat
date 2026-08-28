@@ -56,19 +56,35 @@ export default function StatusModal({
 
   const cleanApiUrl = (baseUrl || getApiBaseUrl()).replace(/\/+$/, '');
 
+  // Filter stories older than 24 hours
+  const is24hValid = (st) => {
+    const timeVal = st?.createdAt || st?.timestamp;
+    if (!timeVal) return true;
+    return Date.now() - new Date(timeVal).getTime() <= 24 * 60 * 60 * 1000;
+  };
+
   // Flattened users list for viewer
-  const effectiveUserList = statusUserList && statusUserList.length > 0
-    ? statusUserList
-    : (() => {
-        const map = {};
-        statuses.forEach((st) => {
-          if (!map[st.nickname]) {
-            map[st.nickname] = { nickname: st.nickname, avatarUrl: st.avatarUrl, statuses: [] };
-          }
-          map[st.nickname].statuses.push(st);
-        });
-        return Object.values(map);
-      })();
+  const effectiveUserList = (() => {
+    const rawList = statusUserList && statusUserList.length > 0
+      ? statusUserList
+      : (() => {
+          const map = {};
+          (statuses || []).forEach((st) => {
+            if (!map[st.nickname]) {
+              map[st.nickname] = { nickname: st.nickname, avatarUrl: st.avatarUrl, statuses: [] };
+            }
+            map[st.nickname].statuses.push(st);
+          });
+          return Object.values(map);
+        })();
+
+    return rawList
+      .map((u) => ({
+        ...u,
+        statuses: (u.statuses || []).filter(is24hValid),
+      }))
+      .filter((u) => u.statuses.length > 0);
+  })();
 
   const currentUserObj = effectiveUserList[userIndex];
   const currentUserStories = currentUserObj?.statuses || [];

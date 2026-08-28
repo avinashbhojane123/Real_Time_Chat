@@ -214,13 +214,28 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       else showToast('Message unpinned');
     });
 
+    // Helper to filter 24h statuses
+    const filter24hStatuses = (list) => {
+      if (!Array.isArray(list)) return [];
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      return list.filter((st) => {
+        const timeVal = st?.createdAt || st?.timestamp;
+        if (!timeVal) return true;
+        return new Date(timeVal).getTime() >= cutoff;
+      });
+    };
+
     // Status Story Event Listeners
+    socket.on('statusesList', (list) => {
+      setStatuses(filter24hStatuses(list));
+    });
+
     socket.on('statusesUpdated', (updatedStatuses) => {
-      setStatuses(updatedStatuses || []);
+      setStatuses(filter24hStatuses(updatedStatuses));
     });
 
     socket.on('statusCreated', (newStatus) => {
-      setStatuses((prev) => [newStatus, ...prev]);
+      setStatuses((prev) => filter24hStatuses([newStatus, ...prev]));
       showToast(`${newStatus.nickname} posted a new status story`);
     });
 

@@ -423,6 +423,17 @@ export class ChatGateway
       nickname: data.nickname,
     });
 
+    const now = new Date();
+    const activeStatuses = await this.statusRepo
+      .createQueryBuilder('status')
+      .where('status.roomId = :roomId', { roomId: room.id })
+      .andWhere('(status.expiresAt IS NULL OR status.expiresAt > :now)', { now })
+      .orderBy('status.createdAt', 'ASC')
+      .getMany();
+
+    client.emit('statusesList', activeStatuses);
+    client.emit('statusesUpdated', activeStatuses);
+
     return {
       success: true,
       roomId: room.id,
