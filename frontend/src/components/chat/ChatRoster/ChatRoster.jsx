@@ -487,13 +487,14 @@ export default function ChatRoster({
             transition={{ duration: 0.2 }}
             style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}
           >
-            {/* My Status Card */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                MY STATUS
-              </div>
+            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', marginBottom: '10px', letterSpacing: '0.5px' }}>
+              STATUS UPDATES
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {/* 1. Add / My Status Item */}
               <motion.div
-                whileHover={{ backgroundColor: '#182229', x: 2 }}
+                whileHover={{ backgroundColor: '#182229', x: 3 }}
                 onClick={() => setShowStatusCreator && setShowStatusCreator(true)}
                 style={{
                   display: 'flex',
@@ -503,7 +504,7 @@ export default function ChatRoster({
                   borderRadius: '12px',
                   cursor: 'pointer',
                   backgroundColor: '#111b21',
-                  border: '1px solid rgba(134, 150, 160, 0.15)',
+                  border: '1px solid rgba(0, 168, 132, 0.25)',
                 }}
               >
                 <div style={{ position: 'relative' }}>
@@ -516,58 +517,46 @@ export default function ChatRoster({
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef' }}>My Status</div>
-                  <div style={{ fontSize: '0.74rem', color: '#8696a0' }}>Tap to add status update</div>
+                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>Tap to add status update</div>
                 </div>
+                <Icon icon="solar:add-circle-bold-duotone" width="20" height="20" style={{ color: '#00a884' }} />
               </motion.div>
-            </div>
 
-            {/* Recent Status Updates */}
-            <div>
-              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#8696a0', marginBottom: '8px', letterSpacing: '0.5px' }}>
-                RECENT UPDATES ({statusUserList.length})
-              </div>
-              {statusUserList.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#8696a0', padding: '24px 8px', fontSize: '0.8rem' }}>
-                  No recent status updates from your contacts yet.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {statusUserList.map((stUser) => (
-                    <motion.div
-                      key={stUser.nickname}
-                      whileHover={{ backgroundColor: '#182229', x: 3 }}
-                      onClick={() => setActiveStatusUser && setActiveStatusUser(stUser)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '8px 10px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        backgroundColor: '#111b21',
-                        border: '1px solid rgba(134, 150, 160, 0.15)',
-                      }}
-                    >
-                      {renderStatusAvatar ? renderStatusAvatar(stUser) : (
-                        <div style={{ width: '42px', height: '42px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                            {stUser.nickname.slice(0, 2).toUpperCase()}
-                          </div>
-                        </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {stUser.nickname}
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
-                          {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
-                        </div>
+              {/* 2. Contact Status Updates */}
+              {statusUserList.map((stUser) => (
+                <motion.div
+                  key={stUser.nickname}
+                  whileHover={{ backgroundColor: '#182229', x: 3 }}
+                  onClick={() => setActiveStatusUser && setActiveStatusUser(stUser)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '8px 10px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    backgroundColor: '#111b21',
+                    border: '1px solid rgba(134, 150, 160, 0.15)',
+                  }}
+                >
+                  {renderStatusAvatar ? renderStatusAvatar(stUser.nickname, '42px') : (
+                    <div style={{ width: '42px', height: '42px', borderRadius: '50%', border: '2px solid #00a884', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#202c33', color: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                        {stUser.nickname.slice(0, 2).toUpperCase()}
                       </div>
-                      <Icon icon="solar:alt-arrow-right-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {stUser.nickname}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600 }}>
+                      {stUser.statuses?.length || 1} story update{stUser.statuses?.length > 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <Icon icon="solar:alt-arrow-right-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         ) : activeTab === 'people' ? (
