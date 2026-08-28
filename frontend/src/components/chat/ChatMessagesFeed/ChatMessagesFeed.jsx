@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import AnimatedMessageBubble from '../../animated/AnimatedMessageBubble';
@@ -9,7 +9,7 @@ import InstagramPreview from '../../InstagramPreview';
 import { formatDateHeader, formatMessageTime } from '../../../utils/chatUtils';
 import './ChatMessagesFeed.css';
 
-export default function ChatMessagesFeed({
+const ChatMessagesFeed = memo(function ChatMessagesFeed({
   filteredMessages,
   nickname,
   users,
@@ -887,4 +887,6 @@ export default function ChatMessagesFeed({
       </div>
     </div>
   );
-}
+});
+
+export default ChatMessagesFeed;

@@ -243,6 +243,18 @@ export default function ChatRoom() {
       expiresIn: null,
     };
 
+    const optimisticMsg = {
+      id: `temp-${Date.now()}`,
+      nickname,
+      message: inputText.trim(),
+      createdAt: new Date().toISOString(),
+      timestamp: 'Just now',
+      replyTo: payload.replyTo,
+      readBy: [nickname],
+      reactions: {},
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
     socketRef.current?.emit('sendMessage', payload);
     socketRef.current?.emit('stopTyping', { passcode, nickname });
     setInputText('');

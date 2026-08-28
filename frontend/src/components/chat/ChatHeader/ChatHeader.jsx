@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
 import './ChatHeader.css';
 
-export default function ChatHeader({
+const ChatHeader = memo(function ChatHeader({
   headerBgOpacity,
   headerBlur,
   showRosterPanel,
@@ -406,4 +406,6 @@ export default function ChatHeader({
       </AnimatePresence>
     </>
   );
-}
+});
+
+export default ChatHeader;

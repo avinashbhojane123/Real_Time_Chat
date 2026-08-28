@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { memo } from 'react';
 import MagneticButton from '../../animated/MagneticButton';
 import './ChatInputBar.css';
 
-export default function ChatInputBar({
+const ChatInputBar = memo(function ChatInputBar({
   replyingTo,
   setReplyingTo,
   editingMsg,
@@ -347,4 +347,6 @@ export default function ChatInputBar({
       </footer>
     </>
   );
-}
+});
+
+export default ChatInputBar;

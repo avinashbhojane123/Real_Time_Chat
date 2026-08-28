@@ -65,15 +65,21 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     // New Message Event Listeners
     socket.on('newMessage', (msg) => {
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        const clean = prev.filter(
+          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
+        );
+        if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
+        return [...clean, msg];
       });
     });
 
     socket.on('message', (msg) => {
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        const clean = prev.filter(
+          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
+        );
+        if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
+        return [...clean, msg];
       });
     });
 

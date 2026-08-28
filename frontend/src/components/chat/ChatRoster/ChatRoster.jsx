@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
@@ -26,7 +26,7 @@ const itemVariants = {
   },
 };
 
-export default function ChatRoster({
+const ChatRoster = memo(function ChatRoster({
   isMobileDevice,
   showRosterPanel,
   setShowRosterPanel,
@@ -1071,4 +1071,6 @@ export default function ChatRoster({
     )}
     </>
   );
-}
+});
+
+export default ChatRoster;
