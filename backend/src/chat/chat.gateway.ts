@@ -716,9 +716,9 @@ export class ChatGateway
     console.log(
       `[CallUser] ${session.nickname} is calling in room: ${data.passcode}`,
     );
-    client.to(data.passcode).emit('userCalling', {
-      callerName: session.nickname,
-    });
+    const callPayload = { callerName: session.nickname, from: session.nickname };
+    client.to(data.passcode).emit('userCalling', callPayload);
+    client.to(data.passcode).emit('callUser', callPayload);
   }
 
   @SubscribeMessage('acceptCall')
@@ -732,9 +732,9 @@ export class ChatGateway
     console.log(
       `[AcceptCall] ${session.nickname} accepted the call in room: ${data.passcode}`,
     );
-    client.to(data.passcode).emit('callAccepted', {
-      receiverName: session.nickname,
-    });
+    const acceptPayload = { receiverName: session.nickname, from: session.nickname };
+    client.to(data.passcode).emit('callAccepted', acceptPayload);
+    client.to(data.passcode).emit('acceptCall', acceptPayload);
   }
 
   @SubscribeMessage('declineCall')
@@ -748,9 +748,9 @@ export class ChatGateway
     console.log(
       `[DeclineCall] ${session.nickname} declined the call in room: ${data.passcode}`,
     );
-    client.to(data.passcode).emit('callDeclined', {
-      receiverName: session.nickname,
-    });
+    const declinePayload = { receiverName: session.nickname, from: session.nickname };
+    client.to(data.passcode).emit('callDeclined', declinePayload);
+    client.to(data.passcode).emit('declineCall', declinePayload);
   }
 
   @SubscribeMessage('webrtcOffer')
@@ -764,10 +764,13 @@ export class ChatGateway
     console.log(
       `[WebRTCOffer] Relaying WebRTC offer from ${session.nickname} in room: ${data.passcode}`,
     );
-    client.to(data.passcode).emit('webrtcOfferRelay', {
+    const offerPayload = {
       offer: data.offer,
       from: session.nickname,
-    });
+      callerName: session.nickname,
+    };
+    client.to(data.passcode).emit('webrtcOfferRelay', offerPayload);
+    client.to(data.passcode).emit('webrtcOffer', offerPayload);
   }
 
   @SubscribeMessage('webrtcAnswer')
@@ -781,12 +784,14 @@ export class ChatGateway
     console.log(
       `[WebRTCAnswer] Relaying WebRTC answer from ${session.nickname} in room: ${data.passcode}`,
     );
-    client.to(data.passcode).emit('webrtcAnswerRelay', {
+    const answerPayload = {
       answer: data.answer,
       from: session.nickname,
-    });
+      receiverName: session.nickname,
+    };
+    client.to(data.passcode).emit('webrtcAnswerRelay', answerPayload);
+    client.to(data.passcode).emit('webrtcAnswer', answerPayload);
   }
-
 
   @SubscribeMessage('webrtcCandidate')
   webrtcCandidate(
@@ -799,9 +804,9 @@ export class ChatGateway
     console.log(
       `[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${data.passcode}`,
     );
-    client.to(data.passcode).emit('webrtcCandidateRelay', {
-      candidate: data.candidate,
-    });
+    const candidatePayload = { candidate: data.candidate };
+    client.to(data.passcode).emit('webrtcCandidateRelay', candidatePayload);
+    client.to(data.passcode).emit('webrtcCandidate', candidatePayload);
   }
 
   @SubscribeMessage('endCall')
@@ -811,6 +816,7 @@ export class ChatGateway
 
     console.log(`[EndCall] Relaying endCall in room: ${data.passcode}`);
     client.to(data.passcode).emit('callEnded');
+    client.to(data.passcode).emit('endCall');
   }
 
   @SubscribeMessage('togglePip')

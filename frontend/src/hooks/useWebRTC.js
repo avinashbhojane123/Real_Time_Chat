@@ -247,19 +247,23 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     const socket = socketRef.current;
     if (!socket) return;
 
-    const handleCallUser = ({ callerName: cName }) => {
+    const handleCallUser = ({ callerName: cName, from }) => {
       if (Date.now() - lastCallEndedAtRef.current < 2500) return;
-      setCallerName(cName || 'Participant');
+      setCallerName(cName || from || 'Participant');
       updateCallState('incoming');
       setShowVideoPanel(true);
     };
 
-    const handleWebrtcOffer = async ({ offer, callerName: cName }) => {
+    const handleCallAccepted = () => {
+      updateCallState('active');
+    };
+
+    const handleWebrtcOffer = async ({ offer, callerName: cName, from }) => {
       if (Date.now() - lastCallEndedAtRef.current < 2500) return;
       latestOfferRef.current = offer;
 
       if (callStateRef.current === 'idle') {
-        setCallerName(cName || 'Participant');
+        setCallerName(cName || from || 'Participant');
         updateCallState('incoming');
         setShowVideoPanel(true);
       } else if (callStateRef.current === 'active') {
@@ -304,18 +308,30 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     socket.on('callUser', handleCallUser);
+    socket.on('userCalling', handleCallUser);
+    socket.on('acceptCall', handleCallAccepted);
+    socket.on('callAccepted', handleCallAccepted);
     socket.on('webrtcOffer', handleWebrtcOffer);
+    socket.on('webrtcOfferRelay', handleWebrtcOffer);
     socket.on('webrtcAnswer', handleWebrtcAnswer);
+    socket.on('webrtcAnswerRelay', handleWebrtcAnswer);
     socket.on('webrtcCandidate', handleWebrtcCandidate);
+    socket.on('webrtcCandidateRelay', handleWebrtcCandidate);
     socket.on('callEnded', handleCallEnd);
     socket.on('endCall', handleCallEnd);
     socket.on('callDeclined', handleCallDeclined);
 
     return () => {
       socket.off('callUser', handleCallUser);
+      socket.off('userCalling', handleCallUser);
+      socket.off('acceptCall', handleCallAccepted);
+      socket.off('callAccepted', handleCallAccepted);
       socket.off('webrtcOffer', handleWebrtcOffer);
+      socket.off('webrtcOfferRelay', handleWebrtcOffer);
       socket.off('webrtcAnswer', handleWebrtcAnswer);
+      socket.off('webrtcAnswerRelay', handleWebrtcAnswer);
       socket.off('webrtcCandidate', handleWebrtcCandidate);
+      socket.off('webrtcCandidateRelay', handleWebrtcCandidate);
       socket.off('callEnded', handleCallEnd);
       socket.off('endCall', handleCallEnd);
       socket.off('callDeclined', handleCallDeclined);
@@ -349,6 +365,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
   const acceptCall = async () => {
     updateCallState('active');
+    socketRef.current?.emit('acceptCall', { passcode });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
