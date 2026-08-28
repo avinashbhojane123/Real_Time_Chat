@@ -151,7 +151,8 @@ export default function ChatMessagesFeed({
       className="wa-doodle-wallpaper wa-feed-container"
     >
       <div className="wa-feed-inner">
-      {visibleMessages.length === 0 ? (
+        <div style={{ marginTop: 'auto' }} />
+        {visibleMessages.length === 0 ? (
         <div style={{ margin: 'auto', textAlign: 'center', color: '#8696a0', padding: '32px 16px', maxWidth: '380px' }}>
           <div
             style={{

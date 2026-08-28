@@ -99,7 +99,7 @@ export default function ChatRoster({
 
   return (
     <>
-      {!showRosterPanel && showRailSidebar && (
+      {showRailSidebar && (
         <aside
         style={{
           width: '60px',
@@ -324,26 +324,50 @@ export default function ChatRoster({
           </span>
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.15, rotate: 90 }}
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          onClick={() => setShowRosterPanel(false)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#8696a0',
-            cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          title="Close Panel"
-        >
-          <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
-        </motion.button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => setShowStatusDrawer(true)}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(37, 211, 102, 0.15)',
+              border: '1px solid rgba(37, 211, 102, 0.35)',
+              color: '#25d366',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Status Updates"
+          >
+            <Icon icon="solar:play-circle-bold-duotone" width="18" height="18" />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.15, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            type="button"
+            onClick={() => setShowRosterPanel(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#8696a0',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Close Panel"
+          >
+            <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
+          </motion.button>
+        </div>
       </div>
 
       {/* Tab Selector Bar */}
