@@ -643,20 +643,6 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTogglePinMessage(msg);
-                              setActiveMenuMsgId(null);
-                            }}
-                            style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
-                            className="hover:bg-[#182229]"
-                          >
-                            <Icon icon="solar:pin-bold-duotone" width="20" height="20" style={{ color: '#8696a0' }} />
-                            <span>{pinnedMessage?.id === msg.id ? 'Unpin' : 'Pin'}</span>
-                          </button>
 
                           {isMe && (
                             <button
