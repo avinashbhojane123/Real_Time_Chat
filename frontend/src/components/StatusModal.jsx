@@ -213,6 +213,25 @@ export default function StatusModal({
     return null;
   };
 
+  // Helper to format status creation timestamp
+  const formatStatusTime = (st) => {
+    const timeVal = st?.createdAt || st?.timestamp;
+    if (!timeVal) return 'Just now';
+    const date = new Date(timeVal);
+    if (isNaN(date.getTime())) return String(timeVal);
+
+    const now = new Date();
+    const diffMs = Math.max(0, now.getTime() - date.getTime());
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -273,7 +292,7 @@ export default function StatusModal({
                 ))}
               </div>
 
-              {/* Header: User Info, Add Status Button & Close Button */}
+              {/* Header: User Info, Pause Button, Add Status Button & Close Button */}
               <div style={{ position: 'absolute', top: 24, left: 16, right: 16, zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#fff' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, overflow: 'hidden', fontSize: '0.9rem' }}>
@@ -287,13 +306,37 @@ export default function StatusModal({
                     <div style={{ fontWeight: 700, fontSize: '0.92rem', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
                       {currentStatus.nickname} {isMyStatus ? '(You)' : ''}
                     </div>
-                    <div style={{ fontSize: '0.72rem', opacity: 0.8, textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-                      {currentStatus.timestamp || 'Just now'}
+                    <div style={{ fontSize: '0.72rem', opacity: 0.85, textShadow: '0 1px 3px rgba(0,0,0,0.8)', fontWeight: 600 }}>
+                      {formatStatusTime(currentStatus)}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Pause / Play Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsPaused((prev) => !prev)}
+                    title={isPaused ? 'Resume Story Playback' : 'Pause Story Playback'}
+                    style={{
+                      background: isPaused ? 'rgba(0, 168, 132, 0.3)' : 'rgba(0,0,0,0.4)',
+                      border: isPaused ? '1px solid #00a884' : 'none',
+                      color: isPaused ? '#00a884' : '#fff',
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                      {isPaused ? 'play_arrow' : 'pause'}
+                    </span>
+                  </button>
+
                   {/* Header "+ Add Status" Action Button */}
                   <motion.button
                     whileHover={{ scale: 1.06 }}
@@ -340,6 +383,38 @@ export default function StatusModal({
                 onTouchStart={() => setIsPaused(true)}
                 onTouchEnd={() => setIsPaused(false)}
               >
+                {/* PAUSED Badge Indicator */}
+                {isPaused && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                      position: 'absolute',
+                      top: '74px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                      color: '#00a884',
+                      border: '1px solid rgba(0, 168, 132, 0.5)',
+                      padding: '4px 14px',
+                      borderRadius: '16px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      letterSpacing: '1px',
+                      zIndex: 25,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      pointerEvents: 'none',
+                      backdropFilter: 'blur(4px)',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>pause</span>
+                    <span>PAUSED</span>
+                  </motion.div>
+                )}
+
                 {currentStatus.type === 'text' && (
                   <div style={{ textAlign: 'center', color: '#fff', fontSize: '1.4rem', fontWeight: 700, lineHeight: 1.4, padding: '20px', wordBreak: 'break-word', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
                     {currentStatus.content}
@@ -459,6 +534,70 @@ export default function StatusModal({
                   </form>
                 )}
               </div>
+
+              {/* Viewers List Overlay / Drawer */}
+              <AnimatePresence>
+                {showViewers && (
+                  <motion.div
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      backgroundColor: '#111b21',
+                      borderTopLeftRadius: '16px',
+                      borderTopRightRadius: '16px',
+                      borderTop: '1px solid rgba(134, 150, 160, 0.2)',
+                      boxShadow: '0 -10px 30px rgba(0,0,0,0.8)',
+                      zIndex: 50,
+                      maxHeight: '60%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(134, 150, 160, 0.15)', backgroundColor: '#202c33' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e9edef', fontWeight: 700, fontSize: '0.9rem' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#00a884' }}>visibility</span>
+                        <span>Viewed by ({currentStatus.viewedBy ? currentStatus.viewedBy.length : 0})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowViewers(false)}
+                        style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>close</span>
+                      </button>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {currentStatus.viewedBy && currentStatus.viewedBy.length > 0 ? (
+                        currentStatus.viewedBy.map((viewer, idx) => {
+                          const viewerName = typeof viewer === 'string' ? viewer : viewer.nickname || 'Contact';
+                          return (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 8px', borderRadius: '8px', backgroundColor: '#1d272d' }}>
+                              <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: '#00a884', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.82rem' }}>
+                                {viewerName.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#e9edef' }}>{viewerName}</div>
+                                <div style={{ fontSize: '0.72rem', color: '#00a884' }}>Viewed story</div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div style={{ padding: '24px', textAlign: 'center', color: '#8696a0', fontSize: '0.85rem' }}>
+                          No views on this status story yet.
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Reply Toast Overlay */}
               {replySentToast && (
