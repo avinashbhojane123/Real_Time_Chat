@@ -389,9 +389,25 @@ const ChatHeader = memo(function ChatHeader({
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             style={{ backgroundColor: '#182229', borderBottom: '1px solid #00a884', padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, overflow: 'hidden' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-              <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#00a884' }} />
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00a884' }}>{pinnedMessage.nickname}:</span>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', cursor: 'pointer', flex: 1 }}
+              onClick={() => {
+                const el = document.getElementById(`msg-item-${pinnedMessage.id}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  const bubble = el.querySelector('.wa-bubble-box');
+                  if (bubble) {
+                    bubble.classList.remove('msg-jump-highlight');
+                    void bubble.offsetWidth;
+                    bubble.classList.add('msg-jump-highlight');
+                    setTimeout(() => bubble.classList.remove('msg-jump-highlight'), 2200);
+                  }
+                }
+              }}
+              title="Click to jump to pinned message"
+            >
+              <Icon icon="solar:pin-bold-duotone" width="18" height="18" style={{ color: '#00a884', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00a884', flexShrink: 0 }}>{pinnedMessage.nickname}:</span>
               <span style={{ fontSize: '0.8rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {pinnedMessage.message}
               </span>

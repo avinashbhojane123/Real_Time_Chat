@@ -120,6 +120,58 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
   const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
   const prevMessagesLengthRef = useRef(filteredMessages.length);
+  const [highlightedMsgId, setHighlightedMsgId] = useState(null);
+  const messageRefs = useRef({});
+
+  // Jump to referenced / replied message with smooth scroll & highlight animation
+  const handleJumpToMessage = (replyTarget) => {
+    if (!replyTarget) return;
+
+    if (replyTarget.isStatus) {
+      if (showToast) showToast(`Replying to ${replyTarget.nickname}'s status story`);
+      return;
+    }
+
+    // 1. Locate message ID from replyTarget
+    let targetId = replyTarget.id ?? replyTarget.messageId;
+
+    // 2. If no ID, search visible messages by content & nickname match
+    if (!targetId && replyTarget.message) {
+      const found = visibleMessages.find(
+        (m) =>
+          m.message &&
+          m.message.trim() === replyTarget.message.trim() &&
+          (!replyTarget.nickname || m.nickname === replyTarget.nickname)
+      );
+      if (found) targetId = found.id;
+    }
+
+    if (!targetId) {
+      if (showToast) showToast('Original message could not be located in this chat');
+      return;
+    }
+
+    const targetEl =
+      document.getElementById(`msg-item-${targetId}`) ||
+      messageRefs.current[targetId] ||
+      messageRefs.current[String(targetId)];
+
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(targetId);
+
+      setTimeout(() => {
+        setHighlightedMsgId((curr) => (String(curr) === String(targetId) ? null : curr));
+      }, 2200);
+    } else {
+      const existsInHistory = visibleMessages.some((m) => String(m.id) === String(targetId));
+      if (existsInHistory) {
+        setHighlightedMsgId(targetId);
+      } else {
+        if (showToast) showToast('Original message may have been deleted or expired');
+      }
+    }
+  };
 
   // Scroll listener to toggle showScrollToBottom & clear unreadCount when scrolled to bottom
   useEffect(() => {
@@ -269,6 +321,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
                   {/* Message Bubble Item */}
                   <div
+                    id={`msg-item-${msg.id}`}
+                    ref={(el) => {
+                      if (el) messageRefs.current[msg.id] = el;
+                    }}
                     style={{
                       display: 'flex',
                       width: '100%',
@@ -311,7 +367,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
                     {/* Feature 1 & 6: M3 Asymmetrical Bubbles & Contextual Selection Highlight Surface */}
                     <div
-                      className={`wa-bubble-box ${isMe ? 'wa-bubble-out' : 'wa-bubble-in'} ${activeMenuMsgId === msg.id ? 'm3-selected-surface' : ''} group`}
+                      className={`wa-bubble-box ${isMe ? 'wa-bubble-out' : 'wa-bubble-in'} ${activeMenuMsgId === msg.id ? 'm3-selected-surface' : ''} ${highlightedMsgId === msg.id || String(highlightedMsgId) === String(msg.id) ? 'msg-jump-highlight' : ''} group`}
                       style={{
                         transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
                         transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
@@ -326,7 +382,15 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
                       {/* Feature 3 (Set 2): M3 Quoted Reply Sub-Card */}
                       {msg.replyTo && (
-                        <div className="wa-quote-box m3-quote-card" style={{ position: 'relative', overflow: 'hidden' }}>
+                        <div
+                          className="wa-quote-box m3-quote-card"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJumpToMessage(msg.replyTo);
+                          }}
+                          style={{ position: 'relative', overflow: 'hidden', cursor: 'pointer' }}
+                          title="Click to jump to original message"
+                        >
                           {msg.replyTo.isStatus ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {msg.replyTo.statusMediaUrl ? (
