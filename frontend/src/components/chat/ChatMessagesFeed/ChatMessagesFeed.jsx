@@ -70,22 +70,28 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     return /\.(jpg|jpeg|png|gif|webp|svg|avif|heic|bmp)($|\?)/i.test(target) || msg.fileUrl.startsWith('data:image/');
   };
 
+  const isAudioFile = (msg) => {
+    if (!msg?.fileUrl) return false;
+    if (msg.fileType && msg.fileType.startsWith('audio/')) return true;
+    if (msg.isVoiceNote) return true;
+    const target = `${msg.fileUrl} ${msg.fileName || ''} ${msg.message || ''}`.toLowerCase();
+    if (target.includes('voicenote') || target.includes('voice note')) return true;
+    return /\.(mp3|wav|ogg|aac|m4a|flac|weba)($|\?)/i.test(target);
+  };
+
   const isVideoFile = (msg) => {
     if (!msg?.fileUrl) return false;
+    // An audio file or voice note must never be treated as a video file
+    if (isAudioFile(msg)) return false;
     if (msg.fileType && msg.fileType.startsWith('video/')) return true;
+    if (msg.isVideoNote) return true;
     const target = `${msg.fileUrl} ${msg.fileName || ''}`.toLowerCase();
     return /\.(mp4|webm|mov|m4v|mkv|avi)($|\?)/i.test(target);
   };
 
-  const isAudioFile = (msg) => {
-    if (!msg?.fileUrl) return false;
-    if (msg.fileType && msg.fileType.startsWith('audio/')) return true;
-    const target = `${msg.fileUrl} ${msg.fileName || ''}`.toLowerCase();
-    return /\.(mp3|wav|ogg|aac|m4a|flac)($|\?)/i.test(target);
-  };
-
   const isVideoNote = (msg) => {
     if (!msg?.fileUrl) return false;
+    if (isAudioFile(msg)) return false;
     if (msg.isVideoNote) return true;
     const target = `${msg.fileUrl} ${msg.fileName || ''} ${msg.message || ''}`.toLowerCase();
     return (target.includes('videonote') || target.includes('video note')) && isVideoFile(msg);
