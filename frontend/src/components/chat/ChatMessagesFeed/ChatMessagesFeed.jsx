@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import AnimatedMessageBubble from '../../animated/AnimatedMessageBubble';
@@ -171,6 +171,75 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
         if (showToast) showToast('Original message may have been deleted or expired');
       }
     }
+  };
+
+  // Jump to mentioned user's message in the feed
+  const handleJumpToMention = (mentionName, currentMsgId) => {
+    if (!mentionName) return;
+    const cleanMention = mentionName.replace(/^@/, '').trim().toLowerCase();
+
+    // Look for the most relevant message from this user (excluding the current msg if it's their own)
+    const candidates = visibleMessages.filter(
+      (m) =>
+        m.nickname &&
+        m.nickname.trim().toLowerCase() === cleanMention &&
+        String(m.id) !== String(currentMsgId)
+    );
+
+    const targetMsg = candidates.length > 0 ? candidates[candidates.length - 1] : visibleMessages.find(
+      (m) => m.nickname && m.nickname.trim().toLowerCase() === cleanMention
+    );
+
+    if (targetMsg) {
+      const targetEl =
+        document.getElementById(`msg-item-${targetMsg.id}`) ||
+        messageRefs.current[targetMsg.id] ||
+        messageRefs.current[String(targetMsg.id)];
+
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedMsgId(targetMsg.id);
+        setTimeout(() => {
+          setHighlightedMsgId((curr) => (String(curr) === String(targetMsg.id) ? null : curr));
+        }, 2200);
+        if (showToast) showToast(`Jumped to @${targetMsg.nickname}'s message`);
+      } else {
+        if (showToast) showToast(`Original message from @${targetMsg.nickname} is not visible`);
+      }
+    } else {
+      if (showToast) showToast(`No messages from @${mentionName} found in current session`);
+    }
+  };
+
+  const renderFormattedMessageText = (text, msgId) => {
+    if (!text || typeof text !== 'string') return null;
+
+    // Match @word patterns (supports letters, numbers, underscores)
+    const parts = text.split(/(@[a-zA-Z0-9_\-\.]+)/g);
+
+    return (
+      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {parts.map((part, pIdx) => {
+          if (part.startsWith('@') && part.length > 1) {
+            const rawNick = part.slice(1);
+            return (
+              <span
+                key={pIdx}
+                className="chat-mention-tag"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleJumpToMention(rawNick, msgId);
+                }}
+                title={`Click to jump to @${rawNick}'s message`}
+              >
+                {part}
+              </span>
+            );
+          }
+          return part;
+        })}
+      </div>
+    );
   };
 
   // Scroll listener to toggle showScrollToBottom & clear unreadCount when scrolled to bottom
@@ -436,7 +505,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
                       {/* Message Content */}
                       <div>
-                        {msg.message && <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>}
+                        {msg.message && renderFormattedMessageText(msg.message, msg.id)}
 
                         {/* Image Attachment Preview with M3 Media Card & Lightbox */}
                         {isImageFile(msg) && (

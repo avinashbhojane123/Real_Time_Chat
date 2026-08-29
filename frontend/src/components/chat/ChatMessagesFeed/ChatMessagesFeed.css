@@ -130,6 +130,30 @@
   z-index: 20 !important;
 }
 
+/* Feature: Clickable Interactive @Mention Tags */
+.chat-mention-tag {
+  color: #53bdeb;
+  background-color: rgba(83, 189, 235, 0.15);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-block;
+  transition: background-color 0.15s ease, transform 0.1s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.chat-mention-tag:hover {
+  background-color: rgba(83, 189, 235, 0.32);
+  color: #70cfff;
+  text-decoration: underline;
+  transform: scale(1.05);
+}
+
+.chat-mention-tag:active {
+  transform: scale(0.96);
+}
+
 /* Feature 2 (Set 2): M3 Undo Snackbar with Action Button */
 .m3-snackbar {
   position: fixed;
