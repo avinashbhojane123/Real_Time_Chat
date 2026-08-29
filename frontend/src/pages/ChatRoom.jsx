@@ -143,44 +143,20 @@ export default function ChatRoom() {
   // Voice & Video Notes Recording State
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recDuration, setRecDuration] = useState(0);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
   const audioStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recTimerRef = useRef(null);
-  const isAudioMutedRef = useRef(false);
 
   // Video Notes Recording State
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [videoWithoutSound, setVideoWithoutSound] = useState(false);
 
   // Voice Recording Functions
-  const toggleAudioMute = () => {
-    setIsAudioMuted((prev) => {
-      const nextVal = !prev;
-      isAudioMutedRef.current = nextVal;
-      if (audioStreamRef.current) {
-        audioStreamRef.current.getAudioTracks().forEach((track) => {
-          track.enabled = !nextVal;
-        });
-      }
-      showToast(nextVal ? 'Voice note muted (Without Sound)' : 'Voice note unmuted');
-      return nextVal;
-    });
-  };
-
-  const startRecording = async ({ withoutSound = false } = {}) => {
+  const startRecording = async () => {
     try {
-      setIsAudioMuted(withoutSound);
-      isAudioMutedRef.current = withoutSound;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-
-      if (withoutSound) {
-        stream.getAudioTracks().forEach((track) => {
-          track.enabled = false;
-        });
-      }
 
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
@@ -200,16 +176,14 @@ export default function ChatRoom() {
             const res = await (await fetch(`${cleanApiUrl}/upload`, { method: 'POST', body: formData })).json();
 
             if (res && res.fileUrl) {
-              const wasMuted = isAudioMutedRef.current;
               const payload = {
                 passcode,
                 nickname,
-                message: wasMuted ? '🎤 Voice Note (Without Sound)' : '🎤 Voice Note',
+                message: '🎤 Voice Note',
                 fileUrl: res.fileUrl,
-                fileName: wasMuted ? 'Voice Note (Without Sound).webm' : 'Voice Note.webm',
+                fileName: 'Voice Note.webm',
                 fileType: 'audio/webm',
                 isVoiceNote: true,
-                isWithoutSound: Boolean(wasMuted),
                 expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
               };
               socketRef.current?.emit('sendMessage', payload);
@@ -666,8 +640,6 @@ export default function ChatRoom() {
           handleSendMessage={handleSendMessage}
           isRecordingAudio={isRecordingAudio}
           recDuration={recDuration}
-          isAudioMuted={isAudioMuted}
-          toggleAudioMute={toggleAudioMute}
           startRecording={startRecording}
           stopRecording={stopRecording}
           cancelRecording={cancelRecording}

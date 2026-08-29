@@ -44,7 +44,7 @@ const ChatInputBar = memo(function ChatInputBar({
   formatTimer,
   showToast,
 }) {
-  // Active Record Mode: 'voice' | 'voice_muted' | 'video' | 'video_muted'
+  // Active Record Mode: 'voice' | 'video' | 'video_muted'
   const [recordMode, setRecordMode] = useState('voice');
   const [showRecordMenu, setShowRecordMenu] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
@@ -72,9 +72,7 @@ const ChatInputBar = memo(function ChatInputBar({
   const handleStartActiveRecord = (mode = recordMode) => {
     setShowRecordMenu(false);
     if (mode === 'voice') {
-      startRecording({ withoutSound: false });
-    } else if (mode === 'voice_muted') {
-      startRecording({ withoutSound: true });
+      startRecording();
     } else if (mode === 'video') {
       startVideoRecording({ withoutSound: false });
     } else if (mode === 'video_muted') {
@@ -84,8 +82,6 @@ const ChatInputBar = memo(function ChatInputBar({
 
   const getModeLabel = (mode) => {
     switch (mode) {
-      case 'voice_muted':
-        return 'Voice Note (Without Sound)';
       case 'video':
         return 'Video Note';
       case 'video_muted':
@@ -98,7 +94,7 @@ const ChatInputBar = memo(function ChatInputBar({
 
   // Cycle to next mode on short tap
   const handleCycleMode = () => {
-    const modes = ['voice', 'video', 'video_muted', 'voice_muted'];
+    const modes = ['voice', 'video', 'video_muted'];
     const nextIdx = (modes.indexOf(recordMode) + 1) % modes.length;
     const nextMode = modes[nextIdx];
     setRecordMode(nextMode);
@@ -168,8 +164,6 @@ const ChatInputBar = memo(function ChatInputBar({
   // Get current record button icon and title
   const getRecordButtonMeta = () => {
     switch (recordMode) {
-      case 'voice_muted':
-        return { icon: 'mic_off', title: 'Hold to Record Voice Note (Without Sound)', color: '#ff9800' };
       case 'video':
         return { icon: 'videocam', title: 'Hold to Record Video Note', color: '#00a884' };
       case 'video_muted':
@@ -310,32 +304,16 @@ const ChatInputBar = memo(function ChatInputBar({
         {isRecordingAudio ? (
           /* Live Voice Recording UI Bar */
           <div className="audio-rec-bar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isAudioMuted ? '#ff9800' : '#ff2e74' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ff2e74' }}>
               <span className="material-symbols-outlined animate-pulse" style={{ fontSize: '20px' }}>
-                {isAudioMuted ? 'mic_off' : 'mic'}
+                mic
               </span>
               <span style={{ fontSize: '0.86rem', fontWeight: 700 }}>
-                {isAudioMuted ? 'Recording (Silent)... ' : 'Recording... '}
-                {formatTimer(recDuration)}
+                Recording... {formatTimer(recDuration)}
               </span>
             </div>
 
             <div style={{ flex: 1 }} />
-
-            {/* Live Audio Mute Toggle Button */}
-            {toggleAudioMute && (
-              <button
-                type="button"
-                className={`audio-rec-sound-btn ${isAudioMuted ? 'is-muted' : ''}`}
-                onClick={toggleAudioMute}
-                title={isAudioMuted ? 'Unmute Sound' : 'Mute Sound (Without Sound)'}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                  {isAudioMuted ? 'volume_off' : 'volume_up'}
-                </span>
-                <span>{isAudioMuted ? 'Without Sound' : 'Sound ON'}</span>
-              </button>
-            )}
 
             {/* Discard Audio Button */}
             <button
@@ -428,7 +406,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     />
                   </label>
 
-                  {/* 2. Voice Note (With Sound) */}
+                  {/* 2. Voice Note */}
                   <button
                     type="button"
                     onClick={() => {
@@ -439,24 +417,10 @@ const ChatInputBar = memo(function ChatInputBar({
                     className="hover:bg-[#182229]"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#00a884' }}>mic</span>
-                    <span>Voice Note (With Sound)</span>
+                    <span>Voice Note</span>
                   </button>
 
-                  {/* 3. Voice Note (Without Sound) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowActionMenu(false);
-                      handleSelectMode('voice_muted');
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff9800' }}>mic_off</span>
-                    <span>Voice Note (Without Sound)</span>
-                  </button>
-
-                  {/* 4. Video Note (With Sound) */}
+                  {/* 3. Video Note (With Sound) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -470,7 +434,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     <span>Video Note (With Sound)</span>
                   </button>
 
-                  {/* 5. Video Note (Without Sound) */}
+                  {/* 4. Video Note (Without Sound) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -486,7 +450,7 @@ const ChatInputBar = memo(function ChatInputBar({
 
                   <div style={{ height: '1px', backgroundColor: 'rgba(134, 150, 160, 0.15)', margin: '4px 0' }} />
 
-                  {/* 6. Create Live Poll */}
+                  {/* 5. Create Live Poll */}
                   <button
                     type="button"
                     onClick={() => {
@@ -500,7 +464,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     <span>Create Poll</span>
                   </button>
 
-                  {/* 7. Share Location */}
+                  {/* 6. Share Location */}
                   <button
                     type="button"
                     onClick={() => {
@@ -514,7 +478,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     <span>Share Location</span>
                   </button>
 
-                  {/* 8. Disappearing Messages */}
+                  {/* 7. Disappearing Messages */}
                   <button
                     type="button"
                     onClick={() => {
@@ -645,7 +609,7 @@ const ChatInputBar = memo(function ChatInputBar({
                   <div className="rec-mode-menu animate-fade-in">
                     <div className="rec-mode-menu-header">Recording Options</div>
 
-                    {/* 1. Voice Note (With Sound) */}
+                    {/* 1. Voice Note */}
                     <button
                       type="button"
                       className={`rec-mode-option ${recordMode === 'voice' ? 'active' : ''}`}
@@ -660,22 +624,7 @@ const ChatInputBar = memo(function ChatInputBar({
                       </div>
                     </button>
 
-                    {/* 2. Voice Note (Without Sound) */}
-                    <button
-                      type="button"
-                      className={`rec-mode-option ${recordMode === 'voice_muted' ? 'active' : ''}`}
-                      onClick={() => handleSelectMode('voice_muted')}
-                    >
-                      <div className="rec-mode-option-icon-box" style={{ color: '#ff9800' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>mic_off</span>
-                      </div>
-                      <div className="rec-mode-option-text">
-                        <span className="rec-mode-option-title">Voice Note (Silent)</span>
-                        <span className="rec-mode-option-desc">Without sound</span>
-                      </div>
-                    </button>
-
-                    {/* 3. Video Note (With Sound) */}
+                    {/* 2. Video Note (With Sound) */}
                     <button
                       type="button"
                       className={`rec-mode-option ${recordMode === 'video' ? 'active' : ''}`}
@@ -690,7 +639,7 @@ const ChatInputBar = memo(function ChatInputBar({
                       </div>
                     </button>
 
-                    {/* 4. Video Note (Without Sound) */}
+                    {/* 3. Video Note (Without Sound) */}
                     <button
                       type="button"
                       className={`rec-mode-option ${recordMode === 'video_muted' ? 'active' : ''}`}

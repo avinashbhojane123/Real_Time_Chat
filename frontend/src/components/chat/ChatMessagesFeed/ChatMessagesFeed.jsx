@@ -450,17 +450,9 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
                         {/* Audio Voice Note Player */}
                         {isAudioFile(msg) && (
-                          <div className="m3-media-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', minWidth: '220px', borderRadius: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Icon icon={isWithoutSound(msg) ? "solar:volume-cross-bold-duotone" : "solar:volume-loud-bold-duotone"} width="22" height="22" style={{ color: isWithoutSound(msg) ? '#ff9800' : '#00a884' }} />
-                              <audio controls controlsList="nodownload" src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
-                            </div>
-                            {isWithoutSound(msg) && (
-                              <div className="vn-audio-silent-badge">
-                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>volume_off</span>
-                                <span>Without Sound (Silent Voice Note)</span>
-                              </div>
-                            )}
+                          <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px', borderRadius: '12px' }}>
+                            <Icon icon="solar:volume-loud-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
+                            <audio controls controlsList="nodownload" src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
                           </div>
                         )}
 
