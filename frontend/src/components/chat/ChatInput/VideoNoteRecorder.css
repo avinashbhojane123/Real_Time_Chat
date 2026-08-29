@@ -1,0 +1,277 @@
+/* Video Note Recorder Overlay Backdrop */
+.vn-recorder-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(11, 20, 26, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Floating Recorder Card */
+.vn-recorder-card {
+  position: relative;
+  background: linear-gradient(145deg, #1f2c34 0%, #111b21 100%);
+  border: 1px solid rgba(134, 150, 160, 0.25);
+  border-radius: 28px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 168, 132, 0.15);
+  max-width: 380px;
+  width: 100%;
+}
+
+/* Header with timer and status */
+.vn-recorder-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.vn-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(0, 0, 0, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+}
+
+.vn-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ff3b30;
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.8);
+  animation: vnPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes vnPulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+}
+
+.vn-timer-text {
+  font-family: monospace, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.vn-max-tag {
+  font-size: 0.72rem;
+  color: #8696a0;
+}
+
+.vn-mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background-color: rgba(0, 168, 132, 0.15);
+  color: #00a884;
+  border: 1px solid rgba(0, 168, 132, 0.3);
+  transition: all 0.2s ease;
+}
+
+.vn-mode-badge.is-muted {
+  background-color: rgba(255, 152, 0, 0.15);
+  color: #ff9800;
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+/* Viewport circular mask */
+.vn-viewport-wrapper {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vn-circular-viewport {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #000000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vn-video-element {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.vn-mirror {
+  transform: scaleX(-1);
+}
+
+.vn-pulse-border {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #00a884;
+  pointer-events: none;
+  animation: vnRingPulse 2s infinite ease-out;
+}
+
+@keyframes vnRingPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 168, 132, 0.6);
+    border-color: #00a884;
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(0, 168, 132, 0);
+    border-color: #00d2a0;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 168, 132, 0);
+    border-color: #00a884;
+  }
+}
+
+.vn-error-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(17, 27, 33, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: #e9edef;
+  font-size: 0.82rem;
+  gap: 8px;
+}
+
+/* Controls Bar */
+.vn-controls-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding-top: 4px;
+  gap: 12px;
+}
+
+.vn-btn {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #e9edef;
+  padding: 8px 12px;
+  border-radius: 16px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.vn-btn-sublabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  opacity: 0.85;
+}
+
+.vn-btn-discard {
+  color: #ff5252;
+  background-color: rgba(255, 82, 82, 0.12);
+}
+
+.vn-btn-discard:hover {
+  background-color: rgba(255, 82, 82, 0.25);
+  transform: scale(1.05);
+}
+
+.vn-btn-sound {
+  color: #00a884;
+  background-color: rgba(0, 168, 132, 0.12);
+  min-width: 62px;
+}
+
+.vn-btn-sound:hover {
+  background-color: rgba(0, 168, 132, 0.25);
+  transform: scale(1.05);
+}
+
+.vn-btn-sound.is-muted {
+  color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.15);
+}
+
+.vn-btn-sound.is-muted:hover {
+  background-color: rgba(255, 152, 0, 0.28);
+}
+
+.vn-btn-flip {
+  color: #8696a0;
+  background-color: rgba(134, 150, 160, 0.12);
+  min-width: 62px;
+}
+
+.vn-btn-flip:hover {
+  color: #e9edef;
+  background-color: rgba(134, 150, 160, 0.22);
+  transform: scale(1.05);
+}
+
+.vn-btn-send {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00a884 0%, #008f6f 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(0, 168, 132, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.vn-btn-send:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(0, 168, 132, 0.7);
+}
+
+.vn-btn-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}

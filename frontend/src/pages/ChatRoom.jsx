@@ -140,12 +140,162 @@ export default function ChatRoom() {
     showToast(`Applied ${THEMES.find((t) => t.key === themeKey)?.name || themeKey} theme`);
   };
 
-  // Voice Notes Audio Recording
+  // Voice & Video Notes Recording State
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recDuration, setRecDuration] = useState(0);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const audioStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recTimerRef = useRef(null);
+  const isAudioMutedRef = useRef(false);
+
+  // Video Notes Recording State
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [videoWithoutSound, setVideoWithoutSound] = useState(false);
+
+  // Voice Recording Functions
+  const toggleAudioMute = () => {
+    setIsAudioMuted((prev) => {
+      const nextVal = !prev;
+      isAudioMutedRef.current = nextVal;
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getAudioTracks().forEach((track) => {
+          track.enabled = !nextVal;
+        });
+      }
+      showToast(nextVal ? 'Voice note muted (Without Sound)' : 'Voice note unmuted');
+      return nextVal;
+    });
+  };
+
+  const startRecording = async ({ withoutSound = false } = {}) => {
+    try {
+      setIsAudioMuted(withoutSound);
+      isAudioMutedRef.current = withoutSound;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      if (withoutSound) {
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = false;
+        });
+      }
+
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioBlob.size > 0 && audioChunksRef.current.length > 0) {
+          showToast('Uploading voice note...');
+          try {
+            const formData = new FormData();
+            formData.append('file', audioBlob, `voicenote-${Date.now()}.webm`);
+            const cleanApiUrl = baseUrl.trim().replace(/\/+$/, '');
+            const res = await (await fetch(`${cleanApiUrl}/upload`, { method: 'POST', body: formData })).json();
+
+            if (res && res.fileUrl) {
+              const wasMuted = isAudioMutedRef.current;
+              const payload = {
+                passcode,
+                nickname,
+                message: wasMuted ? '🎤 Voice Note (Without Sound)' : '🎤 Voice Note',
+                fileUrl: res.fileUrl,
+                fileName: wasMuted ? 'Voice Note (Without Sound).webm' : 'Voice Note.webm',
+                fileType: 'audio/webm',
+                isVoiceNote: true,
+                isWithoutSound: Boolean(wasMuted),
+                expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+              };
+              socketRef.current?.emit('sendMessage', payload);
+              showToast('Voice note sent!');
+            }
+          } catch (err) {
+            showToast('Failed to send voice note');
+          }
+        }
+        stream.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecordingAudio(true);
+      setRecDuration(0);
+      recTimerRef.current = setInterval(() => setRecDuration((prev) => prev + 1), 1000);
+    } catch (err) {
+      alert('Could not access microphone for voice note: ' + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecordingAudio) {
+      mediaRecorderRef.current.stop();
+      setIsRecordingAudio(false);
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecordingAudio) {
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.stop();
+      setIsRecordingAudio(false);
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
+      showToast('Voice note cancelled');
+    }
+  };
+
+  // Video Note Recording Functions
+  const startVideoRecording = ({ withoutSound = false } = {}) => {
+    setVideoWithoutSound(withoutSound);
+    setIsRecordingVideo(true);
+  };
+
+  const closeVideoRecording = () => {
+    setIsRecordingVideo(false);
+  };
+
+  const handleSendVideoNote = async ({ blob, duration, withoutSound, mimeType }) => {
+    if (!blob || blob.size === 0) return;
+    showToast('Uploading video note...');
+    try {
+      const ext = mimeType && mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const formData = new FormData();
+      formData.append('file', blob, `videonote-${Date.now()}.${ext}`);
+      const cleanApiUrl = baseUrl.trim().replace(/\/+$/, '');
+      const res = await (await fetch(`${cleanApiUrl}/upload`, { method: 'POST', body: formData })).json();
+
+      if (res && res.fileUrl) {
+        const payload = {
+          passcode,
+          nickname,
+          message: withoutSound ? '📹 Video Note (Without Sound)' : '📹 Video Note',
+          fileUrl: res.fileUrl,
+          fileName: withoutSound ? `Video Note (Without Sound).${ext}` : `Video Note.${ext}`,
+          fileType: mimeType || 'video/webm',
+          isVideoNote: true,
+          isWithoutSound: Boolean(withoutSound),
+          duration: duration || 0,
+          expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
+        };
+
+        socketRef.current?.emit('sendMessage', payload);
+        showToast('Video note sent!');
+      }
+    } catch (err) {
+      console.error('Failed to send video note:', err);
+      showToast('Failed to send video note');
+    }
+  };
 
   // Disappearing Messages & Polls
   const [disappearingTimer, setDisappearingTimer] = useState(0);
@@ -281,73 +431,7 @@ export default function ChatRoom() {
     setShowCustomReactionForMsgId(null);
   };
 
-  // Voice Recording Functions
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        if (audioBlob.size > 0 && audioChunksRef.current.length > 0) {
-          showToast('Uploading voice note...');
-          try {
-            const formData = new FormData();
-            formData.append('file', audioBlob, `voicenote-${Date.now()}.webm`);
-            const cleanApiUrl = baseUrl.trim().replace(/\/+$/, '');
-            const res = await (await fetch(`${cleanApiUrl}/upload`, { method: 'POST', body: formData })).json();
-
-            if (res && res.fileUrl) {
-              const payload = {
-                passcode,
-                nickname,
-                message: '🎤 Voice Note',
-                fileUrl: res.fileUrl,
-                fileName: 'Voice Note.webm',
-                fileType: 'audio/webm',
-                expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
-              };
-              socketRef.current?.emit('sendMessage', payload);
-              showToast('Voice note sent!');
-            }
-          } catch (err) {
-            showToast('Failed to send voice note');
-          }
-        }
-        stream.getTracks().forEach((t) => t.stop());
-      };
-
-      mediaRecorderRef.current.start();
-      setIsRecordingAudio(true);
-      setRecDuration(0);
-      recTimerRef.current = setInterval(() => setRecDuration((prev) => prev + 1), 1000);
-    } catch (err) {
-      alert('Could not access microphone for voice note: ' + err.message);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecordingAudio) {
-      mediaRecorderRef.current.stop();
-      setIsRecordingAudio(false);
-      if (recTimerRef.current) clearInterval(recTimerRef.current);
-    }
-  };
-
-  const cancelRecording = () => {
-    if (mediaRecorderRef.current && isRecordingAudio) {
-      audioChunksRef.current = [];
-      mediaRecorderRef.current.stop();
-      setIsRecordingAudio(false);
-      if (recTimerRef.current) clearInterval(recTimerRef.current);
-      showToast('Voice note cancelled');
-    }
-  };
 
   const handleLogout = () => {
     webRTC.cleanUpCall();
@@ -582,10 +666,18 @@ export default function ChatRoom() {
           handleSendMessage={handleSendMessage}
           isRecordingAudio={isRecordingAudio}
           recDuration={recDuration}
+          isAudioMuted={isAudioMuted}
+          toggleAudioMute={toggleAudioMute}
           startRecording={startRecording}
           stopRecording={stopRecording}
           cancelRecording={cancelRecording}
+          isRecordingVideo={isRecordingVideo}
+          videoWithoutSound={videoWithoutSound}
+          startVideoRecording={startVideoRecording}
+          closeVideoRecording={closeVideoRecording}
+          handleSendVideoNote={handleSendVideoNote}
           formatTimer={formatTimer}
+          showToast={showToast}
         />
       </main>
 

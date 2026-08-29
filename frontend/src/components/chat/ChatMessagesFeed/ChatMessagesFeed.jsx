@@ -84,6 +84,20 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     return /\.(mp3|wav|ogg|aac|m4a|flac)($|\?)/i.test(target);
   };
 
+  const isVideoNote = (msg) => {
+    if (!msg?.fileUrl) return false;
+    if (msg.isVideoNote) return true;
+    const target = `${msg.fileUrl} ${msg.fileName || ''} ${msg.message || ''}`.toLowerCase();
+    return (target.includes('videonote') || target.includes('video note')) && isVideoFile(msg);
+  };
+
+  const isWithoutSound = (msg) => {
+    if (!msg) return false;
+    if (msg.isWithoutSound) return true;
+    const target = `${msg.fileName || ''} ${msg.message || ''}`.toLowerCase();
+    return target.includes('without sound') || target.includes('silent') || target.includes('muted');
+  };
+
   const resolveMediaUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
@@ -373,8 +387,51 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                           </div>
                         )}
 
-                        {/* Video Attachment Player */}
-                        {isVideoFile(msg) && (
+                        {/* Round Telegram/WhatsApp Style Video Note Player */}
+                        {isVideoFile(msg) && isVideoNote(msg) && (
+                          <div
+                            className={`vn-msg-card ${isWithoutSound(msg) ? 'is-muted' : ''}`}
+                            onClick={(e) => {
+                              const vid = e.currentTarget.querySelector('video');
+                              if (vid) {
+                                if (vid.paused) {
+                                  vid.play().catch(() => {});
+                                } else {
+                                  vid.pause();
+                                }
+                              }
+                            }}
+                            title="Click to play / pause video note"
+                          >
+                            <video
+                              playsInline
+                              loop
+                              muted={isWithoutSound(msg)}
+                              src={resolveMediaUrl(msg.fileUrl)}
+                              className="vn-msg-video"
+                              onPlay={(e) => {
+                                const badge = e.currentTarget.parentElement?.querySelector('.vn-msg-play-badge');
+                                if (badge) badge.style.opacity = '0';
+                              }}
+                              onPause={(e) => {
+                                const badge = e.currentTarget.parentElement?.querySelector('.vn-msg-play-badge');
+                                if (badge) badge.style.opacity = '1';
+                              }}
+                            />
+                            <div className="vn-msg-play-badge">
+                              <span className="material-symbols-outlined" style={{ fontSize: '26px' }}>play_arrow</span>
+                            </div>
+                            <div className={`vn-msg-overlay-chip ${isWithoutSound(msg) ? 'muted' : ''}`}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                                {isWithoutSound(msg) ? 'volume_off' : 'videocam'}
+                              </span>
+                              <span>{isWithoutSound(msg) ? 'Without Sound' : 'Video Note'}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Standard Video Attachment Player */}
+                        {isVideoFile(msg) && !isVideoNote(msg) && (
                           <div className="m3-media-card" style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden' }}>
                             <video
                               controls
@@ -387,9 +444,17 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
                         {/* Audio Voice Note Player */}
                         {isAudioFile(msg) && (
-                          <div className="m3-media-card" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '6px 12px', minWidth: '220px', borderRadius: '12px' }}>
-                            <Icon icon="solar:volume-loud-bold-duotone" width="22" height="22" style={{ color: '#00a884' }} />
-                            <audio controls controlsList="nodownload" src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
+                          <div className="m3-media-card" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px', backgroundColor: 'rgba(0,0,0,0.25)', padding: '8px 12px', minWidth: '220px', borderRadius: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Icon icon={isWithoutSound(msg) ? "solar:volume-cross-bold-duotone" : "solar:volume-loud-bold-duotone"} width="22" height="22" style={{ color: isWithoutSound(msg) ? '#ff9800' : '#00a884' }} />
+                              <audio controls controlsList="nodownload" src={resolveMediaUrl(msg.fileUrl)} style={{ height: '30px', flex: 1, outline: 'none' }} />
+                            </div>
+                            {isWithoutSound(msg) && (
+                              <div className="vn-audio-silent-badge">
+                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>volume_off</span>
+                                <span>Without Sound (Silent Voice Note)</span>
+                              </div>
+                            )}
                           </div>
                         )}
 

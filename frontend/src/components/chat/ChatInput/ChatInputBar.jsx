@@ -1,5 +1,6 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useRef, useEffect } from 'react';
 import MagneticButton from '../../animated/MagneticButton';
+import VideoNoteRecorder from './VideoNoteRecorder';
 import './ChatInputBar.css';
 
 const ChatInputBar = memo(function ChatInputBar({
@@ -26,15 +27,87 @@ const ChatInputBar = memo(function ChatInputBar({
   setInputText,
   handleInputChange,
   handleSendMessage,
+  // Voice Recording Props
   isRecordingAudio,
   recDuration,
+  isAudioMuted = false,
+  toggleAudioMute,
   startRecording,
   stopRecording,
   cancelRecording,
+  // Video Recording Props
+  isRecordingVideo,
+  videoWithoutSound,
+  startVideoRecording,
+  closeVideoRecording,
+  handleSendVideoNote,
   formatTimer,
+  showToast,
 }) {
+  // Active Record Mode: 'voice' | 'voice_muted' | 'video' | 'video_muted'
+  const [recordMode, setRecordMode] = useState('voice');
+  const [showRecordMenu, setShowRecordMenu] = useState(false);
+  const recordMenuRef = useRef(null);
+
+  // Close record mode menu on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (recordMenuRef.current && !recordMenuRef.current.contains(e.target)) {
+        setShowRecordMenu(false);
+      }
+    };
+    if (showRecordMenu) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showRecordMenu]);
+
+  // Trigger recording based on selected mode
+  const handleStartActiveRecord = (mode = recordMode) => {
+    setShowRecordMenu(false);
+    if (mode === 'voice') {
+      startRecording({ withoutSound: false });
+    } else if (mode === 'voice_muted') {
+      startRecording({ withoutSound: true });
+    } else if (mode === 'video') {
+      startVideoRecording({ withoutSound: false });
+    } else if (mode === 'video_muted') {
+      startVideoRecording({ withoutSound: true });
+    }
+  };
+
+  // Get current record button icon and title
+  const getRecordButtonMeta = () => {
+    switch (recordMode) {
+      case 'voice_muted':
+        return { icon: 'mic_off', title: 'Record Voice Note (Without Sound)', color: '#ff9800' };
+      case 'video':
+        return { icon: 'videocam', title: 'Record Video Note', color: '#00a884' };
+      case 'video_muted':
+        return { icon: 'videocam_off', title: 'Record Video Note (Without Sound)', color: '#ff9800' };
+      case 'voice':
+      default:
+        return { icon: 'mic', title: 'Record Voice Note', color: '#00a884' };
+    }
+  };
+
+  const currentMeta = getRecordButtonMeta();
+
   return (
     <>
+      {/* Video Note Circular Recorder Modal Overlay */}
+      {isRecordingVideo && (
+        <VideoNoteRecorder
+          isOpen={isRecordingVideo}
+          initialWithoutSound={videoWithoutSound}
+          onClose={closeVideoRecording}
+          onSend={handleSendVideoNote}
+          showToast={showToast}
+        />
+      )}
+
       {/* Replying Banner Bar */}
       {replyingTo && (
         <div
@@ -149,12 +222,35 @@ const ChatInputBar = memo(function ChatInputBar({
       >
         {isRecordingAudio ? (
           /* Live Voice Recording UI Bar */
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', backgroundColor: '#182229', padding: '6px 14px', borderRadius: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ff2e74' }}>
-              <span className="material-symbols-outlined animate-pulse" style={{ fontSize: '20px' }}>mic</span>
-              <span style={{ fontSize: '0.86rem', fontWeight: 700 }}>Recording... {formatTimer(recDuration)}</span>
+          <div className="audio-rec-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isAudioMuted ? '#ff9800' : '#ff2e74' }}>
+              <span className="material-symbols-outlined animate-pulse" style={{ fontSize: '20px' }}>
+                {isAudioMuted ? 'mic_off' : 'mic'}
+              </span>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700 }}>
+                {isAudioMuted ? 'Recording (Silent)... ' : 'Recording... '}
+                {formatTimer(recDuration)}
+              </span>
             </div>
+
             <div style={{ flex: 1 }} />
+
+            {/* Live Audio Mute Toggle Button */}
+            {toggleAudioMute && (
+              <button
+                type="button"
+                className={`audio-rec-sound-btn ${isAudioMuted ? 'is-muted' : ''}`}
+                onClick={toggleAudioMute}
+                title={isAudioMuted ? 'Unmute Sound' : 'Mute Sound (Without Sound)'}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                  {isAudioMuted ? 'volume_off' : 'volume_up'}
+                </span>
+                <span>{isAudioMuted ? 'Without Sound' : 'Sound ON'}</span>
+              </button>
+            )}
+
+            {/* Discard Audio Button */}
             <button
               type="button"
               onClick={cancelRecording}
@@ -163,10 +259,23 @@ const ChatInputBar = memo(function ChatInputBar({
             >
               <span className="material-symbols-outlined">delete</span>
             </button>
+
+            {/* Send Voice Note Button */}
             <button
               type="button"
               onClick={stopRecording}
-              style={{ backgroundColor: '#00a884', color: '#fff', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              style={{
+                backgroundColor: '#00a884',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
               title="Send Voice Note"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>send</span>
@@ -211,7 +320,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     border: '1px solid rgba(134, 150, 160, 0.2)',
                     padding: '8px 0',
                     zIndex: 100,
-                    width: '240px',
+                    width: '260px',
                   }}
                   className="animate-fade-in"
                 >
@@ -232,7 +341,65 @@ const ChatInputBar = memo(function ChatInputBar({
                     />
                   </label>
 
-                  {/* 2. Create Live Poll */}
+                  {/* 2. Record Voice Note */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowActionMenu(false);
+                      handleStartActiveRecord('voice');
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#00a884' }}>mic</span>
+                    <span>Record Voice Note</span>
+                  </button>
+
+                  {/* 3. Record Voice Note (Without Sound) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowActionMenu(false);
+                      handleStartActiveRecord('voice_muted');
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff9800' }}>mic_off</span>
+                    <span>Voice Note (Without Sound)</span>
+                  </button>
+
+                  {/* 4. Record Video Note */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowActionMenu(false);
+                      handleStartActiveRecord('video');
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#00a884' }}>videocam</span>
+                    <span>Record Video Note</span>
+                  </button>
+
+                  {/* 5. Record Video Note (Without Sound) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowActionMenu(false);
+                      handleStartActiveRecord('video_muted');
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
+                    className="hover:bg-[#182229]"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff9800' }}>videocam_off</span>
+                    <span>Video Note (Without Sound)</span>
+                  </button>
+
+                  <div style={{ height: '1px', backgroundColor: 'rgba(134, 150, 160, 0.15)', margin: '4px 0' }} />
+
+                  {/* 6. Create Live Poll */}
                   <button
                     type="button"
                     onClick={() => {
@@ -246,7 +413,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     <span>Create Poll</span>
                   </button>
 
-                  {/* 3. Share Location */}
+                  {/* 7. Share Location */}
                   <button
                     type="button"
                     onClick={() => {
@@ -260,7 +427,7 @@ const ChatInputBar = memo(function ChatInputBar({
                     <span>Share Location</span>
                   </button>
 
-                  {/* 4. Disappearing Messages */}
+                  {/* 8. Disappearing Messages */}
                   <button
                     type="button"
                     onClick={() => {
@@ -296,7 +463,7 @@ const ChatInputBar = memo(function ChatInputBar({
               }}
             />
 
-            {/* Send / Save or Voice Record Button */}
+            {/* Send / Save or Voice/Video Record Button with Mode Selection */}
             {inputText.trim() || editingMsg ? (
               <MagneticButton
                 type="submit"
@@ -320,27 +487,146 @@ const ChatInputBar = memo(function ChatInputBar({
                 </span>
               </MagneticButton>
             ) : (
-              <button
-                type="button"
-                onClick={startRecording}
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '50%',
-                  backgroundColor: '#00a884',
-                  color: '#ffffff',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0, 168, 132, 0.4)',
-                  flexShrink: 0,
-                }}
-                title="Record Voice Note"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>mic</span>
-              </button>
+              <div className="rec-btn-wrapper" ref={recordMenuRef}>
+                {/* Record Button */}
+                <button
+                  type="button"
+                  onClick={() => handleStartActiveRecord(recordMode)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setShowRecordMenu((prev) => !prev);
+                  }}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: currentMeta.color,
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: `0 2px 8px ${currentMeta.color === '#ff9800' ? 'rgba(255, 152, 0, 0.4)' : 'rgba(0, 168, 132, 0.4)'}`,
+                    flexShrink: 0,
+                    transition: 'all 0.2s ease',
+                  }}
+                  title={`${currentMeta.title} (Right-click or click arrow to change)`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                    {currentMeta.icon}
+                  </span>
+                </button>
+
+                {/* Quick Selection Dropdown Button Indicator */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRecordMenu((prev) => !prev);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    right: '-4px',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    backgroundColor: '#111b21',
+                    border: '1px solid rgba(134, 150, 160, 0.3)',
+                    color: '#8696a0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                  title="Choose Voice or Video Note mode"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                    {showRecordMenu ? 'close' : 'expand_less'}
+                  </span>
+                </button>
+
+                {/* Record Mode Selection Popover Menu */}
+                {showRecordMenu && (
+                  <div className="rec-mode-menu animate-fade-in">
+                    <div className="rec-mode-menu-header">Recording Options</div>
+
+                    {/* 1. Voice Note (With Sound) */}
+                    <button
+                      type="button"
+                      className={`rec-mode-option ${recordMode === 'voice' ? 'active' : ''}`}
+                      onClick={() => {
+                        setRecordMode('voice');
+                        handleStartActiveRecord('voice');
+                      }}
+                    >
+                      <div className="rec-mode-option-icon-box" style={{ color: '#00a884' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>mic</span>
+                      </div>
+                      <div className="rec-mode-option-text">
+                        <span className="rec-mode-option-title">Voice Note</span>
+                        <span className="rec-mode-option-desc">Microphone with audio</span>
+                      </div>
+                    </button>
+
+                    {/* 2. Voice Note (Without Sound) */}
+                    <button
+                      type="button"
+                      className={`rec-mode-option ${recordMode === 'voice_muted' ? 'active' : ''}`}
+                      onClick={() => {
+                        setRecordMode('voice_muted');
+                        handleStartActiveRecord('voice_muted');
+                      }}
+                    >
+                      <div className="rec-mode-option-icon-box" style={{ color: '#ff9800' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>mic_off</span>
+                      </div>
+                      <div className="rec-mode-option-text">
+                        <span className="rec-mode-option-title">Voice Note (Silent)</span>
+                        <span className="rec-mode-option-desc">Without sound</span>
+                      </div>
+                    </button>
+
+                    {/* 3. Video Note (With Sound) */}
+                    <button
+                      type="button"
+                      className={`rec-mode-option ${recordMode === 'video' ? 'active' : ''}`}
+                      onClick={() => {
+                        setRecordMode('video');
+                        handleStartActiveRecord('video');
+                      }}
+                    >
+                      <div className="rec-mode-option-icon-box" style={{ color: '#00a884' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>videocam</span>
+                      </div>
+                      <div className="rec-mode-option-text">
+                        <span className="rec-mode-option-title">Video Note</span>
+                        <span className="rec-mode-option-desc">Round camera + audio</span>
+                      </div>
+                    </button>
+
+                    {/* 4. Video Note (Without Sound) */}
+                    <button
+                      type="button"
+                      className={`rec-mode-option ${recordMode === 'video_muted' ? 'active' : ''}`}
+                      onClick={() => {
+                        setRecordMode('video_muted');
+                        handleStartActiveRecord('video_muted');
+                      }}
+                    >
+                      <div className="rec-mode-option-icon-box" style={{ color: '#ff9800' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>videocam_off</span>
+                      </div>
+                      <div className="rec-mode-option-text">
+                        <span className="rec-mode-option-title">Video Note (Without Sound)</span>
+                        <span className="rec-mode-option-desc">Camera only (Muted)</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </form>
         )}

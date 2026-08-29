@@ -8,3 +8,196 @@
   position: relative;
   z-index: 20;
 }
+
+/* Emoji Picker Container */
+.emoji-picker-container {
+  position: absolute;
+  bottom: 64px;
+  left: 12px;
+  width: 320px;
+  max-width: 90vw;
+  background-color: #202c33;
+  border-radius: 16px;
+  border: 1px solid rgba(134, 150, 160, 0.2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  overflow: hidden;
+  animation: fadeIn 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+.emoji-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #8696a0;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 1.35rem;
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.emoji-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: scale(1.2);
+}
+
+/* Record Mode Quick Menu Popover */
+.rec-mode-menu {
+  position: absolute;
+  bottom: 56px;
+  right: 0;
+  background-color: #233138;
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(134, 150, 160, 0.2);
+  padding: 8px;
+  z-index: 120;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rec-mode-menu-header {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8696a0;
+  padding: 6px 12px 4px 12px;
+}
+
+.rec-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-radius: 12px;
+  color: #e9edef;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.18s ease, transform 0.12s ease;
+  width: 100%;
+}
+
+.rec-mode-option:hover {
+  background-color: #182229;
+  transform: translateX(2px);
+}
+
+.rec-mode-option.active {
+  background-color: rgba(0, 168, 132, 0.15);
+  color: #00a884;
+}
+
+.rec-mode-option-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.rec-mode-option-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.rec-mode-option-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.rec-mode-option-desc {
+  font-size: 0.7rem;
+  color: #8696a0;
+}
+
+/* Audio Recording Bar */
+.audio-rec-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background-color: #182229;
+  padding: 6px 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 46, 116, 0.2);
+}
+
+.audio-rec-sound-btn {
+  background: rgba(134, 150, 160, 0.12);
+  border: none;
+  color: #00a884;
+  border-radius: 14px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.audio-rec-sound-btn.is-muted {
+  background: rgba(255, 152, 0, 0.16);
+  color: #ff9800;
+}
+
+.audio-rec-sound-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Mode Switcher Pill on the Record Button */
+.rec-btn-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.rec-badge-indicator {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #111b21;
+  border: 1px solid rgba(134, 150, 160, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00a884;
+  pointer-events: none;
+}
