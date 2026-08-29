@@ -32,6 +32,13 @@ export class Room {
   })
   isActive!: boolean;
 
+  @Column({
+    type: 'int',
+    nullable: true,
+    default: null,
+  })
+  pinnedMessageId!: number | null;
+
   @OneToMany(() => User, (user) => user.room)
   users!: User[];
 

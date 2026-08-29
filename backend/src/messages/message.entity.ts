@@ -87,6 +87,24 @@ export class Message {
   isDeleted!: boolean;
 
   @Column({
+    type: 'boolean',
+    default: false,
+  })
+  isVoiceNote!: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  isVideoNote!: boolean;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  isWithoutSound!: boolean;
+
+  @Column({
     type: 'jsonb',
     nullable: true,
     default: null,

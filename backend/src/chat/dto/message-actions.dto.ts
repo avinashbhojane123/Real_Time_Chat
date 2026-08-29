@@ -60,3 +60,13 @@ export class ReactToMessageDto {
   @MaxLength(20)
   emoji!: string;
 }
+
+export class PinMessageDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsOptional()
+  messageId?: number | null;
+}

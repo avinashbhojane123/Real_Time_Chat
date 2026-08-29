@@ -202,6 +202,14 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       setMessages((prev) => prev.filter((m) => String(m.id) !== String(messageId)));
     });
 
+    socket.on('messagesExpired', ({ ids }) => {
+      if (Array.isArray(ids) && ids.length > 0) {
+        const idSet = new Set(ids.map((id) => String(id)));
+        setMessages((prev) => prev.filter((m) => !idSet.has(String(m.id))));
+        setPinnedMessage((prev) => (prev && idSet.has(String(prev.id)) ? null : prev));
+      }
+    });
+
     socket.on('historyCleared', () => {
       setMessages([]);
       setPinnedMessage(null);

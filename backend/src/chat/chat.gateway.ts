@@ -32,6 +32,7 @@ import {
   DeleteMessageDto,
   ClearHistoryDto,
   ReactToMessageDto,
+  PinMessageDto,
 } from './dto/message-actions.dto';
 import {
   CallUserDto,
@@ -434,6 +435,14 @@ export class ChatGateway
     client.emit('statusesList', activeStatuses);
     client.emit('statusesUpdated', activeStatuses);
 
+    // Send active pinned message if room has one
+    if (room.pinnedMessageId) {
+      const pinnedMsg = await this.messageRepo.findOne({
+        where: { id: room.pinnedMessageId, roomId: room.id },
+      });
+      client.emit('pinnedMessageUpdated', pinnedMsg || null);
+    }
+
     return {
       success: true,
       roomId: room.id,
@@ -497,6 +506,9 @@ export class ChatGateway
         typeof data.fileSize === 'string'
           ? parseInt(data.fileSize, 10)
           : (data.fileSize ?? null),
+      isVoiceNote: Boolean(data.isVoiceNote),
+      isVideoNote: Boolean(data.isVideoNote),
+      isWithoutSound: Boolean(data.isWithoutSound),
       expiresAt,
       pollData: data.pollData ?? null,
       locationData: data.locationData ?? null,
@@ -521,6 +533,9 @@ export class ChatGateway
       fileName: savedMessage.fileName,
       fileType: savedMessage.fileType,
       fileSize: savedMessage.fileSize,
+      isVoiceNote: savedMessage.isVoiceNote,
+      isVideoNote: savedMessage.isVideoNote,
+      isWithoutSound: savedMessage.isWithoutSound,
       isEdited: savedMessage.isEdited,
       isDeleted: savedMessage.isDeleted,
       reactions: savedMessage.reactions,
@@ -712,6 +727,9 @@ export class ChatGateway
         browser: user.browser,
         os: user.os,
         avatarUrl: user.avatarUrl,
+        networkLabel: user.networkLabel,
+        batteryLabel: user.batteryLabel,
+        batteryIsCharging: user.batteryIsCharging,
       })),
     );
   }
@@ -940,6 +958,13 @@ export class ChatGateway
     msg.fileSize = null;
     await this.messageRepo.save(msg);
 
+    // If this was the pinned message, reset room pinnedMessageId
+    if (room.pinnedMessageId === msg.id) {
+      room.pinnedMessageId = null;
+      await this.roomRepo.save(room);
+      this.server.to(data.passcode).emit('pinnedMessageUpdated', null);
+    }
+
     this.server.to(data.passcode).emit('messageDeleted', {
       messageId: msg.id,
     });
@@ -968,12 +993,52 @@ export class ChatGateway
 
     await this.messageRepo.delete({ roomId: room.id });
 
+    // Clear pinned message in room
+    room.pinnedMessageId = null;
+    await this.roomRepo.save(room);
+
     console.log(
       `[ClearHistory] Room ${targetPasscode} history cleared by user ${session.nickname}`,
     );
 
     this.server.to(targetPasscode).emit('historyCleared');
+    this.server.to(targetPasscode).emit('pinnedMessageUpdated', null);
     return { success: true };
+  }
+
+  @SubscribeMessage('pinMessage')
+  async pinMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: PinMessageDto,
+  ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: targetPasscode },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    let pinnedMsg: Message | null = null;
+    if (data.messageId) {
+      pinnedMsg = await this.messageRepo.findOne({
+        where: { id: data.messageId, roomId: room.id },
+      });
+      if (!pinnedMsg) {
+        return { success: false, message: 'Message not found' };
+      }
+      room.pinnedMessageId = pinnedMsg.id;
+    } else {
+      room.pinnedMessageId = null;
+    }
+
+    await this.roomRepo.save(room);
+
+    this.server.to(targetPasscode).emit('pinnedMessageUpdated', pinnedMsg);
+    return { success: true, pinnedMessage: pinnedMsg };
   }
 
   @SubscribeMessage('reactToMessage')
@@ -1017,6 +1082,18 @@ export class ChatGateway
       messageId: msg.id,
       reactions: msg.reactions,
     });
+    this.server.to(data.passcode).emit('messageReaction', {
+      messageId: msg.id,
+      reactions: msg.reactions,
+    });
+  }
+
+  @SubscribeMessage('reactMessage')
+  async reactMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: ReactToMessageDto,
+  ) {
+    return this.reactToMessage(client, data);
   }
 
   @SubscribeMessage('createStatus')
@@ -1047,6 +1124,7 @@ export class ChatGateway
       mediaUrl: data.mediaUrl || null,
       bgColor: data.bgColor || null,
       fontStyle: data.fontStyle || null,
+      stickers: data.stickers || null,
       viewers: [],
       expiresAt,
     });
@@ -1064,6 +1142,7 @@ export class ChatGateway
       mediaUrl: savedStatus.mediaUrl,
       bgColor: savedStatus.bgColor,
       fontStyle: savedStatus.fontStyle,
+      stickers: savedStatus.stickers || null,
       viewers: savedStatus.viewers || [],
       createdAt: savedStatus.createdAt,
       expiresAt: savedStatus.expiresAt,

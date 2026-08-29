@@ -49,6 +49,15 @@ export class SendMessageDto {
   fileSize?: number | string | null;
 
   @IsOptional()
+  isVoiceNote?: boolean;
+
+  @IsOptional()
+  isVideoNote?: boolean;
+
+  @IsOptional()
+  isWithoutSound?: boolean;
+
+  @IsOptional()
   expiresIn?: number | null;
 
   @IsOptional()

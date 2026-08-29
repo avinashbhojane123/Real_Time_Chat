@@ -69,6 +69,13 @@ export class Status {
   @Column({
     type: 'jsonb',
     nullable: true,
+    default: null,
+  })
+  stickers!: Array<{ id: number; emoji: string }> | null;
+
+  @Column({
+    type: 'jsonb',
+    nullable: true,
     default: '[]',
   })
   viewers!: string[] | null;

@@ -33,6 +33,9 @@ export class CreateStatusDto {
   @IsString()
   @IsOptional()
   fontStyle?: string;
+
+  @IsOptional()
+  stickers?: any;
 }
 
 export class GetStatusesDto {
