@@ -280,9 +280,9 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     const lastMsg = filteredMessages[filteredMessages.length - 1];
     const isOwnMessage = lastMsg?.nickname === nickname;
 
-    // Initial load: scroll to bottom immediately
+    // Initial load: scroll to bottom immediately without window shift
     if (prevLength === 0) {
-      chatBottomRef?.current?.scrollIntoView({ behavior: 'auto' });
+      feedEl.scrollTop = feedEl.scrollHeight;
       if (setUnreadCount) setUnreadCount(0);
       return;
     }
@@ -290,7 +290,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     // Only scroll if a NEW message was added to the feed
     if (currentLength > prevLength) {
       if (isOwnMessage || isAtBottom) {
-        chatBottomRef?.current?.scrollIntoView({ behavior: 'smooth' });
+        feedEl.scrollTo({ top: feedEl.scrollHeight, behavior: 'smooth' });
         if (setUnreadCount) setUnreadCount(0);
       } else {
         if (setUnreadCount) setUnreadCount((prev) => prev + 1);

@@ -8,12 +8,16 @@
 
 .wa-header-container {
   height: 60px;
+  min-height: 60px !important;
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  top: 0 !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
   border-bottom: 1px solid rgba(134, 150, 160, 0.15);
-  z-index: 20;
+  z-index: 50 !important;
   transition: background-color 300ms var(--m3-easing-emphasized);
 }
 

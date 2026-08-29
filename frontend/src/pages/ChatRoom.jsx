@@ -516,7 +516,19 @@ export default function ChatRoom() {
   });
 
   return (
-    <div className={`theme-${currentTheme}`} style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: 'var(--chat-wallpaper-bg, #111b21)', overflow: 'hidden' }}>
+    <div
+      className={`theme-${currentTheme}`}
+      style={{
+        display: 'flex',
+        width: '100vw',
+        height: '100dvh',
+        maxHeight: '100dvh',
+        backgroundColor: 'var(--chat-wallpaper-bg, #111b21)',
+        overflow: 'hidden',
+        position: 'fixed',
+        inset: 0,
+      }}
+    >
       {/* 1. Chats Roster Sidebar Panel */}
       <ChatRoster
         isMobileDevice={isMobileDevice}
@@ -545,6 +557,7 @@ export default function ChatRoom() {
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
+          minHeight: 0,
           backgroundColor: 'var(--chat-wallpaper-bg, #0b141a)',
           backgroundImage:
             currentTheme === 'custom' && customWallpaper

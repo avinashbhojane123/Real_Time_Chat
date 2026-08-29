@@ -73,6 +73,10 @@ const ChatHeader = memo(function ChatHeader({
         }
         style={{
           height: '60px',
+          minHeight: '60px',
+          flexShrink: 0,
+          position: 'sticky',
+          top: 0,
           backgroundColor: headerBgOpacity,
           backdropFilter: headerBlur,
           WebkitBackdropFilter: headerBlur,
@@ -81,7 +85,7 @@ const ChatHeader = memo(function ChatHeader({
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
-          zIndex: 20,
+          zIndex: 50,
         }}
       >
         {/* Header Info: Recipient Name, Avatar, Online/Offline Presence & Hamburger Toggle */}
