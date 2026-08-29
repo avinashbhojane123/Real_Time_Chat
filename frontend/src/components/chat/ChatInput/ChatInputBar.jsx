@@ -116,9 +116,13 @@ const ChatInputBar = memo(function ChatInputBar({
     }
   };
 
-  // Pointer Down (Start long-press timer)
+  // Pointer Down (Start long-press timer with pointer capture for mouse & touch)
   const handleRecordPointerDown = (e) => {
     if (e.button !== undefined && e.button !== 0) return;
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch (_) {}
+
     isLongPressActiveRef.current = false;
     setIsPressing(true);
 
@@ -127,11 +131,15 @@ const ChatInputBar = memo(function ChatInputBar({
       isLongPressActiveRef.current = true;
       setIsPressing(false);
       handleStartActiveRecord(recordMode);
-    }, 400); // 400ms threshold for long press
+    }, 300); // 300ms threshold for responsive desktop & mobile long-press
   };
 
-  // Pointer Up (If released before 400ms -> short click cycles mode)
-  const handleRecordPointerUp = () => {
+  // Pointer Up (If released before 300ms -> short click cycles mode)
+  const handleRecordPointerUp = (e) => {
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch (_) {}
+
     setIsPressing(false);
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -144,7 +152,11 @@ const ChatInputBar = memo(function ChatInputBar({
     isLongPressActiveRef.current = false;
   };
 
-  const handleRecordPointerCancel = () => {
+  const handleRecordPointerCancel = (e) => {
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch (_) {}
+
     setIsPressing(false);
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -569,7 +581,6 @@ const ChatInputBar = memo(function ChatInputBar({
                   onPointerDown={handleRecordPointerDown}
                   onPointerUp={handleRecordPointerUp}
                   onPointerCancel={handleRecordPointerCancel}
-                  onPointerLeave={handleRecordPointerCancel}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setShowRecordMenu((prev) => !prev);
