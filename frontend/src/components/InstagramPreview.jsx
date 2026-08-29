@@ -108,21 +108,21 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
   // Media sources
   const videoSrc = data?.proxyVideoUrl
     ? (data.proxyVideoUrl.startsWith('http')
-        ? data.proxyVideoUrl
-        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyVideoUrl}`)
+      ? data.proxyVideoUrl
+      : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyVideoUrl}`)
     : data?.videoUrl;
 
   const rawAudioUrl = data?.audio?.proxyAudioUrl || data?.audio?.audioUrl;
   const audioSrc = rawAudioUrl
     ? (rawAudioUrl.startsWith('http')
-        ? rawAudioUrl
-        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${rawAudioUrl}`)
+      ? rawAudioUrl
+      : `${apiBaseUrl.replace(/\/api\/?$/, '')}${rawAudioUrl}`)
     : null;
 
   const posterSrc = data?.proxyThumbnailUrl
     ? (data.proxyThumbnailUrl.startsWith('http')
-        ? data.proxyThumbnailUrl
-        : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyThumbnailUrl}`)
+      ? data.proxyThumbnailUrl
+      : `${apiBaseUrl.replace(/\/api\/?$/, '')}${data.proxyThumbnailUrl}`)
     : data?.thumbnailUrl;
 
   const isVideoPost = data?.isVideo && videoSrc && !hasVideoError;
@@ -141,7 +141,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
           (videoRef.current.currentTime || 0) + audioOffset;
         audioRef.current.muted = isMuted;
         audioRef.current.volume = volume;
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch(() => { });
       }
 
       const playPromise = videoRef.current.play();
@@ -156,7 +156,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
               videoRef.current
                 .play()
                 .then(() => setIsPlaying(true))
-                .catch(() => {});
+                .catch(() => { });
             }
           });
       }
@@ -180,7 +180,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
       audioRef.current.volume = 1.0;
       audioRef.current.currentTime =
         (videoRef.current ? videoRef.current.currentTime : 0) + audioOffset;
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
     }
     setIsMuted(false);
     setVolume(1.0);
@@ -197,7 +197,7 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
       if (!nextMuted && isPlaying) {
         audioRef.current.currentTime =
           videoRef.current.currentTime + audioOffset;
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch(() => { });
       }
     }
 
@@ -399,102 +399,19 @@ export default function InstagramPreview({ messageText, onCopySuccess }) {
       {/* Image Post View */}
       {!loading && !isVideoPost && posterSrc && !hasVideoError && (
         <div style={{ position: 'relative', width: '100%', backgroundColor: '#000', maxHeight: '360px', overflow: 'hidden' }}>
-          <img src={posterSrc} alt={data?.caption || 'Instagram Post'} style={{ width: '100%', maxHeight: '360px', objectFit: 'cover', display: 'block' }} />
+          <img src={posterSrc} alt={data?.caption || 'Instagram Post'} style={{ width: '100%', maxHeight: '360px', objectFit: 'cover' }} />
         </div>
       )}
 
-      {/* Native Instagram Reel Card (Clean & Free of Unload Violations) */}
+      {/* Embed Fallback */}
       {!loading && (!posterSrc || hasVideoError) && (
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            padding: '24px 16px',
-            background: 'linear-gradient(135deg, #111b21 0%, #1a162b 50%, #201124 100%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            borderTop: '1px solid rgba(225, 48, 108, 0.2)',
-          }}
-        >
-          {/* Animated Gradient Icon Badge */}
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '16px',
-              background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              boxShadow: '0 4px 20px rgba(225, 48, 108, 0.4)',
-              marginBottom: '12px',
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>
-              play_circle
-            </span>
-          </div>
-
-          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#e9edef', marginBottom: '4px' }}>
-            {data?.author?.fullName || data?.author?.username ? `@${data.author.username || data.author.fullName}` : `Instagram ${igData.type}`}
-          </div>
-
-          <div style={{ fontSize: '0.74rem', color: '#8696a0', marginBottom: '16px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {data?.caption || igData.cleanUrl}
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', maxWidth: '280px' }}>
-            <a
-              href={igData.cleanUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                flex: 1,
-                padding: '8px 14px',
-                borderRadius: '8px',
-                background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: '0.78rem',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 10px rgba(220, 39, 67, 0.3)',
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>open_in_new</span>
-              <span>Watch on Instagram</span>
-            </a>
-
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#e9edef',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              title="Copy Reel Link"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>content_copy</span>
-              <span>Copy</span>
-            </button>
-          </div>
+        <div style={{ position: 'relative', width: '100%', height: '420px', backgroundColor: '#000', overflow: 'hidden' }}>
+          <iframe
+            src={`https://www.instagram.com/p/${igData.shortcode}/embed/`}
+            title="Instagram Reel Player"
+            style={{ width: '100%', height: '500px', marginTop: '-56px', border: 0 }}
+            scrolling="no"
+          />
         </div>
       )}
 

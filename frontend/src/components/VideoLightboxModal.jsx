@@ -184,69 +184,20 @@ export default function VideoLightboxModal({
               }}
             />
           ) : (
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                padding: '48px 24px',
-                background: 'linear-gradient(135deg, #111b21 0%, #1a162b 50%, #201124 100%)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-              }}
-            >
-              <div
+            <div style={{ position: 'relative', width: '100%', height: '560px', overflow: 'hidden', backgroundColor: '#000' }}>
+              <iframe
+                src={embedUrl}
+                title="Instagram Reel Player"
                 style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '20px',
-                  background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                  boxShadow: '0 8px 30px rgba(225, 48, 108, 0.5)',
-                  marginBottom: '16px',
+                  width: '100%',
+                  height: '630px',
+                  marginTop: '-56px',
+                  border: 0,
+                  overflow: 'hidden',
                 }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '36px' }}>
-                  play_circle
-                </span>
-              </div>
-
-              <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#e9edef', marginBottom: '6px' }}>
-                {title || 'Instagram Reel'}
-              </div>
-
-              <div style={{ fontSize: '0.82rem', color: '#8696a0', marginBottom: '24px', maxWidth: '340px' }}>
-                Watch this Reel directly on Instagram in full high definition with original audio.
-              </div>
-
-              {cleanUrl && (
-                <a
-                  href={cleanUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    padding: '10px 24px',
-                    borderRadius: '10px',
-                    background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '0.88rem',
-                    textDecoration: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 16px rgba(220, 39, 67, 0.4)',
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>open_in_new</span>
-                  <span>Watch on Instagram</span>
-                </a>
-              )}
+                scrolling="no"
+                allowTransparency="true"
+              />
             </div>
           )}
         </div>
