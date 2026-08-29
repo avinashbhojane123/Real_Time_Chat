@@ -119,8 +119,13 @@ export default function ChatRoom() {
   const [showActionMenu, setShowActionMenu] = useState(false);
 
   // Themes & Wallpapers
+  const DEFAULT_CUSTOM_WALLPAPER =
+    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop';
+
   const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('chat_theme') || 'wa-doodle');
-  const [customWallpaper, setCustomWallpaper] = useState(() => localStorage.getItem('chat_custom_wallpaper') || '');
+  const [customWallpaper, setCustomWallpaper] = useState(
+    () => localStorage.getItem('chat_custom_wallpaper') || DEFAULT_CUSTOM_WALLPAPER
+  );
   const [showThemeModal, setShowThemeModal] = useState(false);
 
   const THEMES = [
@@ -130,12 +135,13 @@ export default function ChatRoom() {
     { key: 'custom', name: 'Custom Wallpaper', previewColor: '#e9edef', icon: 'wallpaper' },
   ];
 
-  const handleSelectTheme = (themeKey, customUrl = '') => {
+  const handleSelectTheme = (themeKey, customUrl = null) => {
     setCurrentTheme(themeKey);
     localStorage.setItem('chat_theme', themeKey);
-    if (customUrl) {
-      setCustomWallpaper(customUrl);
-      localStorage.setItem('chat_custom_wallpaper', customUrl);
+    if (customUrl !== null && customUrl !== undefined) {
+      const finalUrl = customUrl.trim() || DEFAULT_CUSTOM_WALLPAPER;
+      setCustomWallpaper(finalUrl);
+      localStorage.setItem('chat_custom_wallpaper', finalUrl);
     }
     showToast(`Applied ${THEMES.find((t) => t.key === themeKey)?.name || themeKey} theme`);
   };
@@ -540,11 +546,16 @@ export default function ChatRoom() {
           flexDirection: 'column',
           height: '100%',
           backgroundColor: 'var(--chat-wallpaper-bg, #0b141a)',
-          backgroundImage: currentTheme === 'custom' && customWallpaper ? `url(${customWallpaper})` : 'var(--chat-wallpaper-img)',
+          backgroundImage:
+            currentTheme === 'custom' && customWallpaper
+              ? `linear-gradient(rgba(11, 20, 26, 0.62), rgba(11, 20, 26, 0.62)), url("${customWallpaper}")`
+              : 'var(--chat-wallpaper-img)',
           backgroundSize: currentTheme === 'custom' ? 'cover' : '24px 24px',
           backgroundPosition: 'center',
+          backgroundRepeat: currentTheme === 'custom' ? 'no-repeat' : 'repeat',
           position: 'relative',
           overflow: 'hidden',
+          transition: 'background 0.3s ease',
         }}
       >
         {/* Main Header */}

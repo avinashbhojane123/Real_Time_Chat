@@ -23,10 +23,8 @@
 
 /* WhatsApp Styling Utilities */
 .wa-doodle-wallpaper {
-  background-color: var(--wa-chat-bg, #0b141a);
-  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1.2px, transparent 0);
-  background-size: 24px 24px;
-  background-position: -19px -19px;
+  background-color: transparent !important;
+  background-image: none !important;
   position: relative;
 }
 
