@@ -14,8 +14,8 @@ jobs:
       - name: Ping Keep-Alive Endpoint
         run: |
           TARGET_URL="${{ secrets.RENDER_SERVER_URL }}"
-          if [ -z "$TARGET_URL" ]; then
-            TARGET_URL="https://yoursitehere.onrender.com"
+          if [ -z "$TARGET_URL" ] || [ "$TARGET_URL" = "https://yoursitehere.onrender.com" ]; then
+            TARGET_URL="https://backend-9i6w.onrender.com"
           fi
           
           # Remove trailing slash if present
@@ -29,8 +29,12 @@ jobs:
           fi
           
           echo "Pinging server at: $PING_ENDPOINT"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$PING_ENDPOINT")
+          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 --retry 2 --retry-delay 5 "$PING_ENDPOINT")
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
           echo "HTTP Status Code: $HTTP_STATUS"
+          echo "Response Body: $BODY"
           
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
             echo "Successfully pinged Render server! Server status: OK"
