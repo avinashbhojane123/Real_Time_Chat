@@ -57,7 +57,7 @@ async function bootstrap() {
   });
 
   const globalPrefix = process.env.GLOBAL_PREFIX || 'api';
-  const excludePath = uploadDirName + '/(.*)';
+  const excludePath = `${uploadDirName}/*path`;
 
   app.setGlobalPrefix(globalPrefix, {
     exclude: [excludePath, uploadDirName],
