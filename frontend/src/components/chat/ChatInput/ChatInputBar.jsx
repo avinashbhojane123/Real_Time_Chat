@@ -406,48 +406,6 @@ const ChatInputBar = memo(function ChatInputBar({
                     />
                   </label>
 
-                  {/* 2. Voice Note */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowActionMenu(false);
-                      handleSelectMode('voice');
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#00a884' }}>mic</span>
-                    <span>Voice Note</span>
-                  </button>
-
-                  {/* 3. Video Note (With Sound) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowActionMenu(false);
-                      handleSelectMode('video');
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#00a884' }}>videocam</span>
-                    <span>Video Note (With Sound)</span>
-                  </button>
-
-                  {/* 4. Video Note (Without Sound) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowActionMenu(false);
-                      handleSelectMode('video_muted');
-                    }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 16px', background: 'none', border: 'none', color: '#e9edef', fontSize: '0.86rem', cursor: 'pointer', textAlign: 'left' }}
-                    className="hover:bg-[#182229]"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#ff9800' }}>videocam_off</span>
-                    <span>Video Note (Without Sound)</span>
-                  </button>
-
                   <div style={{ height: '1px', backgroundColor: 'rgba(134, 150, 160, 0.15)', margin: '4px 0' }} />
 
                   {/* 5. Create Live Poll */}
