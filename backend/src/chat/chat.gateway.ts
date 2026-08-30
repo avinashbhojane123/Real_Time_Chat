@@ -1047,7 +1047,8 @@ export class ChatGateway
     @MessageBody() data: ReactToMessageDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session) return;
+    if (session.passcode.trim().toLowerCase() !== (data.passcode || '').trim().toLowerCase()) return;
 
     const room = await this.roomRepo.findOne({
       where: { passcode: session.passcode },
@@ -1059,23 +1060,9 @@ export class ChatGateway
     });
     if (!msg) return;
 
-    let reactions: Record<string, string[]> = {};
-    if (msg.reactions) {
-      if (typeof msg.reactions === 'string') {
-        try {
-          reactions = JSON.parse(msg.reactions);
-        } catch {
-          reactions = {};
-        }
-      } else if (typeof msg.reactions === 'object') {
-        reactions = { ...msg.reactions };
-      }
-    }
-
+    const reactions = msg.reactions || {};
     const activeNickname = session.nickname;
-    let reactionUsers: string[] = Array.isArray(reactions[data.emoji])
-      ? [...reactions[data.emoji]]
-      : [];
+    let reactionUsers = reactions[data.emoji] || [];
 
     if (reactionUsers.includes(activeNickname)) {
       reactionUsers = reactionUsers.filter((u) => u !== activeNickname);
@@ -1092,14 +1079,11 @@ export class ChatGateway
     msg.reactions = Object.keys(reactions).length > 0 ? reactions : null;
     await this.messageRepo.save(msg);
 
-    const roomPasscode = room.passcode.trim();
-    const dataPasscode = data.passcode.trim();
-
-    this.server.to(roomPasscode).to(dataPasscode).emit('messageReactionsUpdated', {
+    this.server.to(data.passcode).emit('messageReactionsUpdated', {
       messageId: msg.id,
       reactions: msg.reactions,
     });
-    this.server.to(roomPasscode).to(dataPasscode).emit('messageReaction', {
+    this.server.to(data.passcode).emit('messageReaction', {
       messageId: msg.id,
       reactions: msg.reactions,
     });

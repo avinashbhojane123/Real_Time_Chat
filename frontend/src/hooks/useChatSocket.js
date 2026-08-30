@@ -77,21 +77,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     // New Message Event Listeners
     socket.on('newMessage', (msg) => {
       setMessages((prev) => {
-        const tempIdx = prev.findIndex(
-          (m) =>
-            String(m.id).startsWith('temp-') &&
-            m.nickname === msg.nickname &&
-            (m.message === msg.message || (!m.message && !msg.message) || (m.fileUrl && m.fileUrl === msg.fileUrl))
-        );
-
-        if (tempIdx !== -1) {
-          const updated = [...prev];
-          updated[tempIdx] = { ...updated[tempIdx], ...msg, id: msg.id };
-          return updated;
-        }
-
         const clean = prev.filter(
-          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && (m.message === msg.message || (!m.message && !msg.message)))
+          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
         );
         if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
         return [...clean, msg];
@@ -100,21 +87,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     socket.on('message', (msg) => {
       setMessages((prev) => {
-        const tempIdx = prev.findIndex(
-          (m) =>
-            String(m.id).startsWith('temp-') &&
-            m.nickname === msg.nickname &&
-            (m.message === msg.message || (!m.message && !msg.message) || (m.fileUrl && m.fileUrl === msg.fileUrl))
-        );
-
-        if (tempIdx !== -1) {
-          const updated = [...prev];
-          updated[tempIdx] = { ...updated[tempIdx], ...msg, id: msg.id };
-          return updated;
-        }
-
         const clean = prev.filter(
-          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && (m.message === msg.message || (!m.message && !msg.message)))
+          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
         );
         if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
         return [...clean, msg];
@@ -207,11 +181,11 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         prev.map((m) =>
           String(m.id) === String(targetId)
             ? {
-                ...m,
-                message: newMessage !== undefined ? newMessage : (message !== undefined ? message : m.message),
-                fileUrl: fileUrl !== undefined ? fileUrl : m.fileUrl,
-                isEdited: isEdited !== undefined ? isEdited : true,
-              }
+              ...m,
+              message: newMessage !== undefined ? newMessage : (message !== undefined ? message : m.message),
+              fileUrl: fileUrl !== undefined ? fileUrl : m.fileUrl,
+              isEdited: isEdited !== undefined ? isEdited : true,
+            }
             : m
         )
       );
@@ -403,33 +377,13 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   };
 
   const handleReactToMessage = (messageId, emoji) => {
-    let targetId = messageId;
-    if (typeof messageId === 'string' && messageId.startsWith('temp-')) {
-      const found = messages.find((m) => String(m.id) === String(messageId));
-      if (found && typeof found.id === 'number') {
-        targetId = found.id;
-      }
-    }
-
-    const numericId = typeof targetId === 'number' ? targetId : parseInt(targetId, 10);
-    if (isNaN(numericId)) {
-      console.warn('Cannot react to message with non-numeric ID:', messageId);
-      return;
-    }
+    const numericId = typeof messageId === 'number' ? messageId : (parseInt(messageId, 10) || messageId);
 
     // Optimistic UI state update (0ms instant visual feedback)
     setMessages((prev) =>
       prev.map((m) => {
-        if (String(m.id) !== String(messageId) && String(m.id) !== String(numericId)) return m;
+        if (String(m.id) !== String(messageId)) return m;
         let reactions = m.reactions;
-
-        if (typeof reactions === 'string') {
-          try {
-            reactions = JSON.parse(reactions);
-          } catch {
-            reactions = {};
-          }
-        }
 
         if (!reactions || typeof reactions !== 'object') {
           reactions = {};
@@ -468,6 +422,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       messageId: numericId,
       emoji,
     });
+    socketRef.current?.emit('reactMessage', {
+      passcode,
+      nickname,
+      messageId: numericId,
+      emoji,
+    });
   };
 
   const handleFileUpload = async (e, disappearingTimer) => {
@@ -498,10 +458,10 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
           /\.(jpg|jpeg|png|gif|webp|svg|avif|heic|bmp)$/i.test(file.name)
             ? 'image/jpeg'
             : /\.(mp4|webm|mov|m4v)$/i.test(file.name)
-            ? 'video/mp4'
-            : /\.(mp3|wav|ogg|aac|m4a)$/i.test(file.name)
-            ? 'audio/mpeg'
-            : 'application/octet-stream'
+              ? 'video/mp4'
+              : /\.(mp3|wav|ogg|aac|m4a)$/i.test(file.name)
+                ? 'audio/mpeg'
+                : 'application/octet-stream'
         );
 
         const payload = {

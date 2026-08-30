@@ -361,10 +361,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                 idx === 0 ||
                 formatDateHeader(msg.createdAt) !== formatDateHeader(visibleMessages[idx - 1].createdAt);
 
-              const isMenuActive =
-                (activeMenuMsgId != null && String(activeMenuMsgId) === String(msg.id)) ||
-                (activeReactionMsgId != null && String(activeReactionMsgId) === String(msg.id)) ||
-                (showCustomReactionForMsgId != null && String(showCustomReactionForMsgId) === String(msg.id));
+              const isMenuActive = activeMenuMsgId === msg.id || activeReactionMsgId === msg.id || showCustomReactionForMsgId === msg.id;
 
               return (
                 <AnimatedMessageBubble
@@ -452,10 +449,6 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       style={{
                         transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
                         transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
-                      }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        handleReactToMessage(msg.id, '❤️', e);
                       }}
                     >
                       {/* Sender Nickname Header for Incoming Messages */}
@@ -550,7 +543,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                               const vid = e.currentTarget.querySelector('video');
                               if (vid) {
                                 if (vid.paused) {
-                                  vid.play().catch(() => {});
+                                  vid.play().catch(() => { });
                                 } else {
                                   vid.pause();
                                 }
@@ -768,7 +761,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             onPointerUp={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setActiveReactionMsgId(String(activeReactionMsgId) === String(msg.id) ? null : msg.id);
+                              setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
                               setActiveMenuMsgId(null);
                             }}
                             style={{
@@ -798,7 +791,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             onPointerUp={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setActiveMenuMsgId(String(activeMenuMsgId) === String(msg.id) ? null : msg.id);
+                              setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
                               setActiveReactionMsgId(null);
                             }}
                             style={{
@@ -820,14 +813,14 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             title="Message options"
                           >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" style={{ display: 'block' }}>
-                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
                             </svg>
                           </button>
                         </div>
                       )}
 
                       {/* 3 Dots Context Dropdown Menu */}
-                      {!msg.isDeleted && String(activeMenuMsgId) === String(msg.id) && (
+                      {!msg.isDeleted && activeMenuMsgId === msg.id && (
                         <div
                           onPointerDown={(e) => e.stopPropagation()}
                           onPointerUp={(e) => e.stopPropagation()}
@@ -915,7 +908,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       )}
 
                       {/* Emoji Reactions Popover */}
-                      {String(activeReactionMsgId) === String(msg.id) && (
+                      {activeReactionMsgId === msg.id && (
                         <div
                           className="reactions-popover"
                           onPointerDown={(e) => e.stopPropagation()}
@@ -952,7 +945,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             onPointerUp={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowCustomReactionForMsgId(String(showCustomReactionForMsgId) === String(msg.id) ? null : msg.id);
+                              setShowCustomReactionForMsgId(showCustomReactionForMsgId === msg.id ? null : msg.id);
                               setActiveReactionMsgId(null);
                             }}
                             title="More Emojis"
@@ -964,7 +957,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       )}
 
                       {/* Custom Reaction Emoji Picker Grid */}
-                      {String(showCustomReactionForMsgId) === String(msg.id) && (
+                      {showCustomReactionForMsgId === msg.id && (
                         <div
                           onPointerDown={(e) => e.stopPropagation()}
                           onPointerUp={(e) => e.stopPropagation()}
