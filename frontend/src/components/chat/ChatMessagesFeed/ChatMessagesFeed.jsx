@@ -361,7 +361,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                 idx === 0 ||
                 formatDateHeader(msg.createdAt) !== formatDateHeader(visibleMessages[idx - 1].createdAt);
 
-              const isMenuActive = activeMenuMsgId === msg.id || activeReactionMsgId === msg.id || showCustomReactionForMsgId === msg.id;
+              const isMenuActive =
+                (activeMenuMsgId != null && String(activeMenuMsgId) === String(msg.id)) ||
+                (activeReactionMsgId != null && String(activeReactionMsgId) === String(msg.id)) ||
+                (showCustomReactionForMsgId != null && String(showCustomReactionForMsgId) === String(msg.id));
 
               return (
                 <AnimatedMessageBubble
@@ -449,6 +452,10 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       style={{
                         transform: activeDragId === msg.id ? `translateX(${dragTranslateX}px)` : 'none',
                         transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        handleReactToMessage(msg.id, '❤️', e);
                       }}
                     >
                       {/* Sender Nickname Header for Incoming Messages */}
@@ -742,46 +749,85 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                         />
                       )}
 
-                      {/* Message 3 Dots Button Trigger */}
+                      {/* Quick React Smile Trigger & 3 Dots Button */}
                       {!msg.isDeleted && (
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onPointerUp={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuMsgId(activeMenuMsgId === msg.id ? null : msg.id);
-                          }}
+                        <div
                           style={{
                             position: 'absolute',
                             top: '6px',
                             right: '6px',
-                            width: '28px',
-                            height: '28px',
-                            backgroundColor: 'rgba(32, 44, 51, 0.85)',
-                            border: '1px solid rgba(255, 255, 255, 0.25)',
-                            color: '#ffffff',
-                            cursor: 'pointer',
-                            borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            gap: '4px',
                             zIndex: 25,
-                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
-                            backdropFilter: 'blur(4px)',
-                            transition: 'all 0.15s ease-in-out',
                           }}
-                          className="opacity-95 hover:opacity-100 hover:scale-110 active:scale-95"
-                          title="Message options"
                         >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" style={{ display: 'block' }}>
-                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                          </svg>
-                        </button>
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onPointerUp={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveReactionMsgId(String(activeReactionMsgId) === String(msg.id) ? null : msg.id);
+                              setActiveMenuMsgId(null);
+                            }}
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              backgroundColor: 'rgba(32, 44, 51, 0.85)',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              color: '#00a884',
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
+                              backdropFilter: 'blur(4px)',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            className="opacity-80 hover:opacity-100 hover:scale-110 active:scale-95"
+                            title="React to message"
+                          >
+                            <Icon icon="solar:smile-circle-bold-duotone" width="17" height="17" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onPointerUp={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuMsgId(String(activeMenuMsgId) === String(msg.id) ? null : msg.id);
+                              setActiveReactionMsgId(null);
+                            }}
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              backgroundColor: 'rgba(32, 44, 51, 0.85)',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              color: '#ffffff',
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
+                              backdropFilter: 'blur(4px)',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            className="opacity-95 hover:opacity-100 hover:scale-110 active:scale-95"
+                            title="Message options"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff" style={{ display: 'block' }}>
+                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                            </svg>
+                          </button>
+                        </div>
                       )}
 
                       {/* 3 Dots Context Dropdown Menu */}
-                      {!msg.isDeleted && activeMenuMsgId === msg.id && (
+                      {!msg.isDeleted && String(activeMenuMsgId) === String(msg.id) && (
                         <div
                           onPointerDown={(e) => e.stopPropagation()}
                           onPointerUp={(e) => e.stopPropagation()}
@@ -869,15 +915,19 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       )}
 
                       {/* Emoji Reactions Popover */}
-                      {activeReactionMsgId === msg.id && (
+                      {String(activeReactionMsgId) === String(msg.id) && (
                         <div
                           className="reactions-popover"
                           onPointerDown={(e) => e.stopPropagation()}
                           onPointerUp={(e) => e.stopPropagation()}
                           onClick={(e) => e.stopPropagation()}
                           style={{
+                            position: 'absolute',
+                            top: isNearTop ? '100%' : '-46px',
+                            marginTop: isNearTop ? '6px' : '0',
                             right: isMe ? '0px' : 'auto',
                             left: !isMe ? '0px' : 'auto',
+                            zIndex: 1002,
                           }}
                         >
                           {QUICK_REACTIONS.map((emoji, i) => (
@@ -902,7 +952,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             onPointerUp={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowCustomReactionForMsgId(showCustomReactionForMsgId === msg.id ? null : msg.id);
+                              setShowCustomReactionForMsgId(String(showCustomReactionForMsgId) === String(msg.id) ? null : msg.id);
                               setActiveReactionMsgId(null);
                             }}
                             title="More Emojis"
@@ -914,14 +964,15 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       )}
 
                       {/* Custom Reaction Emoji Picker Grid */}
-                      {showCustomReactionForMsgId === msg.id && (
+                      {String(showCustomReactionForMsgId) === String(msg.id) && (
                         <div
                           onPointerDown={(e) => e.stopPropagation()}
                           onPointerUp={(e) => e.stopPropagation()}
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             position: 'absolute',
-                            top: '-200px',
+                            top: isNearTop ? '100%' : '-200px',
+                            marginTop: isNearTop ? '6px' : '0',
                             right: isMe ? '0px' : 'auto',
                             left: !isMe ? '0px' : 'auto',
                             width: '260px',
@@ -930,7 +981,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             border: '1px solid rgba(134, 150, 160, 0.25)',
                             borderRadius: '16px',
                             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
-                            zIndex: 100,
+                            zIndex: 1003,
                             padding: '8px',
                             display: 'flex',
                             flexDirection: 'column',

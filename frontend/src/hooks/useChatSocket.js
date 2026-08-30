@@ -77,8 +77,21 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     // New Message Event Listeners
     socket.on('newMessage', (msg) => {
       setMessages((prev) => {
+        const tempIdx = prev.findIndex(
+          (m) =>
+            String(m.id).startsWith('temp-') &&
+            m.nickname === msg.nickname &&
+            (m.message === msg.message || (!m.message && !msg.message) || (m.fileUrl && m.fileUrl === msg.fileUrl))
+        );
+
+        if (tempIdx !== -1) {
+          const updated = [...prev];
+          updated[tempIdx] = { ...updated[tempIdx], ...msg, id: msg.id };
+          return updated;
+        }
+
         const clean = prev.filter(
-          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
+          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && (m.message === msg.message || (!m.message && !msg.message)))
         );
         if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
         return [...clean, msg];
@@ -87,8 +100,21 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     socket.on('message', (msg) => {
       setMessages((prev) => {
+        const tempIdx = prev.findIndex(
+          (m) =>
+            String(m.id).startsWith('temp-') &&
+            m.nickname === msg.nickname &&
+            (m.message === msg.message || (!m.message && !msg.message) || (m.fileUrl && m.fileUrl === msg.fileUrl))
+        );
+
+        if (tempIdx !== -1) {
+          const updated = [...prev];
+          updated[tempIdx] = { ...updated[tempIdx], ...msg, id: msg.id };
+          return updated;
+        }
+
         const clean = prev.filter(
-          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
+          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && (m.message === msg.message || (!m.message && !msg.message)))
         );
         if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
         return [...clean, msg];
@@ -377,12 +403,24 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   };
 
   const handleReactToMessage = (messageId, emoji) => {
-    const numericId = typeof messageId === 'number' ? messageId : (parseInt(messageId, 10) || messageId);
+    let targetId = messageId;
+    if (typeof messageId === 'string' && messageId.startsWith('temp-')) {
+      const found = messages.find((m) => String(m.id) === String(messageId));
+      if (found && typeof found.id === 'number') {
+        targetId = found.id;
+      }
+    }
+
+    const numericId = typeof targetId === 'number' ? targetId : parseInt(targetId, 10);
+    if (isNaN(numericId)) {
+      console.warn('Cannot react to message with non-numeric ID:', messageId);
+      return;
+    }
 
     // Optimistic UI state update (0ms instant visual feedback)
     setMessages((prev) =>
       prev.map((m) => {
-        if (String(m.id) !== String(messageId)) return m;
+        if (String(m.id) !== String(messageId) && String(m.id) !== String(numericId)) return m;
         let reactions = m.reactions;
 
         if (typeof reactions === 'string') {

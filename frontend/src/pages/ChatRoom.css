@@ -210,7 +210,7 @@
   align-items: center;
   gap: 4px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
-  z-index: 70;
+  z-index: 1002;
   white-space: nowrap;
   max-width: calc(100vw - 32px);
   animation: fadeIn 0.15s cubic-bezier(0.1, 0.9, 0.2, 1);
