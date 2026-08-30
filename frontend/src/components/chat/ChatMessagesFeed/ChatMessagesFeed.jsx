@@ -48,14 +48,23 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
   // Helper function to normalize reaction maps/arrays into a clean list
   const getNormalizedReactions = (reactions) => {
     if (!reactions) return [];
+    if (typeof reactions === 'string') {
+      try {
+        reactions = JSON.parse(reactions);
+      } catch {
+        return [];
+      }
+    }
     if (Array.isArray(reactions)) return reactions;
-    if (typeof reactions === 'object') {
+    if (typeof reactions === 'object' && reactions !== null) {
       const list = [];
       Object.entries(reactions).forEach(([emoji, users]) => {
         if (Array.isArray(users)) {
           users.forEach((userNick) => {
             list.push({ emoji, nickname: userNick });
           });
+        } else if (typeof users === 'string') {
+          list.push({ emoji, nickname: users });
         }
       });
       return list;
@@ -967,27 +976,29 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                         const normalizedReactions = getNormalizedReactions(msg.reactions);
                         if (normalizedReactions.length === 0) return null;
                         return (
-                          <motion.button
-                            type="button"
-                            className="m3-reaction-chip"
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.92 }}
-                            transition={{ type: 'spring', stiffness: 450, damping: 22 }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onPointerUp={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
-                            }}
-                            title={normalizedReactions.map((r) => `${r.nickname}: ${r.emoji}`).join('\n')}
-                          >
-                            {Array.from(new Set(normalizedReactions.map((r) => r.emoji))).map((emoji, i) => (
-                              <span key={i}>{emoji}</span>
-                            ))}
-                            <span style={{ color: '#00a884', fontWeight: 700, fontSize: '0.7rem' }}>
-                              {normalizedReactions.length}
-                            </span>
-                          </motion.button>
+                          <div style={{ display: 'flex', clear: 'both', marginTop: '6px', paddingTop: '2px' }}>
+                            <motion.button
+                              type="button"
+                              className="m3-reaction-chip"
+                              whileHover={{ scale: 1.08 }}
+                              whileTap={{ scale: 0.94 }}
+                              transition={{ type: 'spring', stiffness: 450, damping: 22 }}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onPointerUp={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
+                              }}
+                              title={normalizedReactions.map((r) => `${r.nickname}: ${r.emoji}`).join('\n')}
+                            >
+                              {Array.from(new Set(normalizedReactions.map((r) => r.emoji))).map((emoji, i) => (
+                                <span key={i} style={{ fontSize: '0.85rem' }}>{emoji}</span>
+                              ))}
+                              <span style={{ color: '#00a884', fontWeight: 700, fontSize: '0.72rem', marginLeft: '2px' }}>
+                                {normalizedReactions.length}
+                              </span>
+                            </motion.button>
+                          </div>
                         );
                       })()}
                     </div>

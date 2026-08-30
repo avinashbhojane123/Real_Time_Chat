@@ -385,6 +385,14 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         if (String(m.id) !== String(messageId)) return m;
         let reactions = m.reactions;
 
+        if (typeof reactions === 'string') {
+          try {
+            reactions = JSON.parse(reactions);
+          } catch {
+            reactions = {};
+          }
+        }
+
         if (!reactions || typeof reactions !== 'object') {
           reactions = {};
         }
@@ -417,12 +425,6 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     );
 
     socketRef.current?.emit('reactToMessage', {
-      passcode,
-      nickname,
-      messageId: numericId,
-      emoji,
-    });
-    socketRef.current?.emit('reactMessage', {
       passcode,
       nickname,
       messageId: numericId,

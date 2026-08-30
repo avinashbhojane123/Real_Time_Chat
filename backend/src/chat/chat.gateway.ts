@@ -1059,9 +1059,23 @@ export class ChatGateway
     });
     if (!msg) return;
 
-    const reactions = msg.reactions || {};
+    let reactions: Record<string, string[]> = {};
+    if (msg.reactions) {
+      if (typeof msg.reactions === 'string') {
+        try {
+          reactions = JSON.parse(msg.reactions);
+        } catch {
+          reactions = {};
+        }
+      } else if (typeof msg.reactions === 'object') {
+        reactions = { ...msg.reactions };
+      }
+    }
+
     const activeNickname = session.nickname;
-    let reactionUsers = reactions[data.emoji] || [];
+    let reactionUsers: string[] = Array.isArray(reactions[data.emoji])
+      ? [...reactions[data.emoji]]
+      : [];
 
     if (reactionUsers.includes(activeNickname)) {
       reactionUsers = reactionUsers.filter((u) => u !== activeNickname);
@@ -1078,11 +1092,14 @@ export class ChatGateway
     msg.reactions = Object.keys(reactions).length > 0 ? reactions : null;
     await this.messageRepo.save(msg);
 
-    this.server.to(data.passcode).emit('messageReactionsUpdated', {
+    const roomPasscode = room.passcode.trim();
+    const dataPasscode = data.passcode.trim();
+
+    this.server.to(roomPasscode).to(dataPasscode).emit('messageReactionsUpdated', {
       messageId: msg.id,
       reactions: msg.reactions,
     });
-    this.server.to(data.passcode).emit('messageReaction', {
+    this.server.to(roomPasscode).to(dataPasscode).emit('messageReaction', {
       messageId: msg.id,
       reactions: msg.reactions,
     });
