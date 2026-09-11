@@ -6,6 +6,16 @@ import './WatchPartyModal.css';
 // Curated Cinema Library Presets
 const CURATED_PRESETS = [
   {
+    id: 'call-my-agent-2026',
+    title: 'Call My Agent! The Movie (2026)',
+    subtitle: 'Dix Pour Cent ! • CinemaOS • 117 min',
+    url: 'https://cinemaos.live/watch/movie/1365884',
+    type: 'embed',
+    tmdbId: '1365884',
+    imdbId: 'tt38267923',
+    icon: 'solar:clapperboard-play-bold-duotone',
+  },
+  {
     id: 'tears-of-steel',
     title: 'Tears of Steel (Sci-Fi 4K)',
     subtitle: 'Blender Foundation • 12 min',
@@ -151,10 +161,42 @@ export default function WatchPartyModal({
 
     // Detect YouTube URL
     const isYt = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i.test(url);
+    const isDirectVideo = /\.(mp4|webm|ogg|mov|mkv|m4v|m3u8)(\?.*)?$/i.test(url);
+
+    // Extract TMDB or IMDb ID from links like cinemaos.live/watch/movie/1365884
+    const tmdbMatch = url.match(/(?:movie|tv|id)\/(\d+)/i);
+    const imdbMatch = url.match(/(tt\d{7,8})/i);
+    const extractedTmdbId = tmdbMatch ? tmdbMatch[1] : null;
+    const extractedImdbId = imdbMatch ? imdbMatch[1] : null;
+
+    let videoType = 'direct';
+    if (isYt) {
+      videoType = 'youtube';
+    } else if (isDirectVideo) {
+      videoType = 'direct';
+    } else {
+      videoType = 'embed';
+    }
+
+    let defaultTitle = customInputTitle.trim();
+    if (!defaultTitle) {
+      if (url.includes('1365884') || url.toLowerCase().includes('call-my-agent')) {
+        defaultTitle = 'Call My Agent! The Movie (2026)';
+      } else if (isYt) {
+        defaultTitle = 'YouTube Video';
+      } else if (videoType === 'embed') {
+        defaultTitle = 'Cinema Movie Stream';
+      } else {
+        defaultTitle = 'Custom Video Stream';
+      }
+    }
+
     const source = {
       url,
-      title: customInputTitle.trim() || (isYt ? 'YouTube Video' : 'Custom Movie Stream'),
-      type: isYt ? 'youtube' : 'direct',
+      title: defaultTitle,
+      type: videoType,
+      tmdbId: extractedTmdbId,
+      imdbId: extractedImdbId,
     };
     changeVideo(source);
     setCustomInputUrl('');
@@ -257,8 +299,15 @@ export default function WatchPartyModal({
             <iframe
               src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
               className="watch-party-yt-iframe"
-              allow="autoplay; encrypted-media"
+              allow="autoplay; encrypted-media; fullscreen"
               title="YouTube Watch Party"
+            />
+          ) : videoSource?.url ? (
+            <iframe
+              src={videoSource.url}
+              className="watch-party-yt-iframe"
+              allow="autoplay; encrypted-media; fullscreen"
+              title={videoSource.title || 'Watch Party Stream'}
             />
           ) : null}
         </div>
@@ -371,6 +420,144 @@ export default function WatchPartyModal({
           </div>
         </div>
 
+        {/* Server / Mirror Switcher Bar for Cinema / Embed Streams */}
+        {(videoSource?.type === 'embed' || videoSource?.tmdbId || videoSource?.url?.includes('cinemaos') || videoSource?.url?.includes('1365884')) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 16px',
+              background: 'rgba(0, 0, 0, 0.75)',
+              borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
+              fontSize: '0.78rem',
+              overflowX: 'auto',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ color: '#00a884', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+              <Icon icon="solar:server-square-bold-duotone" width="16" />
+              <span>Movie Stream:</span>
+            </span>
+
+            <button
+              type="button"
+              style={{
+                padding: '3px 10px',
+                fontSize: '0.75rem',
+                background: videoSource.url?.includes('cinemaos.live') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                color: videoSource.url?.includes('cinemaos.live') ? '#00a884' : '#e9edef',
+                border: videoSource.url?.includes('cinemaos.live') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => {
+                const id = videoSource.tmdbId || '1365884';
+                changeVideo({
+                  ...videoSource,
+                  url: `https://cinemaos.live/watch/movie/${id}`,
+                  type: 'embed',
+                });
+              }}
+            >
+              CinemaOS (Direct)
+            </button>
+
+            <button
+              type="button"
+              style={{
+                padding: '3px 10px',
+                fontSize: '0.75rem',
+                background: videoSource.url?.includes('vidlink.pro') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                color: videoSource.url?.includes('vidlink.pro') ? '#00a884' : '#e9edef',
+                border: videoSource.url?.includes('vidlink.pro') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => {
+                const id = videoSource.tmdbId || '1365884';
+                changeVideo({
+                  ...videoSource,
+                  url: `https://vidlink.pro/movie/${id}`,
+                  type: 'embed',
+                });
+              }}
+            >
+              VidLink (Clean Embed)
+            </button>
+
+            <button
+              type="button"
+              style={{
+                padding: '3px 10px',
+                fontSize: '0.75rem',
+                background: videoSource.url?.includes('vidsrc.pro') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                color: videoSource.url?.includes('vidsrc.pro') ? '#00a884' : '#e9edef',
+                border: videoSource.url?.includes('vidsrc.pro') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => {
+                const id = videoSource.tmdbId || '1365884';
+                changeVideo({
+                  ...videoSource,
+                  url: `https://vidsrc.pro/embed/movie/${id}`,
+                  type: 'embed',
+                });
+              }}
+            >
+              VidSrc
+            </button>
+
+            <button
+              type="button"
+              style={{
+                padding: '3px 10px',
+                fontSize: '0.75rem',
+                background: videoSource.url?.includes('multiembed.mov') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                color: videoSource.url?.includes('multiembed.mov') ? '#00a884' : '#e9edef',
+                border: videoSource.url?.includes('multiembed.mov') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => {
+                const id = videoSource.tmdbId || '1365884';
+                changeVideo({
+                  ...videoSource,
+                  url: `https://multiembed.mov/?video_id=${id}&tmdb=1`,
+                  type: 'embed',
+                });
+              }}
+            >
+              MultiEmbed
+            </button>
+
+            <a
+              href={videoSource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                marginLeft: 'auto',
+                color: '#00a884',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.75rem',
+                whiteSpace: 'nowrap',
+              }}
+              title="Open stream in a new tab if iframe playback is restricted by browser"
+            >
+              <span>Open in New Tab</span>
+              <Icon icon="solar:arrow-right-up-bold" width="12" />
+            </a>
+          </div>
+        )}
+
         {/* Video Player Surface */}
         <div className="watch-party-player-surface">
           {videoSource?.type === 'direct' ? (
@@ -389,8 +576,17 @@ export default function WatchPartyModal({
             <iframe
               src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
               className="watch-party-yt-iframe"
-              allow="autoplay; encrypted-media"
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
               title="YouTube Watch Party"
+            />
+          ) : videoSource?.type === 'embed' || videoSource?.url ? (
+            <iframe
+              src={videoSource.url}
+              className="watch-party-yt-iframe"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              allowFullScreen
+              title={videoSource.title || 'Movie Watch Party'}
             />
           ) : (
             <div style={{ color: '#8696a0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
