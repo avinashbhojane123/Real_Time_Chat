@@ -778,56 +778,59 @@ export default function ChatRoom() {
         />
       </main>
 
-      {/* WebRTC Video Call Panel Overlay */}
-      <VideoCallPanel
-        showVideoPanel={webRTC.showVideoPanel}
-        setShowVideoPanel={webRTC.setShowVideoPanel}
-        callState={webRTC.callState}
-        callerName={webRTC.callerName}
-        remoteUserName={webRTC.remoteUserName}
-        remoteVideoRef={webRTC.remoteVideoRef}
-        localVideoRef={webRTC.localVideoRef}
-        localStream={webRTC.localStream}
-        remoteStream={webRTC.remoteStream}
-        videoFit={webRTC.videoFit}
-        setVideoFit={webRTC.setVideoFit}
-        callDuration={webRTC.callDuration}
-        formatTimer={formatTimer}
-        isStreamSwapped={webRTC.isStreamSwapped}
-        setIsStreamSwapped={webRTC.setIsStreamSwapped}
-        micMuted={webRTC.micMuted}
-        cameraOff={webRTC.cameraOff}
-        isScreenSharing={webRTC.isScreenSharing}
-        isScreenShareSupported={webRTC.isScreenShareSupported}
-        toggleMic={webRTC.toggleMic}
-        toggleCamera={webRTC.toggleCamera}
-        flipCamera={webRTC.flipCamera}
-        toggleScreenShare={webRTC.toggleScreenShare}
-        pipMode={webRTC.pipMode}
-        setPipMode={webRTC.setPipMode}
-        pipWindow={webRTC.pipWindow}
-        openDesktopPip={webRTC.openDesktopPip}
-        openInAppPip={webRTC.openInAppPip}
-        closePip={webRTC.closePip}
-        togglePip={webRTC.togglePip}
-        isPipSupported={webRTC.isPipSupported}
-        isDocPipSupported={webRTC.isDocPipSupported}
-        isPipMinimized={webRTC.isPipMinimized}
-        setIsPipMinimized={webRTC.setIsPipMinimized}
-        togglePipMinimized={webRTC.togglePipMinimized}
-        toggleNativePip={webRTC.toggleNativePip}
-        acceptCall={webRTC.acceptCall}
-        declineCall={webRTC.declineCall}
-        endCall={webRTC.endCall}
-      />
+      {/* WebRTC Video Call Panel Overlay (hidden when WatchParty cinema has its own live face cams) */}
+      {!watchParty.isOpen && (
+        <VideoCallPanel
+          showVideoPanel={webRTC.showVideoPanel}
+          setShowVideoPanel={webRTC.setShowVideoPanel}
+          callState={webRTC.callState}
+          callerName={webRTC.callerName}
+          remoteUserName={webRTC.remoteUserName}
+          remoteVideoRef={webRTC.remoteVideoRef}
+          localVideoRef={webRTC.localVideoRef}
+          localStream={webRTC.localStream}
+          remoteStream={webRTC.remoteStream}
+          videoFit={webRTC.videoFit}
+          setVideoFit={webRTC.setVideoFit}
+          callDuration={webRTC.callDuration}
+          formatTimer={formatTimer}
+          isStreamSwapped={webRTC.isStreamSwapped}
+          setIsStreamSwapped={webRTC.setIsStreamSwapped}
+          micMuted={webRTC.micMuted}
+          cameraOff={webRTC.cameraOff}
+          isScreenSharing={webRTC.isScreenSharing}
+          isScreenShareSupported={webRTC.isScreenShareSupported}
+          toggleMic={webRTC.toggleMic}
+          toggleCamera={webRTC.toggleCamera}
+          flipCamera={webRTC.flipCamera}
+          toggleScreenShare={webRTC.toggleScreenShare}
+          pipMode={webRTC.pipMode}
+          setPipMode={webRTC.setPipMode}
+          pipWindow={webRTC.pipWindow}
+          openDesktopPip={webRTC.openDesktopPip}
+          openInAppPip={webRTC.openInAppPip}
+          closePip={webRTC.closePip}
+          togglePip={webRTC.togglePip}
+          isPipSupported={webRTC.isPipSupported}
+          isDocPipSupported={webRTC.isDocPipSupported}
+          isPipMinimized={webRTC.isPipMinimized}
+          setIsPipMinimized={webRTC.setIsPipMinimized}
+          togglePipMinimized={webRTC.togglePipMinimized}
+          toggleNativePip={webRTC.toggleNativePip}
+          acceptCall={webRTC.acceptCall}
+          declineCall={webRTC.declineCall}
+          endCall={webRTC.endCall}
+        />
+      )}
 
-      {/* Zero-Lag Watch Party / Watch Together Cinema Modal */}
+      {/* Zero-Lag Watch Party / Watch Together Cinema Modal with Live Face Cams */}
       <WatchPartyModal
         isOpen={watchParty.isOpen}
         onClose={() => watchParty.setIsOpen(false)}
         watchParty={watchParty}
         recipientUser={recipientUser}
         currentNickname={nickname}
+        webRTC={webRTC}
         onSendChatMessage={handleSendMessage}
       />
 

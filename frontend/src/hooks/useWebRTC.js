@@ -336,11 +336,13 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       } else if (callStateRef.current === 'active') {
         const pc = peerConnectionRef.current || createPeerConnection();
         try {
-          await pc.setRemoteDescription(new RTCSessionDescription(offer));
-          processPendingIceCandidates();
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          socket.emit('webrtcAnswer', { passcode, answer });
+          if (pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            processPendingIceCandidates();
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('webrtcAnswer', { passcode, answer, receiverName: nickname });
+          }
         } catch (err) {
           console.warn('[WebRTC] Handling offer error:', err);
         }
@@ -349,7 +351,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
     const handleWebrtcAnswer = async ({ answer }) => {
       const pc = peerConnectionRef.current;
-      if (pc) {
+      if (pc && pc.signalingState === 'have-local-offer') {
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
           processPendingIceCandidates();
@@ -361,7 +363,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     const handleWebrtcCandidate = ({ candidate }) => {
-      addIceCandidateSafely(candidate);
+      if (candidate) {
+        addIceCandidateSafely(candidate);
+      }
     };
 
     const handleScreenShareStatus = ({ isSharing }) => {
@@ -383,37 +387,25 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     socket.on('callUser', handleCallUser);
-    socket.on('userCalling', handleCallUser);
     socket.on('acceptCall', handleCallAccepted);
-    socket.on('callAccepted', handleCallAccepted);
     socket.on('webrtcOffer', handleWebrtcOffer);
-    socket.on('webrtcOfferRelay', handleWebrtcOffer);
     socket.on('webrtcAnswer', handleWebrtcAnswer);
-    socket.on('webrtcAnswerRelay', handleWebrtcAnswer);
     socket.on('webrtcCandidate', handleWebrtcCandidate);
-    socket.on('webrtcCandidateRelay', handleWebrtcCandidate);
     socket.on('screenShareStatus', handleScreenShareStatus);
     socket.on('callEnded', handleCallEnd);
-    socket.on('endCall', handleCallEnd);
     socket.on('callDeclined', handleCallDeclined);
 
     return () => {
       socket.off('callUser', handleCallUser);
-      socket.off('userCalling', handleCallUser);
       socket.off('acceptCall', handleCallAccepted);
-      socket.off('callAccepted', handleCallAccepted);
       socket.off('webrtcOffer', handleWebrtcOffer);
-      socket.off('webrtcOfferRelay', handleWebrtcOffer);
       socket.off('webrtcAnswer', handleWebrtcAnswer);
-      socket.off('webrtcAnswerRelay', handleWebrtcAnswer);
       socket.off('webrtcCandidate', handleWebrtcCandidate);
-      socket.off('webrtcCandidateRelay', handleWebrtcCandidate);
       socket.off('screenShareStatus', handleScreenShareStatus);
       socket.off('callEnded', handleCallEnd);
-      socket.off('endCall', handleCallEnd);
       socket.off('callDeclined', handleCallDeclined);
     };
-  }, [socketRef, passcode, createPeerConnection, processPendingIceCandidates, addIceCandidateSafely, cleanUpCall, showToast]);
+  }, [socketRef, passcode, nickname, createPeerConnection, processPendingIceCandidates, addIceCandidateSafely, cleanUpCall, showToast]);
 
   const startCall = async () => {
     updateCallState('calling');
@@ -443,7 +435,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
   const acceptCall = async () => {
     updateCallState('active');
-    socketRef.current?.emit('acceptCall', { passcode });
+    socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -459,7 +451,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        socketRef.current?.emit('webrtcAnswer', { passcode, answer });
+        socketRef.current?.emit('webrtcAnswer', { passcode, answer, receiverName: nickname });
       }
     } catch (err) {
       alert('Could not access camera/microphone to accept call: ' + err.message);
@@ -468,7 +460,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   };
 
   const declineCall = () => {
-    socketRef.current?.emit('declineCall', { passcode });
+    socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
     cleanUpCall();
   };
 

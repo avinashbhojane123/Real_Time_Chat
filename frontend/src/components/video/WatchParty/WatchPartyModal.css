@@ -162,6 +162,95 @@
   border-color: #f15c6d;
 }
 
+/* Movie Stream & Mirror Switcher Toolbar */
+.watch-party-stream-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background: rgba(11, 20, 26, 0.95);
+  border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+  font-size: 0.78rem;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.stream-bar-provider-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: rgba(0, 168, 132, 0.15);
+  border: 1px solid rgba(0, 168, 132, 0.35);
+  border-radius: 6px;
+  color: #00a884;
+  font-weight: 700;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.stream-bar-title {
+  color: #e9edef;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.stream-bar-btn {
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e9edef;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.stream-bar-btn:hover {
+  background: rgba(0, 168, 132, 0.2);
+  border-color: #00a884;
+  color: #00a884;
+}
+
+.stream-bar-btn.active {
+  background: rgba(0, 168, 132, 0.25);
+  color: #00a884;
+  border-color: #00a884;
+}
+
+.stream-bar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stream-bar-link {
+  color: #00a884;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: rgba(0, 168, 132, 0.1);
+  border: 1px solid rgba(0, 168, 132, 0.25);
+  transition: all 0.15s ease;
+}
+
+.stream-bar-link:hover {
+  background: rgba(0, 168, 132, 0.25);
+  border-color: #00a884;
+}
+
 /* Player Surface */
 .watch-party-player-surface {
   position: relative;
@@ -566,6 +655,69 @@
   color: #8696a0;
 }
 
+/* Supported Movie Platform Chips */
+.watch-party-sites-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.watch-party-sites-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8696a0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.watch-party-sites-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.watch-party-site-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(134, 150, 160, 0.2);
+  color: #e9edef;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  cursor: pointer;
+}
+
+.watch-party-site-chip:hover {
+  background: rgba(0, 168, 132, 0.15);
+  border-color: #00a884;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.watch-party-site-chip .site-name {
+  white-space: nowrap;
+}
+
+.watch-party-site-chip .site-arrow {
+  opacity: 0.45;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.watch-party-site-chip:hover .site-arrow {
+  opacity: 1;
+  transform: translate(1px, -1px);
+}
+
 /* Custom URL Input Row */
 .custom-url-form {
   display: flex;
@@ -664,3 +816,324 @@
     width: 260px;
   }
 }
+
+/* =========================================================================
+   Floating Live Face Cams (Sender & Receiver Live Webcams)
+   ========================================================================= */
+.watch-party-btn-icon.call-active-glow {
+  background: rgba(0, 168, 132, 0.25);
+  color: #00a884;
+  border-color: #00a884;
+  box-shadow: 0 0 12px rgba(0, 168, 132, 0.4);
+}
+
+.watch-party-btn-icon.incoming-pulse {
+  animation: incomingPulse 1s infinite alternate;
+  border-color: #00a884;
+  color: #00a884;
+}
+
+@keyframes incomingPulse {
+  from { box-shadow: 0 0 4px #00a884; transform: scale(1); }
+  to { box-shadow: 0 0 16px #00a884; transform: scale(1.1); }
+}
+
+.watch-party-face-cams {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 320px;
+  background: rgba(17, 27, 33, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 168, 132, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+  z-index: 45;
+  overflow: hidden;
+  cursor: grab;
+  transition: width 0.25s ease, border-color 0.2s ease;
+}
+
+.watch-party-face-cams:active {
+  cursor: grabbing;
+}
+
+.watch-party-face-cams.minimized {
+  width: 170px;
+}
+
+.face-cams-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.face-cams-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #00a884;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.face-cam-live-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #00a884;
+  box-shadow: 0 0 8px #00a884;
+  animation: watchPartyPulse 1.5s infinite;
+}
+
+.face-cams-duration {
+  color: #8696a0;
+  font-weight: 500;
+  font-size: 0.7rem;
+  margin-left: 4px;
+}
+
+.face-cams-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.face-cam-mini-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8696a0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.face-cam-mini-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #e9edef;
+}
+
+.face-cam-mini-btn.end-call:hover {
+  background: rgba(241, 92, 109, 0.25);
+  border-color: #f15c6d;
+  color: #f15c6d;
+}
+
+/* Incoming / Calling Prompt */
+.face-cams-prompt {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.prompt-caller-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #e9edef;
+}
+
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.prompt-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.prompt-btn.accept {
+  background: #00a884;
+  color: #111b21;
+}
+
+.prompt-btn.accept:hover {
+  background: #008f6f;
+}
+
+.prompt-btn.decline {
+  background: rgba(241, 92, 109, 0.18);
+  border: 1px solid rgba(241, 92, 109, 0.4);
+  color: #f15c6d;
+}
+
+.prompt-btn.decline:hover {
+  background: rgba(241, 92, 109, 0.35);
+}
+
+/* Dual Cams Grid (Partner & You) */
+.face-cams-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+}
+
+.face-cam-card {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #060d11;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.face-cam-card.receiver {
+  border-color: rgba(0, 168, 132, 0.4);
+}
+
+.face-cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.face-cam-video.cam-off {
+  display: none;
+}
+
+.face-cam-avatar-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: #0b141a;
+}
+
+.face-cam-avatar-fallback .avatar-letter {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #00a884;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.face-cam-avatar-fallback .avatar-status {
+  font-size: 0.68rem;
+  color: #8696a0;
+}
+
+.face-cam-tag {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(11, 20, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #e9edef;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.face-cam-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8696a0;
+}
+
+.face-cam-dot.active {
+  background: #00a884;
+}
+
+/* Face Cams Quick Control Bar */
+.face-cams-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.face-cam-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e9edef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.face-cam-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.face-cam-action-btn.muted {
+  background: rgba(241, 92, 109, 0.2);
+  border-color: #f15c6d;
+  color: #f15c6d;
+}
+
+.face-cam-action-btn.end-btn {
+  background: #f15c6d;
+  border-color: #f15c6d;
+  color: #ffffff;
+}
+
+.face-cam-action-btn.end-btn:hover {
+  background: #d84355;
+}
+
+@media (max-width: 768px) {
+  .watch-party-face-cams {
+    width: 240px;
+    top: 8px;
+    right: 8px;
+  }
+}
+

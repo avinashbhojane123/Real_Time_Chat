@@ -5,12 +5,59 @@ import './WatchPartyModal.css';
 
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
 
+// Supported Movie & Series Platforms
+const SUPPORTED_MOVIE_SITES = [
+  {
+    name: 'CinemaOS',
+    url: 'https://cinemaos.live',
+    tagline: 'HD Movies & Series',
+    icon: 'solar:clapperboard-play-bold-duotone',
+    color: '#00a884',
+  },
+  {
+    name: 'CineHD',
+    url: 'https://cinehd.vc',
+    tagline: '4K Cinema',
+    icon: 'solar:videocamera-record-bold-duotone',
+    color: '#3b82f6',
+  },
+  {
+    name: 'Cineby',
+    url: 'https://cinebytv.com/',
+    tagline: 'Free Streaming',
+    icon: 'solar:tv-bold-duotone',
+    color: '#ec4899',
+  },
+  {
+    name: 'Cinevice',
+    url: 'https://cinevice.net/',
+    tagline: 'Fast Streams',
+    icon: 'solar:playback-speed-bold-duotone',
+    color: '#8b5cf6',
+  },
+  {
+    name: 'MX Player',
+    url: 'https://www.mxplayer.in/',
+    tagline: 'Indian & Global Shows',
+    icon: 'solar:play-circle-bold-duotone',
+    color: '#f59e0b',
+  },
+  {
+    name: 'PRMovies',
+    url: 'https://prmovies.energy/',
+    tagline: 'Bollywood & Hollywood',
+    icon: 'solar:film-strip-bold-duotone',
+    color: '#ef4444',
+  },
+];
+
 export default function WatchPartyModal({
   isOpen,
   onClose,
   watchParty,
   recipientUser,
   currentNickname,
+  webRTC,
   onSendChatMessage,
 }) {
   const {
@@ -47,6 +94,27 @@ export default function WatchPartyModal({
   const [quickComment, setQuickComment] = useState('');
   const [danmakuComments, setDanmakuComments] = useState([]);
   const scrubberRef = useRef(null);
+
+  // Live Face Cams (Sender & Receiver) states & refs
+  const [showFaceCams, setShowFaceCams] = useState(true);
+  const [faceCamsMinimized, setFaceCamsMinimized] = useState(false);
+  const partyLocalVideoRef = useRef(null);
+  const partyRemoteVideoRef = useRef(null);
+
+  // Sync webRTC streams to Watch Party face cams
+  useEffect(() => {
+    if (partyLocalVideoRef.current && webRTC?.localStream) {
+      partyLocalVideoRef.current.srcObject = webRTC.localStream;
+      partyLocalVideoRef.current.play().catch(() => {});
+    }
+  }, [webRTC?.localStream, webRTC?.callState, showFaceCams, faceCamsMinimized]);
+
+  useEffect(() => {
+    if (partyRemoteVideoRef.current && webRTC?.remoteStream) {
+      partyRemoteVideoRef.current.srcObject = webRTC.remoteStream;
+      partyRemoteVideoRef.current.play().catch(() => {});
+    }
+  }, [webRTC?.remoteStream, webRTC?.callState, showFaceCams, faceCamsMinimized]);
 
   // Video element sync & event wiring
   const handleTimeUpdate = (e) => {
@@ -100,49 +168,130 @@ export default function WatchPartyModal({
       rawUrl = 'https://' + rawUrl;
     }
 
-    const isCinemaOs = /cinemaos\.live/i.test(rawUrl);
     const isYt = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i.test(rawUrl);
     const isDirectVideo = /\.(mp4|webm|ogg|mov|mkv|m4v|m3u8)(\?.*)?$/i.test(rawUrl);
+    const isCinemaOs = /cinemaos\.live/i.test(rawUrl);
+    const isCineHd = /cinehd\./i.test(rawUrl);
+    const isCineby = /cineby/i.test(rawUrl);
+    const isCinevice = /cinevice/i.test(rawUrl);
+    const isMxPlayer = /mxplayer\.in/i.test(rawUrl);
+    const isPrMovies = /prmovies/i.test(rawUrl);
 
-    // Extract type and ID from cinemaos or embed links (e.g. cinemaos.live/watch/movie/1365884 or cinemaos.live/watch/tv/1234/1/1)
+    // Extract type and ID from movie links (e.g. cinemaos.live/watch/movie/1365884 or cinemaos.live/watch/tv/1234/1/1)
     const mediaTypeMatch = rawUrl.match(/(?:watch\/)?(movie|tv)\/([a-zA-Z0-9_\-]+)(?:\/(\d+)\/(\d+))?/i);
     const tmdbMatch = rawUrl.match(/(?:movie|tv|id|video_id=)\/?(\d+)/i);
     const imdbMatch = rawUrl.match(/(tt\d{7,8})/i);
 
     const mediaType = mediaTypeMatch ? mediaTypeMatch[1].toLowerCase() : (rawUrl.includes('/tv/') ? 'tv' : 'movie');
-    const extractedTmdbId = tmdbMatch ? tmdbMatch[1] : (mediaTypeMatch ? mediaTypeMatch[2] : null);
+    const extractedTmdbId = tmdbMatch ? tmdbMatch[1] : (mediaTypeMatch && /^\d+$/.test(mediaTypeMatch[2]) ? mediaTypeMatch[2] : null);
     const extractedImdbId = imdbMatch ? imdbMatch[1] : null;
     const season = mediaTypeMatch && mediaTypeMatch[3] ? mediaTypeMatch[3] : '1';
     const episode = mediaTypeMatch && mediaTypeMatch[4] ? mediaTypeMatch[4] : '1';
 
     let videoType = 'direct';
+    let provider = 'Web Stream';
+    let providerColor = '#00a884';
+    let providerIcon = 'solar:clapperboard-play-bold-duotone';
+
     if (isYt) {
       videoType = 'youtube';
+      provider = 'YouTube';
+      providerColor = '#ff4444';
+      providerIcon = 'solar:play-circle-bold-duotone';
     } else if (isDirectVideo) {
       videoType = 'direct';
+      provider = 'Direct Stream';
+      providerColor = '#00a884';
+      providerIcon = 'solar:videocamera-record-bold-duotone';
     } else {
       videoType = 'embed';
+      if (isCinemaOs) {
+        provider = 'CinemaOS';
+        providerColor = '#00a884';
+        providerIcon = 'solar:clapperboard-play-bold-duotone';
+      } else if (isCineHd) {
+        provider = 'CineHD';
+        providerColor = '#3b82f6';
+        providerIcon = 'solar:videocamera-record-bold-duotone';
+      } else if (isCineby) {
+        provider = 'Cineby';
+        providerColor = '#ec4899';
+        providerIcon = 'solar:tv-bold-duotone';
+      } else if (isCinevice) {
+        provider = 'Cinevice';
+        providerColor = '#8b5cf6';
+        providerIcon = 'solar:playback-speed-bold-duotone';
+      } else if (isMxPlayer) {
+        provider = 'MX Player';
+        providerColor = '#f59e0b';
+        providerIcon = 'solar:play-circle-bold-duotone';
+      } else if (isPrMovies) {
+        provider = 'PRMovies';
+        providerColor = '#ef4444';
+        providerIcon = 'solar:film-strip-bold-duotone';
+      }
     }
 
+    // Auto-convert cinemaos.live/movie/12345 to watch format cinemaos.live/watch/movie/12345
+    let streamUrl = rawUrl;
+    if (isCinemaOs && !streamUrl.includes('/watch/')) {
+      if (extractedTmdbId) {
+        streamUrl = `https://cinemaos.live/watch/movie/${extractedTmdbId}`;
+      }
+    }
+
+    // Smartly derive title from URL slug or parameters
     let defaultTitle = customInputTitle.trim();
     if (!defaultTitle) {
-      if (rawUrl.includes('1365884') || rawUrl.toLowerCase().includes('call-my-agent')) {
-        defaultTitle = 'Call My Agent! The Movie (2026)';
-      } else if (isCinemaOs) {
-        defaultTitle = `CinemaOS ${mediaType === 'tv' ? `Series (S${season}E${episode})` : 'Movie'} #${extractedTmdbId || 'Stream'}`;
-      } else if (isYt) {
-        defaultTitle = 'YouTube Video';
-      } else if (videoType === 'embed') {
-        defaultTitle = 'Cinema Movie Stream';
-      } else {
-        defaultTitle = 'Custom Video Stream';
+      try {
+        const parsed = new URL(rawUrl);
+        const pathSegments = parsed.pathname.split('/').filter(Boolean);
+        const lastSegment = pathSegments[pathSegments.length - 1] || pathSegments[pathSegments.length - 2] || '';
+
+        if (lastSegment && !/^\d+$/.test(lastSegment)) {
+          let clean = decodeURIComponent(lastSegment)
+            .replace(/^watch-?/i, '')
+            .replace(/-(?:full-)?movie(?:-online)?(?:-free)?$/i, '')
+            .replace(/-(?:online-free|online|free|hd|4k|hindi|dubbed|dual-audio)$/i, '')
+            .replace(/-\d{6,}$/i, '')
+            .replace(/[-_]+/g, ' ')
+            .trim();
+
+          if (clean) {
+            clean = clean
+              .split(' ')
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+              .join(' ');
+            defaultTitle = `${clean} • ${provider}`;
+          }
+        }
+      } catch (err) {
+        // Fallback below
+      }
+
+      if (!defaultTitle) {
+        if (rawUrl.includes('1365884') || rawUrl.toLowerCase().includes('call-my-agent')) {
+          defaultTitle = 'Call My Agent! The Movie (2026)';
+        } else if (isCinemaOs) {
+          defaultTitle = `CinemaOS ${mediaType === 'tv' ? `Series (S${season}E${episode})` : 'Movie'} #${extractedTmdbId || 'Stream'}`;
+        } else if (isYt) {
+          defaultTitle = 'YouTube Video';
+        } else if (extractedTmdbId) {
+          defaultTitle = `${provider} Movie #${extractedTmdbId}`;
+        } else {
+          defaultTitle = `${provider} Movie Stream`;
+        }
       }
     }
 
     const source = {
-      url: rawUrl,
+      url: streamUrl,
+      originalUrl: rawUrl,
       title: defaultTitle,
       type: videoType,
+      provider,
+      providerColor,
+      providerIcon,
       isCinemaOs,
       mediaType,
       tmdbId: extractedTmdbId,
@@ -314,9 +463,6 @@ export default function WatchPartyModal({
               <span className="watch-party-pulse-dot" />
               <span>Watch Together</span>
             </div>
-            <span className="watch-party-video-title" title={videoSource?.title}>
-              {videoSource?.title || 'Select a Movie or Video'}
-            </span>
           </div>
 
           {/* Recipient / Partner Sync Status Pill */}
@@ -334,6 +480,46 @@ export default function WatchPartyModal({
 
           {/* Header Controls */}
           <div className="watch-party-header-actions">
+            {/* Live Face Cam (Video Call) Toggle Button */}
+            {webRTC && (
+              <button
+                type="button"
+                className={`watch-party-btn-icon ${webRTC.callState === 'active' ? 'active call-active-glow' : ''} ${webRTC.callState === 'incoming' ? 'incoming-pulse' : ''}`}
+                onClick={() => {
+                  if (webRTC.callState === 'idle') {
+                    webRTC.startCall();
+                    setShowFaceCams(true);
+                    setFaceCamsMinimized(false);
+                  } else if (webRTC.callState === 'incoming') {
+                    webRTC.acceptCall();
+                    setShowFaceCams(true);
+                    setFaceCamsMinimized(false);
+                  } else {
+                    setShowFaceCams(!showFaceCams);
+                  }
+                }}
+                title={
+                  webRTC.callState === 'active'
+                    ? (showFaceCams ? 'Hide Face Cams' : 'Show Face Cams')
+                    : webRTC.callState === 'incoming'
+                    ? 'Accept Live Face Cam Call'
+                    : 'Start Live Face Cams while Watching'
+                }
+              >
+                {webRTC.callState === 'active' && <span className="watch-party-pulse-dot" style={{ backgroundColor: '#00a884' }} />}
+                <Icon
+                  icon={
+                    webRTC.callState === 'active'
+                      ? 'solar:videocamera-record-bold-duotone'
+                      : webRTC.callState === 'incoming'
+                      ? 'solar:phone-calling-rounded-bold'
+                      : 'solar:videocamera-add-bold-duotone'
+                  }
+                  width="20"
+                />
+              </button>
+            )}
+
             <button
               type="button"
               className={`watch-party-btn-icon ${showDrawer ? 'active' : ''}`}
@@ -372,141 +558,110 @@ export default function WatchPartyModal({
           </div>
         </div>
 
-        {/* Server / Mirror Switcher Bar for Cinema / Embed Streams */}
-        {(videoSource?.type === 'embed' || videoSource?.tmdbId || videoSource?.url?.includes('cinemaos') || videoSource?.url?.includes('1365884')) && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              background: 'rgba(0, 0, 0, 0.75)',
-              borderBottom: '1px solid rgba(134, 150, 160, 0.15)',
-              fontSize: '0.78rem',
-              overflowX: 'auto',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ color: '#00a884', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-              <Icon icon="solar:server-square-bold-duotone" width="16" />
-              <span>Movie Stream:</span>
-            </span>
+        {/* Stream Source & Mirror Switcher Bar for Movie Streams */}
+        {videoSource && videoSource.type !== 'direct' && (
+          <div className="watch-party-stream-bar">
+            <div className="stream-bar-provider-badge">
+              <Icon icon={videoSource.providerIcon || 'solar:clapperboard-play-bold-duotone'} width="15" style={{ color: videoSource.providerColor || '#00a884' }} />
+              <span>{videoSource.provider || 'Movie Stream'}</span>
+            </div>
 
-            <button
-              type="button"
-              style={{
-                padding: '3px 10px',
-                fontSize: '0.75rem',
-                background: videoSource.url?.includes('cinemaos.live') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                color: videoSource.url?.includes('cinemaos.live') ? '#00a884' : '#e9edef',
-                border: videoSource.url?.includes('cinemaos.live') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              onClick={() => {
-                const id = videoSource.tmdbId || '1365884';
-                changeVideo({
-                  ...videoSource,
-                  url: `https://cinemaos.live/watch/movie/${id}`,
-                  type: 'embed',
-                });
-              }}
-            >
-              CinemaOS (Direct)
-            </button>
+            {videoSource.title && (
+              <span className="stream-bar-title" title={videoSource.title}>
+                {videoSource.title}
+              </span>
+            )}
 
-            <button
-              type="button"
-              style={{
-                padding: '3px 10px',
-                fontSize: '0.75rem',
-                background: videoSource.url?.includes('vidlink.pro') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                color: videoSource.url?.includes('vidlink.pro') ? '#00a884' : '#e9edef',
-                border: videoSource.url?.includes('vidlink.pro') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              onClick={() => {
-                const id = videoSource.tmdbId || '1365884';
-                changeVideo({
-                  ...videoSource,
-                  url: `https://vidlink.pro/movie/${id}`,
-                  type: 'embed',
-                });
-              }}
-            >
-              VidLink (Clean Embed)
-            </button>
+            {/* Switch back to original pasted URL if currently on a mirror */}
+            {videoSource.originalUrl && videoSource.originalUrl !== videoSource.url && (
+              <button
+                type="button"
+                className="stream-bar-btn"
+                onClick={() => {
+                  changeVideo({
+                    ...videoSource,
+                    url: videoSource.originalUrl,
+                  });
+                }}
+                title="Switch back to original site stream"
+              >
+                Original Stream
+              </button>
+            )}
 
-            <button
-              type="button"
-              style={{
-                padding: '3px 10px',
-                fontSize: '0.75rem',
-                background: videoSource.url?.includes('vidsrc.pro') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                color: videoSource.url?.includes('vidsrc.pro') ? '#00a884' : '#e9edef',
-                border: videoSource.url?.includes('vidsrc.pro') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              onClick={() => {
-                const id = videoSource.tmdbId || '1365884';
-                changeVideo({
-                  ...videoSource,
-                  url: `https://vidsrc.pro/embed/movie/${id}`,
-                  type: 'embed',
-                });
-              }}
-            >
-              VidSrc
-            </button>
+            {/* Multi-Server Mirrors for movies with TMDB ID */}
+            {videoSource.tmdbId && (
+              <>
+                <button
+                  type="button"
+                  className={`stream-bar-btn ${videoSource.url?.includes('cinemaos.live') ? 'active' : ''}`}
+                  onClick={() => {
+                    changeVideo({
+                      ...videoSource,
+                      url: `https://cinemaos.live/watch/movie/${videoSource.tmdbId}`,
+                      type: 'embed',
+                    });
+                  }}
+                >
+                  CinemaOS
+                </button>
 
-            <button
-              type="button"
-              style={{
-                padding: '3px 10px',
-                fontSize: '0.75rem',
-                background: videoSource.url?.includes('multiembed.mov') ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                color: videoSource.url?.includes('multiembed.mov') ? '#00a884' : '#e9edef',
-                border: videoSource.url?.includes('multiembed.mov') ? '1px solid #00a884' : '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              onClick={() => {
-                const id = videoSource.tmdbId || '1365884';
-                changeVideo({
-                  ...videoSource,
-                  url: `https://multiembed.mov/?video_id=${id}&tmdb=1`,
-                  type: 'embed',
-                });
-              }}
-            >
-              MultiEmbed
-            </button>
+                <button
+                  type="button"
+                  className={`stream-bar-btn ${videoSource.url?.includes('vidlink.pro') ? 'active' : ''}`}
+                  onClick={() => {
+                    changeVideo({
+                      ...videoSource,
+                      url: `https://vidlink.pro/movie/${videoSource.tmdbId}`,
+                      type: 'embed',
+                    });
+                  }}
+                >
+                  VidLink
+                </button>
 
-            <a
-              href={videoSource.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                marginLeft: 'auto',
-                color: '#00a884',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '0.75rem',
-                whiteSpace: 'nowrap',
-              }}
-              title="Open stream in a new tab if iframe playback is restricted by browser"
-            >
-              <span>Open in New Tab</span>
-              <Icon icon="solar:arrow-right-up-bold" width="12" />
-            </a>
+                <button
+                  type="button"
+                  className={`stream-bar-btn ${videoSource.url?.includes('vidsrc.pro') ? 'active' : ''}`}
+                  onClick={() => {
+                    changeVideo({
+                      ...videoSource,
+                      url: `https://vidsrc.pro/embed/movie/${videoSource.tmdbId}`,
+                      type: 'embed',
+                    });
+                  }}
+                >
+                  VidSrc
+                </button>
+
+                <button
+                  type="button"
+                  className={`stream-bar-btn ${videoSource.url?.includes('multiembed.mov') ? 'active' : ''}`}
+                  onClick={() => {
+                    changeVideo({
+                      ...videoSource,
+                      url: `https://multiembed.mov/?video_id=${videoSource.tmdbId}&tmdb=1`,
+                      type: 'embed',
+                    });
+                  }}
+                >
+                  MultiEmbed
+                </button>
+              </>
+            )}
+
+            <div className="stream-bar-actions">
+              <a
+                href={videoSource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="stream-bar-link"
+                title="Open stream in a new tab if playback is restricted by the website"
+              >
+                <span>Open in Tab</span>
+                <Icon icon="solar:arrow-right-up-bold" width="12" />
+              </a>
+            </div>
           </div>
         )}
 
@@ -534,16 +689,32 @@ export default function WatchPartyModal({
             />
           ) : videoSource?.type === 'embed' || videoSource?.url ? (
             <iframe
+              key={videoSource.url}
               src={videoSource.url}
               className="watch-party-yt-iframe"
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share"
               allowFullScreen
+              referrerPolicy="no-referrer"
               title={videoSource.title || 'Movie Watch Party'}
             />
           ) : (
-            <div style={{ color: '#8696a0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-              <Icon icon="solar:clapperboard-play-bold-duotone" width="48" style={{ color: '#00a884' }} />
-              <span>Paste a video or YouTube URL to start watching together</span>
+            <div style={{ color: '#8696a0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center', padding: '24px' }}>
+              <Icon icon="solar:clapperboard-play-bold-duotone" width="52" style={{ color: '#00a884' }} />
+              <div style={{ fontSize: '1.05rem', fontWeight: 600, color: '#e9edef' }}>
+                Select a Movie from Supported Platforms
+              </div>
+              <div style={{ fontSize: '0.85rem', color: '#8696a0', maxWidth: '440px', lineHeight: 1.5 }}>
+                Browse CinemaOS, CineHD, Cineby, Cinevice, MX Player, or PRMovies to pick any movie, then paste its link below to watch together.
+              </div>
+              <button
+                type="button"
+                className="custom-url-btn"
+                style={{ marginTop: '8px' }}
+                onClick={() => setShowDrawer(true)}
+              >
+                <Icon icon="solar:link-bold-duotone" width="18" />
+                <span>Add Movie URL</span>
+              </button>
             </div>
           )}
 
@@ -598,6 +769,177 @@ export default function WatchPartyModal({
               ))}
             </AnimatePresence>
           </div>
+
+          {/* Live Floating Face Cams (Sender & Receiver Live Webcams) */}
+          <AnimatePresence>
+            {webRTC && showFaceCams && (webRTC.callState === 'active' || webRTC.callState === 'calling' || webRTC.callState === 'incoming') && (
+              <motion.div
+                drag
+                dragMomentum={false}
+                className={`watch-party-face-cams ${faceCamsMinimized ? 'minimized' : ''}`}
+                initial={{ opacity: 0, scale: 0.85, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 15 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              >
+                {/* Face Cams Header */}
+                <div className="face-cams-header">
+                  <div className="face-cams-header-badge">
+                    <span className="face-cam-live-indicator" />
+                    <span>Live Faces</span>
+                    {webRTC.callDuration > 0 && (
+                      <span className="face-cams-duration">
+                        {Math.floor(webRTC.callDuration / 60)}:{(webRTC.callDuration % 60).toString().padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="face-cams-header-controls">
+                    <button
+                      type="button"
+                      className="face-cam-mini-btn"
+                      onClick={() => setFaceCamsMinimized(!faceCamsMinimized)}
+                      title={faceCamsMinimized ? 'Expand Face Cams' : 'Minimize Face Cams'}
+                    >
+                      <Icon icon={faceCamsMinimized ? 'solar:maximize-square-bold' : 'solar:minimize-square-bold'} width="13" />
+                    </button>
+                    <button
+                      type="button"
+                      className="face-cam-mini-btn end-call"
+                      onClick={webRTC.endCall}
+                      title="Disconnect Face Cams"
+                    >
+                      <Icon icon="line-md:close" width="13" />
+                    </button>
+                  </div>
+                </div>
+
+                {!faceCamsMinimized && (
+                  <>
+                    {/* Incoming Call In-Cinema Prompt */}
+                    {webRTC.callState === 'incoming' && (
+                      <div className="face-cams-prompt">
+                        <div className="prompt-caller-info">
+                          <Icon icon="solar:phone-calling-rounded-bold-duotone" width="22" style={{ color: '#00a884' }} />
+                          <span><strong>{webRTC.callerName || 'Partner'}</strong> is video calling!</span>
+                        </div>
+                        <div className="prompt-actions">
+                          <button type="button" className="prompt-btn accept" onClick={webRTC.acceptCall}>
+                            <Icon icon="solar:videocamera-bold" width="15" />
+                            <span>Accept</span>
+                          </button>
+                          <button type="button" className="prompt-btn decline" onClick={webRTC.declineCall}>
+                            <span>Decline</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Calling / Waiting State */}
+                    {webRTC.callState === 'calling' && (
+                      <div className="face-cams-prompt">
+                        <div className="watch-party-spinner" style={{ width: '24px', height: '24px' }} />
+                        <span style={{ fontSize: '0.82rem', color: '#e9edef' }}>
+                          Calling {recipientUser?.nickname || 'Partner'}...
+                        </span>
+                        <button type="button" className="prompt-btn decline" style={{ padding: '3px 10px', fontSize: '0.75rem', marginTop: '4px' }} onClick={webRTC.endCall}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Active Dual Face Cams (Sender & Receiver) */}
+                    {webRTC.callState === 'active' && (
+                      <div className="face-cams-grid">
+                        {/* Receiver (Partner) Cam */}
+                        <div className="face-cam-card receiver">
+                          <video
+                            ref={partyRemoteVideoRef}
+                            autoPlay
+                            playsInline
+                            className="face-cam-video"
+                          />
+                          {!webRTC.remoteStream && (
+                            <div className="face-cam-avatar-fallback">
+                              <span className="avatar-letter">{(recipientUser?.nickname || 'P').slice(0, 2).toUpperCase()}</span>
+                              <span className="avatar-status">Connecting...</span>
+                            </div>
+                          )}
+                          <div className="face-cam-tag">
+                            <span className="face-cam-dot active" />
+                            <span>{recipientUser?.nickname || webRTC.remoteUserName || 'Partner'}</span>
+                          </div>
+                        </div>
+
+                        {/* Sender (You) Cam */}
+                        <div className="face-cam-card sender">
+                          <video
+                            ref={partyLocalVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className={`face-cam-video ${webRTC.cameraOff ? 'cam-off' : ''}`}
+                          />
+                          {webRTC.cameraOff && (
+                            <div className="face-cam-avatar-fallback">
+                              <span className="avatar-letter">{(currentNickname || 'Me').slice(0, 2).toUpperCase()}</span>
+                              <span className="avatar-status">Camera Off</span>
+                            </div>
+                          )}
+                          <div className="face-cam-tag">
+                            <span className="face-cam-dot" />
+                            <span>You</span>
+                            {webRTC.micMuted && (
+                              <Icon icon="solar:muted-bold" width="12" style={{ color: '#f15c6d', marginLeft: '3px' }} />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Live Cam Controls Bar */}
+                    {webRTC.callState === 'active' && (
+                      <div className="face-cams-actions-row">
+                        <button
+                          type="button"
+                          className={`face-cam-action-btn ${webRTC.micMuted ? 'muted' : ''}`}
+                          onClick={webRTC.toggleMic}
+                          title={webRTC.micMuted ? 'Unmute Mic' : 'Mute Mic'}
+                        >
+                          <Icon icon={webRTC.micMuted ? 'solar:muted-bold' : 'solar:microphone-bold'} width="15" />
+                        </button>
+                        <button
+                          type="button"
+                          className={`face-cam-action-btn ${webRTC.cameraOff ? 'muted' : ''}`}
+                          onClick={webRTC.toggleCamera}
+                          title={webRTC.cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+                        >
+                          <Icon icon={webRTC.cameraOff ? 'solar:videocamera-cross-bold' : 'solar:videocamera-bold'} width="15" />
+                        </button>
+                        {webRTC.flipCamera && (
+                          <button
+                            type="button"
+                            className="face-cam-action-btn"
+                            onClick={webRTC.flipCamera}
+                            title="Flip Camera"
+                          >
+                            <Icon icon="solar:camera-rotate-bold" width="15" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="face-cam-action-btn end-btn"
+                          onClick={webRTC.endCall}
+                          title="Disconnect Face Cams"
+                        >
+                          <Icon icon="solar:phone-calling-rounded-bold" width="15" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Video Scrubber & Playback Controls Bar */}
@@ -740,7 +1082,7 @@ export default function WatchPartyModal({
           </form>
         </div>
 
-        {/* Source Selection Drawer (Custom URL Input) */}
+        {/* Source Selection Drawer (Platform Shortcuts & URL Input) */}
         <AnimatePresence>
           {showDrawer && (
             <motion.div
@@ -750,11 +1092,35 @@ export default function WatchPartyModal({
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             >
+              {/* Quick Supported Movie Platforms Row */}
+              <div className="watch-party-sites-bar">
+                <span className="watch-party-sites-label">
+                  <Icon icon="solar:clapperboard-play-bold-duotone" width="15" />
+                  <span>Select movie from supported platforms:</span>
+                </span>
+                <div className="watch-party-sites-list">
+                  {SUPPORTED_MOVIE_SITES.map((site) => (
+                    <a
+                      key={site.name}
+                      href={site.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="watch-party-site-chip"
+                      title={`Open ${site.name} (${site.tagline}) in new tab`}
+                    >
+                      <Icon icon={site.icon} width="16" style={{ color: site.color }} />
+                      <span className="site-name">{site.name}</span>
+                      <Icon icon="solar:arrow-right-up-bold" width="11" className="site-arrow" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+
               <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
                 <input
                   type="text"
                   className="custom-url-input"
-                  placeholder="Paste YouTube link, cinemaos movie URL, or video stream (.mp4, .m3u8)..."
+                  placeholder="Paste movie link from CinemaOS, CineHD, Cineby, Cinevice, MX Player, PRMovies, or YouTube..."
                   value={customInputUrl}
                   onChange={(e) => setCustomInputUrl(e.target.value)}
                   required
@@ -763,8 +1129,8 @@ export default function WatchPartyModal({
                 <input
                   type="text"
                   className="custom-url-input"
-                  style={{ flex: 0.6 }}
-                  placeholder="Movie Title (Optional)"
+                  style={{ flex: 0.5 }}
+                  placeholder="Movie Title (Optional - auto-detected)"
                   value={customInputTitle}
                   onChange={(e) => setCustomInputTitle(e.target.value)}
                 />
