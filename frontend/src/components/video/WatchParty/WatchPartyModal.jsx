@@ -156,18 +156,27 @@ export default function WatchPartyModal({
 
   const handleCustomUrlSubmit = (e) => {
     e.preventDefault();
-    const url = customInputUrl.trim();
-    if (!url) return;
+    let rawUrl = customInputUrl.trim();
+    if (!rawUrl) return;
 
-    // Detect YouTube URL
-    const isYt = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i.test(url);
-    const isDirectVideo = /\.(mp4|webm|ogg|mov|mkv|m4v|m3u8)(\?.*)?$/i.test(url);
+    if (!/^https?:\/\//i.test(rawUrl)) {
+      rawUrl = 'https://' + rawUrl;
+    }
 
-    // Extract TMDB or IMDb ID from links like cinemaos.live/watch/movie/1365884
-    const tmdbMatch = url.match(/(?:movie|tv|id)\/(\d+)/i);
-    const imdbMatch = url.match(/(tt\d{7,8})/i);
-    const extractedTmdbId = tmdbMatch ? tmdbMatch[1] : null;
+    const isCinemaOs = /cinemaos\.live/i.test(rawUrl);
+    const isYt = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i.test(rawUrl);
+    const isDirectVideo = /\.(mp4|webm|ogg|mov|mkv|m4v|m3u8)(\?.*)?$/i.test(rawUrl);
+
+    // Extract type and ID from cinemaos or embed links (e.g. cinemaos.live/watch/movie/1365884 or cinemaos.live/watch/tv/1234/1/1)
+    const mediaTypeMatch = rawUrl.match(/(?:watch\/)?(movie|tv)\/([a-zA-Z0-9_\-]+)(?:\/(\d+)\/(\d+))?/i);
+    const tmdbMatch = rawUrl.match(/(?:movie|tv|id|video_id=)\/?(\d+)/i);
+    const imdbMatch = rawUrl.match(/(tt\d{7,8})/i);
+
+    const mediaType = mediaTypeMatch ? mediaTypeMatch[1].toLowerCase() : (rawUrl.includes('/tv/') ? 'tv' : 'movie');
+    const extractedTmdbId = tmdbMatch ? tmdbMatch[1] : (mediaTypeMatch ? mediaTypeMatch[2] : null);
     const extractedImdbId = imdbMatch ? imdbMatch[1] : null;
+    const season = mediaTypeMatch && mediaTypeMatch[3] ? mediaTypeMatch[3] : '1';
+    const episode = mediaTypeMatch && mediaTypeMatch[4] ? mediaTypeMatch[4] : '1';
 
     let videoType = 'direct';
     if (isYt) {
@@ -180,8 +189,10 @@ export default function WatchPartyModal({
 
     let defaultTitle = customInputTitle.trim();
     if (!defaultTitle) {
-      if (url.includes('1365884') || url.toLowerCase().includes('call-my-agent')) {
+      if (rawUrl.includes('1365884') || rawUrl.toLowerCase().includes('call-my-agent')) {
         defaultTitle = 'Call My Agent! The Movie (2026)';
+      } else if (isCinemaOs) {
+        defaultTitle = `CinemaOS ${mediaType === 'tv' ? `Series (S${season}E${episode})` : 'Movie'} #${extractedTmdbId || 'Stream'}`;
       } else if (isYt) {
         defaultTitle = 'YouTube Video';
       } else if (videoType === 'embed') {
@@ -192,11 +203,15 @@ export default function WatchPartyModal({
     }
 
     const source = {
-      url,
+      url: rawUrl,
       title: defaultTitle,
       type: videoType,
+      isCinemaOs,
+      mediaType,
       tmdbId: extractedTmdbId,
       imdbId: extractedImdbId,
+      season,
+      episode,
     };
     changeVideo(source);
     setCustomInputUrl('');
@@ -889,9 +904,9 @@ export default function WatchPartyModal({
               {activeTab === 'custom_url' && (
                 <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
                   <input
-                    type="url"
+                    type="text"
                     className="custom-url-input"
-                    placeholder="Paste direct MP4, WebM, or YouTube video link..."
+                    placeholder="Paste any cinemaos.live movie link, YouTube, or video URL..."
                     value={customInputUrl}
                     onChange={(e) => setCustomInputUrl(e.target.value)}
                     required
@@ -900,7 +915,7 @@ export default function WatchPartyModal({
                     type="text"
                     className="custom-url-input"
                     style={{ flex: 0.6 }}
-                    placeholder="Video Title (Optional)"
+                    placeholder="Movie Title (Optional)"
                     value={customInputTitle}
                     onChange={(e) => setCustomInputTitle(e.target.value)}
                   />

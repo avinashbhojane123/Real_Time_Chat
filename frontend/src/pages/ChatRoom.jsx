@@ -661,6 +661,90 @@ export default function ChatRoom() {
           pinnedMessage={pinnedMessage}
         />
 
+        {/* CinemaOS Movie Quick Launcher Banner */}
+        <AnimatePresence>
+          {inputText && /cinemaos\.live/i.test(inputText) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0, y: 10 }}
+              animate={{ height: 'auto', opacity: 1, y: 0 }}
+              exit={{ height: 0, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              style={{
+                backgroundColor: '#111b21',
+                borderTop: '2px solid #00a884',
+                padding: '8px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                boxShadow: '0 -4px 20px rgba(0, 168, 132, 0.25)',
+                zIndex: 25,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <span style={{ fontSize: '1.4rem' }}>🍿</span>
+                <div>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#ffffff' }}>
+                    CinemaOS Movie Link Detected!
+                  </div>
+                  <div style={{ fontSize: '0.73rem', color: '#8696a0' }}>
+                    Watch together with {recipientUser ? recipientUser.nickname : 'partner'} in perfect sync
+                  </div>
+                </div>
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                type="button"
+                style={{
+                  background: 'linear-gradient(135deg, #00a884 0%, #25d366 100%)',
+                  color: '#111b21',
+                  border: 'none',
+                  padding: '7px 15px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(0, 168, 132, 0.4)',
+                  whiteSpace: 'nowrap',
+                }}
+                onClick={() => {
+                  let rawUrl = inputText.trim();
+                  if (!/^https?:\/\//i.test(rawUrl)) rawUrl = 'https://' + rawUrl;
+
+                  const mediaTypeMatch = rawUrl.match(/(?:watch\/)?(movie|tv)\/([a-zA-Z0-9_\-]+)(?:\/(\d+)\/(\d+))?/i);
+                  const isTv = rawUrl.includes('/tv/');
+                  const id = mediaTypeMatch ? mediaTypeMatch[2] : (rawUrl.match(/(\d+)/)?.[1] || '');
+                  const season = mediaTypeMatch && mediaTypeMatch[3] ? mediaTypeMatch[3] : '1';
+                  const episode = mediaTypeMatch && mediaTypeMatch[4] ? mediaTypeMatch[4] : '1';
+
+                  const title = rawUrl.includes('1365884')
+                    ? 'Call My Agent! The Movie (2026)'
+                    : `CinemaOS ${isTv ? `Series (S${season}E${episode})` : 'Movie'} #${id || 'Stream'}`;
+
+                  watchParty.startWatchParty({
+                    url: rawUrl,
+                    title,
+                    type: 'embed',
+                    isCinemaOs: true,
+                    mediaType: isTv ? 'tv' : 'movie',
+                    tmdbId: id,
+                    season,
+                    episode,
+                  });
+                  setInputText('');
+                }}
+              >
+                <span>Watch Together 🍿</span>
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Bottom Input Control Bar */}
         <ChatInputBar
           replyingTo={replyingTo}
