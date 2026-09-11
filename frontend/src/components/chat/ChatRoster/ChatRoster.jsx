@@ -45,6 +45,8 @@ const ChatRoster = memo(function ChatRoster({
   setShowLogoutConfirm,
   setShowThemeModal,
   setShowClearConfirm,
+  onOpenWatchParty,
+  isWatchPartyActive,
 }) {
   const [activeTab, setActiveTab] = useState('people'); // 'people' | 'status' | 'media'
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
@@ -210,6 +212,48 @@ const ChatRoster = memo(function ChatRoster({
             />
           )}
         </motion.button>
+
+        {/* Watch Together / Watch Party Rail Button */}
+        {onOpenWatchParty && (
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={onOpenWatchParty}
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              backgroundColor: isWatchPartyActive ? 'rgba(0, 168, 132, 0.25)' : 'rgba(255, 0, 128, 0.12)',
+              border: `1px solid ${isWatchPartyActive ? '#00a884' : 'rgba(255, 0, 128, 0.3)'}`,
+              color: isWatchPartyActive ? '#00a884' : '#ff007f',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '14px',
+              position: 'relative',
+            }}
+            className="media-item-card"
+            title={isWatchPartyActive ? 'Watch Party Active — Click to Join' : 'Start Watch Party (Watch Movies in Perfect Sync)'}
+          >
+            <Icon icon="solar:clapperboard-play-bold-duotone" width="22" height="22" style={{ color: isWatchPartyActive ? '#00a884' : '#ff007f' }} />
+            {isWatchPartyActive && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: '#25d366',
+                  boxShadow: '0 0 8px #25d366',
+                }}
+              />
+            )}
+          </motion.button>
+        )}
 
         {/* 2. Change Theme & Wallpaper Button */}
         <motion.button

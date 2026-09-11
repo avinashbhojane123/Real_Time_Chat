@@ -50,6 +50,28 @@ import {
   ViewStatusDto,
   DeleteStatusDto,
 } from './dto/status.dto';
+import {
+  WatchPartyActionDto,
+  GetWatchPartyDto,
+  WatchPartyReactionDto,
+} from './dto/watch-party.dto';
+
+interface WatchPartyState {
+  isActive: boolean;
+  videoSource: {
+    url: string;
+    title: string;
+    type?: 'direct' | 'youtube';
+    duration?: number;
+  } | null;
+  currentTime: number;
+  isPlaying: boolean;
+  playbackRate: number;
+  lastUpdatedTimestamp: number;
+  lastActorNickname: string;
+  isBuffering: boolean;
+  bufferingUsers: string[];
+}
 
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 @WebSocketGateway({
@@ -175,6 +197,22 @@ export class ChatGateway
   >();
 
   private socketMessageTimes = new Map<string, number[]>();
+
+  private watchPartyRooms = new Map<string, WatchPartyState>();
+
+  private getCalculatedWatchPartyPosition(state: WatchPartyState): number {
+    if (!state.isPlaying || state.isBuffering) {
+      return state.currentTime;
+    }
+    const elapsedSec =
+      ((Date.now() - state.lastUpdatedTimestamp) / 1000) *
+      (state.playbackRate || 1);
+    const calculated = state.currentTime + elapsedSec;
+    if (state.videoSource?.duration && calculated > state.videoSource.duration) {
+      return state.videoSource.duration;
+    }
+    return Math.max(0, calculated);
+  }
 
   private checkRateLimit(
     client: Socket,
@@ -1233,6 +1271,194 @@ export class ChatGateway
     const trimmedPasscode = (data.passcode || session.passcode).trim();
     this.server.to(trimmedPasscode).emit('statusDeleted', {
       statusId: data.statusId,
+    });
+  }
+
+  @SubscribeMessage('watchPartyAction')
+  async handleWatchPartyAction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WatchPartyActionDto,
+  ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (data.passcode || session?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    let state = this.watchPartyRooms.get(targetPasscode);
+    const now = Date.now();
+
+    if (!state) {
+      state = {
+        isActive: true,
+        videoSource: data.videoSource || null,
+        currentTime: data.currentTime || 0,
+        isPlaying: Boolean(data.isPlaying),
+        playbackRate: data.playbackRate || 1,
+        lastUpdatedTimestamp: now,
+        lastActorNickname: session.nickname,
+        isBuffering: false,
+        bufferingUsers: [],
+      };
+      this.watchPartyRooms.set(targetPasscode, state);
+    }
+
+    const currentPos = this.getCalculatedWatchPartyPosition(state);
+
+    switch (data.action) {
+      case 'open':
+        state.isActive = true;
+        if (data.videoSource) state.videoSource = data.videoSource;
+        if (data.currentTime !== undefined) state.currentTime = data.currentTime;
+        state.lastActorNickname = session.nickname;
+        state.lastUpdatedTimestamp = now;
+        break;
+
+      case 'play':
+        state.isPlaying = true;
+        state.currentTime =
+          data.currentTime !== undefined ? data.currentTime : currentPos;
+        state.lastUpdatedTimestamp = now;
+        state.lastActorNickname = session.nickname;
+        state.isBuffering = false;
+        state.bufferingUsers = [];
+        break;
+
+      case 'pause':
+        state.isPlaying = false;
+        state.currentTime =
+          data.currentTime !== undefined ? data.currentTime : currentPos;
+        state.lastUpdatedTimestamp = now;
+        state.lastActorNickname = session.nickname;
+        break;
+
+      case 'seek':
+        state.currentTime =
+          data.currentTime !== undefined ? Math.max(0, data.currentTime) : 0;
+        if (data.isPlaying !== undefined) {
+          state.isPlaying = data.isPlaying;
+        }
+        state.lastUpdatedTimestamp = now;
+        state.lastActorNickname = session.nickname;
+        break;
+
+      case 'rate':
+        state.currentTime =
+          data.currentTime !== undefined ? data.currentTime : currentPos;
+        state.playbackRate = data.playbackRate || 1;
+        state.lastUpdatedTimestamp = now;
+        state.lastActorNickname = session.nickname;
+        break;
+
+      case 'change_video':
+        state.videoSource = data.videoSource || null;
+        state.currentTime = 0;
+        state.isPlaying = false;
+        state.playbackRate = 1;
+        state.lastUpdatedTimestamp = now;
+        state.lastActorNickname = session.nickname;
+        state.isBuffering = false;
+        state.bufferingUsers = [];
+        state.isActive = true;
+        break;
+
+      case 'buffering':
+        if (!state.bufferingUsers.includes(session.nickname)) {
+          state.bufferingUsers.push(session.nickname);
+        }
+        state.isBuffering = true;
+        state.currentTime = currentPos;
+        state.lastUpdatedTimestamp = now;
+        break;
+
+      case 'ready':
+        state.bufferingUsers = state.bufferingUsers.filter(
+          (u) => u !== session.nickname,
+        );
+        if (state.bufferingUsers.length === 0) {
+          state.isBuffering = false;
+          state.lastUpdatedTimestamp = now;
+        }
+        break;
+
+      case 'close':
+        state.isActive = false;
+        state.isPlaying = false;
+        this.watchPartyRooms.delete(targetPasscode);
+        this.server.to(targetPasscode).emit('watchPartyClosed', {
+          closedBy: session.nickname,
+        });
+        return { success: true };
+    }
+
+    const payload = {
+      action: data.action,
+      videoSource: state.videoSource,
+      currentTime: state.currentTime,
+      isPlaying: state.isPlaying,
+      playbackRate: state.playbackRate,
+      isBuffering: state.isBuffering,
+      bufferingUsers: state.bufferingUsers,
+      lastUpdatedTimestamp: state.lastUpdatedTimestamp,
+      lastActorNickname: session.nickname,
+      serverTime: now,
+    };
+
+    // Broadcast synchronized state to everyone in the room
+    this.server.to(targetPasscode).emit('watchPartyUpdate', payload);
+    return { success: true, state: payload };
+  }
+
+  @SubscribeMessage('getWatchPartyState')
+  getWatchPartyState(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: GetWatchPartyDto,
+  ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const state = this.watchPartyRooms.get(targetPasscode);
+    if (!state || !state.isActive) {
+      client.emit('watchPartyState', null);
+      return { success: true, state: null };
+    }
+
+    const calculatedTime = this.getCalculatedWatchPartyPosition(state);
+    const payload = {
+      action: 'sync',
+      videoSource: state.videoSource,
+      currentTime: calculatedTime,
+      isPlaying: state.isPlaying,
+      playbackRate: state.playbackRate,
+      isBuffering: state.isBuffering,
+      bufferingUsers: state.bufferingUsers,
+      lastUpdatedTimestamp: state.lastUpdatedTimestamp,
+      lastActorNickname: state.lastActorNickname,
+      serverTime: Date.now(),
+    };
+
+    client.emit('watchPartyState', payload);
+    return { success: true, state: payload };
+  }
+
+  @SubscribeMessage('watchPartyReaction')
+  watchPartyReaction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WatchPartyReactionDto,
+  ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return;
+    }
+
+    this.server.to(targetPasscode).emit('watchPartyReaction', {
+      from: session.nickname,
+      reaction: data.reaction,
+      timestamp: Date.now(),
     });
   }
 }

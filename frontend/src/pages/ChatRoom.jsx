@@ -10,6 +10,7 @@ import { formatTimer } from '../utils/chatUtils';
 // Hooks
 import { useChatSocket } from '../hooks/useChatSocket';
 import { useWebRTC } from '../hooks/useWebRTC';
+import { useWatchParty } from '../hooks/useWatchParty';
 
 // Feature Components
 import ChatRoster from '../components/chat/ChatRoster/ChatRoster';
@@ -17,6 +18,7 @@ import ChatHeader from '../components/chat/ChatHeader/ChatHeader';
 import ChatMessagesFeed from '../components/chat/ChatMessagesFeed/ChatMessagesFeed';
 import ChatInputBar from '../components/chat/ChatInput/ChatInputBar';
 import VideoCallPanel from '../components/video/VideoCallPanel/VideoCallPanel';
+import WatchPartyModal from '../components/video/WatchParty/WatchPartyModal';
 
 // Overlay Modals
 import ClearConfirmModal from '../components/modals/ClearConfirmModal/ClearConfirmModal';
@@ -80,6 +82,17 @@ export default function ChatRoom() {
 
   // WebRTC Video/Voice Call Hook
   const webRTC = useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast });
+
+  // Watch Party (Watch Together) Zero-Lag Synchronized Movie Player Hook
+  const watchParty = useWatchParty({ socketRef, passcode, nickname, showToast });
+
+  // Filter video files shared in the chat room for quick watch party selection
+  const sharedRoomVideos = messages.filter(
+    (m) =>
+      m.fileUrl &&
+      !m.isDeleted &&
+      (m.fileType?.startsWith('video/') || /\.(mp4|webm|mov|mkv|m4v)$/i.test(m.fileUrl || ''))
+  );
 
   // Responsive Roster & Rail Sidebar Toggle State
   const [showRosterPanel, setShowRosterPanel] = useState(false);
@@ -548,6 +561,11 @@ export default function ChatRoom() {
         setShowLogoutConfirm={setShowLogoutConfirm}
         setShowThemeModal={setShowThemeModal}
         setShowClearConfirm={setShowClearConfirm}
+        onOpenWatchParty={() => {
+          watchParty.setIsOpen(true);
+          watchParty.setIsMinimized(false);
+        }}
+        isWatchPartyActive={watchParty.isActive}
       />
 
       {/* 2. Main Chat Panel */}
@@ -596,6 +614,11 @@ export default function ChatRoom() {
           pinnedMessage={pinnedMessage}
           handleTogglePinMessage={handleTogglePinMessage}
           setShowLogoutConfirm={setShowLogoutConfirm}
+          onOpenWatchParty={() => {
+            watchParty.setIsOpen(true);
+            watchParty.setIsMinimized(false);
+          }}
+          isWatchPartyActive={watchParty.isActive}
         />
 
         {/* Main Feed */}
@@ -718,6 +741,17 @@ export default function ChatRoom() {
         acceptCall={webRTC.acceptCall}
         declineCall={webRTC.declineCall}
         endCall={webRTC.endCall}
+      />
+
+      {/* Zero-Lag Watch Party / Watch Together Cinema Modal */}
+      <WatchPartyModal
+        isOpen={watchParty.isOpen}
+        onClose={() => watchParty.setIsOpen(false)}
+        watchParty={watchParty}
+        recipientUser={recipientUser}
+        currentNickname={nickname}
+        sharedRoomVideos={sharedRoomVideos}
+        onSendChatMessage={handleSendMessage}
       />
 
       {/* Clear History Confirmation Modal */}
