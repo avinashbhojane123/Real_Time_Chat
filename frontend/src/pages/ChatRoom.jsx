@@ -87,13 +87,6 @@ export default function ChatRoom() {
   // Watch Party (Watch Together) Zero-Lag Synchronized Movie Player Hook
   const watchParty = useWatchParty({ socketRef, passcode, nickname, showToast });
 
-  // Filter video files shared in the chat room for quick watch party selection
-  const sharedRoomVideos = messages.filter(
-    (m) =>
-      m.fileUrl &&
-      !m.isDeleted &&
-      (m.fileType?.startsWith('video/') || /\.(mp4|webm|mov|mkv|m4v)$/i.test(m.fileUrl || ''))
-  );
 
   // Responsive Roster & Rail Sidebar Toggle State
   const [showRosterPanel, setShowRosterPanel] = useState(false);
@@ -835,7 +828,6 @@ export default function ChatRoom() {
         watchParty={watchParty}
         recipientUser={recipientUser}
         currentNickname={nickname}
-        sharedRoomVideos={sharedRoomVideos}
         onSendChatMessage={handleSendMessage}
       />
 

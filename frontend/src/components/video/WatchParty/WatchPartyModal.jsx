@@ -3,60 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import './WatchPartyModal.css';
 
-// Curated Cinema Library Presets
-const CURATED_PRESETS = [
-  {
-    id: 'call-my-agent-2026',
-    title: 'Call My Agent! The Movie (2026)',
-    subtitle: 'Dix Pour Cent ! • CinemaOS • 117 min',
-    url: 'https://cinemaos.live/watch/movie/1365884',
-    type: 'embed',
-    tmdbId: '1365884',
-    imdbId: 'tt38267923',
-    icon: 'solar:clapperboard-play-bold-duotone',
-  },
-  {
-    id: 'tears-of-steel',
-    title: 'Tears of Steel (Sci-Fi 4K)',
-    subtitle: 'Blender Foundation • 12 min',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    type: 'direct',
-    icon: 'solar:videocamera-record-bold-duotone',
-  },
-  {
-    id: 'sintel',
-    title: 'Sintel (Fantasy Animation)',
-    subtitle: 'Blender Foundation • 15 min',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    type: 'direct',
-    icon: 'solar:magic-stick-3-bold-duotone',
-  },
-  {
-    id: 'big-buck-bunny',
-    title: 'Big Buck Bunny (Animation)',
-    subtitle: 'Classic Cartoon • 10 min',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    type: 'direct',
-    icon: 'solar:smile-circle-bold-duotone',
-  },
-  {
-    id: 'elephants-dream',
-    title: 'Elephants Dream (Sci-Fi)',
-    subtitle: 'Open Movie Project • 11 min',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    type: 'direct',
-    icon: 'solar:stars-line-duotone',
-  },
-  {
-    id: 'lo-fi-chill',
-    title: 'Sunset Cityscape (Chill Visuals)',
-    subtitle: 'Nature & Motion • 1 min Loop',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    type: 'direct',
-    icon: 'solar:sunset-bold-duotone',
-  },
-];
-
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
 
 export default function WatchPartyModal({
@@ -65,7 +11,6 @@ export default function WatchPartyModal({
   watchParty,
   recipientUser,
   currentNickname,
-  sharedRoomVideos = [],
   onSendChatMessage,
 }) {
   const {
@@ -93,7 +38,6 @@ export default function WatchPartyModal({
   } = watchParty;
 
   // Local UI states
-  const [activeTab, setActiveTab] = useState('library'); // 'library' | 'chat_videos' | 'custom_url'
   const [customInputUrl, setCustomInputUrl] = useState('');
   const [customInputTitle, setCustomInputTitle] = useState('');
   const [showDrawer, setShowDrawer] = useState(!videoSource);
@@ -103,13 +47,6 @@ export default function WatchPartyModal({
   const [quickComment, setQuickComment] = useState('');
   const [danmakuComments, setDanmakuComments] = useState([]);
   const scrubberRef = useRef(null);
-
-  // Set default video if none selected yet
-  useEffect(() => {
-    if (!videoSource && CURATED_PRESETS.length > 0) {
-      changeVideo(CURATED_PRESETS[0]);
-    }
-  }, [videoSource, changeVideo]);
 
   // Video element sync & event wiring
   const handleTimeUpdate = (e) => {
@@ -401,9 +338,9 @@ export default function WatchPartyModal({
               type="button"
               className={`watch-party-btn-icon ${showDrawer ? 'active' : ''}`}
               onClick={() => setShowDrawer(!showDrawer)}
-              title="Pick Movie / Video Source"
+              title="Change Video / Enter URL"
             >
-              <Icon icon="solar:folder-with-files-bold-duotone" width="20" />
+              <Icon icon="solar:link-bold-duotone" width="20" />
             </button>
 
             <button
@@ -606,7 +543,7 @@ export default function WatchPartyModal({
           ) : (
             <div style={{ color: '#8696a0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
               <Icon icon="solar:clapperboard-play-bold-duotone" width="48" style={{ color: '#00a884' }} />
-              <span>Select a video from the library or paste a link below to start watching</span>
+              <span>Paste a video or YouTube URL to start watching together</span>
             </div>
           )}
 
@@ -803,7 +740,7 @@ export default function WatchPartyModal({
           </form>
         </div>
 
-        {/* Source Selection Drawer (Library / Shared Videos / Custom Link) */}
+        {/* Source Selection Drawer (Custom URL Input) */}
         <AnimatePresence>
           {showDrawer && (
             <motion.div
@@ -813,118 +750,29 @@ export default function WatchPartyModal({
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             >
-              <div className="watch-party-drawer-tabs">
-                <button
-                  type="button"
-                  className={`drawer-tab-btn ${activeTab === 'library' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('library')}
-                >
-                  <Icon icon="solar:film-strip-bold-duotone" width="18" />
-                  <span>Curated Movies ({CURATED_PRESETS.length})</span>
+              <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
+                <input
+                  type="text"
+                  className="custom-url-input"
+                  placeholder="Paste YouTube link, cinemaos movie URL, or video stream (.mp4, .m3u8)..."
+                  value={customInputUrl}
+                  onChange={(e) => setCustomInputUrl(e.target.value)}
+                  required
+                  autoFocus
+                />
+                <input
+                  type="text"
+                  className="custom-url-input"
+                  style={{ flex: 0.6 }}
+                  placeholder="Movie Title (Optional)"
+                  value={customInputTitle}
+                  onChange={(e) => setCustomInputTitle(e.target.value)}
+                />
+                <button type="submit" className="custom-url-btn">
+                  <Icon icon="solar:play-bold" width="18" />
+                  <span>Watch Together</span>
                 </button>
-
-                <button
-                  type="button"
-                  className={`drawer-tab-btn ${activeTab === 'chat_videos' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('chat_videos')}
-                >
-                  <Icon icon="solar:chat-round-video-bold-duotone" width="18" />
-                  <span>Room Shared Videos ({sharedRoomVideos.length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`drawer-tab-btn ${activeTab === 'custom_url' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('custom_url')}
-                >
-                  <Icon icon="solar:link-bold-duotone" width="18" />
-                  <span>Paste Video / YouTube URL</span>
-                </button>
-              </div>
-
-              {/* Tab 1: Curated Library */}
-              {activeTab === 'library' && (
-                <div className="watch-party-presets-grid">
-                  {CURATED_PRESETS.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`preset-card ${videoSource?.url === item.url ? 'active' : ''}`}
-                      onClick={() => {
-                        changeVideo(item);
-                        setShowDrawer(false);
-                      }}
-                    >
-                      <div className="preset-icon-wrap">
-                        <Icon icon={item.icon} width="20" />
-                      </div>
-                      <div className="preset-info">
-                        <div className="preset-title">{item.title}</div>
-                        <div className="preset-subtitle">{item.subtitle}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Tab 2: Shared Room Videos */}
-              {activeTab === 'chat_videos' && (
-                <div className="watch-party-presets-grid">
-                  {sharedRoomVideos.length === 0 ? (
-                    <div style={{ color: '#8696a0', padding: '12px', fontSize: '0.85rem' }}>
-                      No videos shared in this chat room yet. Send a video message in chat to watch it together!
-                    </div>
-                  ) : (
-                    sharedRoomVideos.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`preset-card ${videoSource?.url === msg.fileUrl ? 'active' : ''}`}
-                        onClick={() => {
-                          changeVideo({
-                            url: msg.fileUrl,
-                            title: msg.fileName || 'Shared Video',
-                            type: 'direct',
-                          });
-                          setShowDrawer(false);
-                        }}
-                      >
-                        <div className="preset-icon-wrap">
-                          <Icon icon="solar:videocamera-record-bold-duotone" width="20" />
-                        </div>
-                        <div className="preset-info">
-                          <div className="preset-title">{msg.fileName || 'Shared Video'}</div>
-                          <div className="preset-subtitle">Shared by {msg.nickname}</div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {/* Tab 3: Custom URL */}
-              {activeTab === 'custom_url' && (
-                <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
-                  <input
-                    type="text"
-                    className="custom-url-input"
-                    placeholder="Paste any cinemaos.live movie link, YouTube, or video URL..."
-                    value={customInputUrl}
-                    onChange={(e) => setCustomInputUrl(e.target.value)}
-                    required
-                  />
-                  <input
-                    type="text"
-                    className="custom-url-input"
-                    style={{ flex: 0.6 }}
-                    placeholder="Movie Title (Optional)"
-                    value={customInputTitle}
-                    onChange={(e) => setCustomInputTitle(e.target.value)}
-                  />
-                  <button type="submit" className="custom-url-btn">
-                    <Icon icon="solar:play-bold" width="18" />
-                    <span>Watch Together</span>
-                  </button>
-                </form>
-              )}
+              </form>
             </motion.div>
           )}
         </AnimatePresence>
