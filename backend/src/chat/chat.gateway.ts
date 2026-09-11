@@ -1307,12 +1307,40 @@ export class ChatGateway
 
     switch (data.action) {
       case 'open':
+      case 'invite':
         state.isActive = true;
         if (data.videoSource) state.videoSource = data.videoSource;
         if (data.currentTime !== undefined) state.currentTime = data.currentTime;
         state.lastActorNickname = session.nickname;
         state.lastUpdatedTimestamp = now;
+        // Notify other participant(s) in the room with an invitation popup
+        client.to(targetPasscode).emit('watchPartyInvite', {
+          from: session.nickname,
+          videoSource: state.videoSource,
+          timestamp: now,
+        });
         break;
+
+      case 'accept':
+        state.isActive = true;
+        state.isPlaying = true;
+        state.currentTime =
+          data.currentTime !== undefined ? data.currentTime : (state.currentTime || 0);
+        state.lastUpdatedTimestamp = now;
+        state.lastActorNickname = session.nickname;
+        state.isBuffering = false;
+        state.bufferingUsers = [];
+        this.server.to(targetPasscode).emit('watchPartyAccepted', {
+          acceptedBy: session.nickname,
+          videoSource: state.videoSource,
+        });
+        break;
+
+      case 'decline':
+        client.to(targetPasscode).emit('watchPartyDeclined', {
+          declinedBy: session.nickname,
+        });
+        return { success: true };
 
       case 'play':
         state.isPlaying = true;

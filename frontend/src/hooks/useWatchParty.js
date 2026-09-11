@@ -24,6 +24,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
   const [bufferingUsers, setBufferingUsers] = useState([]);
   const [partnerSyncStatus, setPartnerSyncStatus] = useState('synced'); // 'synced' | 'buffering' | 'drift_correcting'
   const [flyingReactions, setFlyingReactions] = useState([]);
+  const [incomingInvite, setIncomingInvite] = useState(null);
 
   // Ref tracking to prevent feedback loops when local action triggers video events
   const isLocalActionRef = useRef(false);
@@ -174,8 +175,33 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       setIsActive(false);
       setIsOpen(false);
       setIsPlaying(false);
+      setIncomingInvite(null);
       if (closedBy && closedBy !== nickname) {
         showToast?.(`${closedBy} closed the Watch Party`);
+      }
+    };
+
+    const onInvite = (invite) => {
+      if (invite && invite.from !== nickname) {
+        setIncomingInvite(invite);
+      }
+    };
+
+    const onAccepted = ({ acceptedBy, videoSource: source }) => {
+      if (source) setVideoSource(source);
+      setIsActive(true);
+      setIsOpen(true);
+      setIsPlaying(true);
+      setIncomingInvite(null);
+      if (acceptedBy && acceptedBy !== nickname) {
+        showToast?.(`🍿 ${acceptedBy} accepted the invitation! Starting movie directly...`);
+      }
+    };
+
+    const onDeclined = ({ declinedBy }) => {
+      setIncomingInvite(null);
+      if (declinedBy && declinedBy !== nickname) {
+        showToast?.(`${declinedBy} declined the Watch Party invitation`);
       }
     };
 
@@ -183,6 +209,9 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     socket.on('watchPartyState', onState);
     socket.on('watchPartyReaction', onReaction);
     socket.on('watchPartyClosed', onClosed);
+    socket.on('watchPartyInvite', onInvite);
+    socket.on('watchPartyAccepted', onAccepted);
+    socket.on('watchPartyDeclined', onDeclined);
 
     // Fetch current state on mount or room join
     socket.emit('getWatchPartyState', { passcode });
@@ -192,6 +221,9 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       socket.off('watchPartyState', onState);
       socket.off('watchPartyReaction', onReaction);
       socket.off('watchPartyClosed', onClosed);
+      socket.off('watchPartyInvite', onInvite);
+      socket.off('watchPartyAccepted', onAccepted);
+      socket.off('watchPartyDeclined', onDeclined);
     };
   }, [getSocket, passcode, nickname, handleWatchPartyUpdate, showToast]);
 
@@ -224,17 +256,43 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
   // User Action Handlers
   const startWatchParty = useCallback(
     (initialSource = null) => {
+      const sourceToUse = initialSource || videoSource;
       setIsOpen(true);
       setIsMinimized(false);
       setIsActive(true);
-      emitAction('open', {
-        videoSource: initialSource || videoSource,
+      setIsPlaying(false);
+      if (sourceToUse) setVideoSource(sourceToUse);
+      emitAction('invite', {
+        videoSource: sourceToUse,
         currentTime: 0,
         isPlaying: false,
       });
+      showToast?.('Sent Watch Together invitation to partner 🍿');
     },
-    [emitAction, videoSource]
+    [emitAction, videoSource, showToast]
   );
+
+  const acceptWatchPartyInvite = useCallback(() => {
+    if (!incomingInvite) return;
+    const source = incomingInvite.videoSource;
+    setIncomingInvite(null);
+    if (source) setVideoSource(source);
+    setIsActive(true);
+    setIsOpen(true);
+    setIsMinimized(false);
+    setIsPlaying(true);
+    emitAction('accept', {
+      videoSource: source,
+      currentTime: 0,
+      isPlaying: true,
+    });
+    showToast?.('🍿 Accepted! Movie starting directly in sync...');
+  }, [incomingInvite, emitAction, showToast]);
+
+  const declineWatchPartyInvite = useCallback(() => {
+    setIncomingInvite(null);
+    emitAction('decline');
+  }, [emitAction]);
 
   const closeWatchParty = useCallback(() => {
     emitAction('close');
@@ -337,9 +395,12 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     bufferingUsers,
     partnerSyncStatus,
     flyingReactions,
+    incomingInvite,
     videoElementRef,
     ytPlayerRef,
     startWatchParty,
+    acceptWatchPartyInvite,
+    declineWatchPartyInvite,
     closeWatchParty,
     togglePlay,
     seek,

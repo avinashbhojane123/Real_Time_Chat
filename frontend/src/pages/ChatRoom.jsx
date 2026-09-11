@@ -19,6 +19,7 @@ import ChatMessagesFeed from '../components/chat/ChatMessagesFeed/ChatMessagesFe
 import ChatInputBar from '../components/chat/ChatInput/ChatInputBar';
 import VideoCallPanel from '../components/video/VideoCallPanel/VideoCallPanel';
 import WatchPartyModal from '../components/video/WatchParty/WatchPartyModal';
+import IncomingWatchPartyModal from '../components/video/WatchParty/IncomingWatchPartyModal';
 
 // Overlay Modals
 import ClearConfirmModal from '../components/modals/ClearConfirmModal/ClearConfirmModal';
@@ -752,6 +753,13 @@ export default function ChatRoom() {
         currentNickname={nickname}
         sharedRoomVideos={sharedRoomVideos}
         onSendChatMessage={handleSendMessage}
+      />
+
+      {/* Incoming Movie Night / Watch Party Invitation Popup */}
+      <IncomingWatchPartyModal
+        invite={watchParty.incomingInvite}
+        onAccept={watchParty.acceptWatchPartyInvite}
+        onDecline={watchParty.declineWatchPartyInvite}
       />
 
       {/* Clear History Confirmation Modal */}

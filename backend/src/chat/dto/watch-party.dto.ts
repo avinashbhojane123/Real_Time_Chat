@@ -18,6 +18,9 @@ export class WatchPartyActionDto {
   @IsNotEmpty()
   @IsIn([
     'open',
+    'invite',
+    'accept',
+    'decline',
     'play',
     'pause',
     'seek',
