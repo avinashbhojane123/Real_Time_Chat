@@ -71,6 +71,26 @@ export default function VideoCallPanel({
     }
   }, [showPipMenu]);
 
+  // Guaranteed internal stream binding on mount and stream/state updates
+  useEffect(() => {
+    const mainStream = isStreamSwapped ? localStream : remoteStream;
+    const pipStream = isStreamSwapped ? remoteStream : localStream;
+
+    if (remoteVideoRef?.current && mainStream) {
+      if (remoteVideoRef.current.srcObject !== mainStream) {
+        remoteVideoRef.current.srcObject = mainStream;
+      }
+      remoteVideoRef.current.play().catch(() => {});
+    }
+
+    if (localVideoRef?.current && pipStream) {
+      if (localVideoRef.current.srcObject !== pipStream) {
+        localVideoRef.current.srcObject = pipStream;
+      }
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [localStream, remoteStream, isStreamSwapped, callState]);
+
   // If panel is hidden and not in any PiP mode, return null
   if (!showVideoPanel && pipMode === 'none') return null;
 
@@ -210,7 +230,14 @@ export default function VideoCallPanel({
         <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', overflow: 'hidden' }}>
           {/* Remote Video Stream */}
           <video
-            ref={remoteVideoRef}
+            ref={(el) => {
+              if (remoteVideoRef) remoteVideoRef.current = el;
+              const streamToAttach = isStreamSwapped ? localStream : remoteStream;
+              if (el && streamToAttach && el.srcObject !== streamToAttach) {
+                el.srcObject = streamToAttach;
+                el.play().catch(() => {});
+              }
+            }}
             autoPlay
             playsInline
             style={{
@@ -273,10 +300,17 @@ export default function VideoCallPanel({
             }}
           >
             <video
-              ref={localVideoRef}
+              ref={(el) => {
+                if (localVideoRef) localVideoRef.current = el;
+                const streamToAttach = isStreamSwapped ? remoteStream : localStream;
+                if (el && streamToAttach && el.srcObject !== streamToAttach) {
+                  el.srcObject = streamToAttach;
+                  el.play().catch(() => {});
+                }
+              }}
               autoPlay
               playsInline
-              muted
+              muted={!isStreamSwapped}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
             <div
@@ -525,7 +559,7 @@ export default function VideoCallPanel({
 
       {/* Main Viewport */}
       <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', overflow: 'hidden' }}>
-        {/* Calling View */}
+        {/* Calling View: Live Sender Camera Preview with Glassmorphic Overlay */}
         {callState === 'calling' && (
           <div
             style={{
@@ -534,55 +568,179 @@ export default function VideoCallPanel({
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
+              justifyContent: 'space-between',
               backgroundColor: '#0b141a',
-              padding: '20px',
+              overflow: 'hidden',
             }}
           >
+            {/* Live Sender Camera Feed Preview */}
+            {localStream && !cameraOff ? (
+              <video
+                ref={(el) => {
+                  if (el && localStream && el.srcObject !== localStream) {
+                    el.srcObject = localStream;
+                    el.play().catch(() => {});
+                  }
+                }}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  transform: 'scaleX(-1)', // Mirror local self-view
+                  filter: 'brightness(0.92)',
+                  zIndex: 1,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: '#0b141a',
+                  zIndex: 1,
+                }}
+              />
+            )}
+
+            {/* Gradient Mask Over Live Preview */}
             <div
-              className="wa-call-pulse"
               style={{
-                width: '96px',
-                height: '96px',
-                borderRadius: '50%',
-                backgroundColor: '#00a884',
-                color: '#fff',
+                position: 'absolute',
+                inset: 0,
+                background: localStream && !cameraOff
+                  ? 'linear-gradient(180deg, rgba(11,20,26,0.72) 0%, rgba(11,20,26,0.25) 45%, rgba(11,20,26,0.88) 100%)'
+                  : 'radial-gradient(circle at center, #111b21 0%, #0b141a 100%)',
+                zIndex: 2,
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Top Contact Info */}
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 5,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '2.5rem',
-                fontWeight: 700,
-                marginBottom: '20px',
-                boxShadow: '0 8px 24px rgba(0, 168, 132, 0.4)',
+                marginTop: '48px',
+                padding: '0 20px',
+                textAlign: 'center',
               }}
             >
-              {initialLetter}
+              <div
+                className="wa-call-pulse"
+                style={{
+                  width: '84px',
+                  height: '84px',
+                  borderRadius: '50%',
+                  backgroundColor: '#00a884',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '2.2rem',
+                  fontWeight: 700,
+                  marginBottom: '16px',
+                  boxShadow: '0 8px 30px rgba(0, 168, 132, 0.45)',
+                  border: '3px solid rgba(255, 255, 255, 0.2)',
+                }}
+              >
+                {initialLetter}
+              </div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '6px', color: '#fff', textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>
+                Calling {remoteUserName}...
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="wa-pulse-dot" style={{ backgroundColor: '#25d366' }} />
+                <span style={{ color: '#25d366', fontSize: '0.92rem', fontWeight: 600, textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
+                  Ringing... (Your face is live)
+                </span>
+              </div>
             </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '6px', textAlign: 'center' }}>
-              Calling {remoteUserName}...
-            </h3>
-            <p style={{ color: '#8696a0', fontSize: '0.9rem', marginBottom: '32px' }}>Waiting for response</p>
-            <button
-              onClick={endCall}
+
+            {/* Bottom Controls Bar for Calling State */}
+            <div
               style={{
-                backgroundColor: '#ea0038',
-                color: '#fff',
-                border: 'none',
-                padding: '14px 32px',
-                borderRadius: '30px',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                cursor: 'pointer',
+                position: 'relative',
+                zIndex: 5,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 14px rgba(234, 0, 56, 0.4)',
+                gap: '16px',
+                marginBottom: '44px',
+                backgroundColor: 'rgba(11, 20, 26, 0.75)',
+                backdropFilter: 'blur(16px)',
+                padding: '12px 24px',
+                borderRadius: '40px',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6)',
               }}
             >
-              <span className="material-symbols-outlined">call_end</span>
-              End Call
-            </button>
+              {/* Mic Toggle */}
+              <button
+                type="button"
+                onClick={toggleMic}
+                className={`wa-control-btn ${micMuted ? 'danger' : ''}`}
+                style={{ width: '46px', height: '46px' }}
+                title={micMuted ? 'Unmute Mic' : 'Mute Mic'}
+              >
+                <span className="material-symbols-outlined">{micMuted ? 'mic_off' : 'mic'}</span>
+              </button>
+
+              {/* Camera Toggle */}
+              <button
+                type="button"
+                onClick={toggleCamera}
+                className={`wa-control-btn ${cameraOff ? 'danger' : ''}`}
+                style={{ width: '46px', height: '46px' }}
+                title={cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+              >
+                <span className="material-symbols-outlined">{cameraOff ? 'videocam_off' : 'videocam'}</span>
+              </button>
+
+              {/* Flip Camera */}
+              {flipCamera && (
+                <button
+                  type="button"
+                  onClick={flipCamera}
+                  className="wa-control-btn"
+                  style={{ width: '46px', height: '46px' }}
+                  title="Flip Camera"
+                >
+                  <span className="material-symbols-outlined">flip_camera_ios</span>
+                </button>
+              )}
+
+              {/* End / Cancel Call */}
+              <button
+                type="button"
+                onClick={endCall}
+                style={{
+                  backgroundColor: '#ea0038',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '12px 26px',
+                  borderRadius: '30px',
+                  fontWeight: 700,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 16px rgba(234, 0, 56, 0.45)',
+                  transition: 'transform 0.15s ease',
+                }}
+                title="Cancel Call"
+              >
+                <span className="material-symbols-outlined">call_end</span>
+                <span>Cancel</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -676,7 +834,14 @@ export default function VideoCallPanel({
           <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             {/* Remote Stream Video */}
             <video
-              ref={remoteVideoRef}
+              ref={(el) => {
+                if (remoteVideoRef) remoteVideoRef.current = el;
+                const streamToAttach = isStreamSwapped ? localStream : remoteStream;
+                if (el && streamToAttach && el.srcObject !== streamToAttach) {
+                  el.srcObject = streamToAttach;
+                  el.play().catch(() => {});
+                }
+              }}
               autoPlay
               playsInline
               style={{
@@ -689,6 +854,51 @@ export default function VideoCallPanel({
                 transition: 'object-fit 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             />
+
+            {/* Connecting Remote Video Overlay if remote video stream has not yet arrived */}
+            {(!remoteStream || (!isStreamSwapped && !remoteStream.getVideoTracks()?.length)) && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: '#0b141a',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  zIndex: 2,
+                }}
+              >
+                <div
+                  className="wa-call-pulse"
+                  style={{
+                    width: '84px',
+                    height: '84px',
+                    borderRadius: '50%',
+                    backgroundColor: '#00a884',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.2rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {initialLetter}
+                </div>
+                <div style={{ color: '#e9edef', fontSize: '1rem', fontWeight: 600 }}>
+                  Connecting video with {displayName}...
+                </div>
+                <div className="wa-sound-waves">
+                  <span className="wa-sound-bar" />
+                  <span className="wa-sound-bar" />
+                  <span className="wa-sound-bar" />
+                  <span className="wa-sound-bar" />
+                  <span className="wa-sound-bar" />
+                </div>
+              </div>
+            )}
 
             {/* Floating PIP Local Stream */}
             <motion.div
@@ -705,10 +915,17 @@ export default function VideoCallPanel({
               }}
             >
               <video
-                ref={localVideoRef}
+                ref={(el) => {
+                  if (localVideoRef) localVideoRef.current = el;
+                  const streamToAttach = isStreamSwapped ? remoteStream : localStream;
+                  if (el && streamToAttach && el.srcObject !== streamToAttach) {
+                    el.srcObject = streamToAttach;
+                    el.play().catch(() => {});
+                  }
+                }}
                 autoPlay
                 playsInline
-                muted
+                muted={!isStreamSwapped}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
               <div

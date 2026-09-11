@@ -188,7 +188,14 @@ export default function DesktopPipPortal({
       >
         {/* Remote / Main Video Stream */}
         <video
-          ref={pipRemoteVideoRef}
+          ref={(el) => {
+            pipRemoteVideoRef.current = el;
+            const streamToAttach = isStreamSwapped ? localStream : remoteStream;
+            if (el && streamToAttach && el.srcObject !== streamToAttach) {
+              el.srcObject = streamToAttach;
+              el.play().catch(() => {});
+            }
+          }}
           autoPlay
           playsInline
           style={{
@@ -219,10 +226,17 @@ export default function DesktopPipPortal({
           }}
         >
           <video
-            ref={pipLocalVideoRef}
+            ref={(el) => {
+              pipLocalVideoRef.current = el;
+              const streamToAttach = isStreamSwapped ? remoteStream : localStream;
+              if (el && streamToAttach && el.srcObject !== streamToAttach) {
+                el.srcObject = streamToAttach;
+                el.play().catch(() => {});
+              }
+            }}
             autoPlay
             playsInline
-            muted
+            muted={!isStreamSwapped}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
           <div

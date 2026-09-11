@@ -104,14 +104,18 @@ export default function WatchPartyModal({
   // Sync webRTC streams to Watch Party face cams
   useEffect(() => {
     if (partyLocalVideoRef.current && webRTC?.localStream) {
-      partyLocalVideoRef.current.srcObject = webRTC.localStream;
+      if (partyLocalVideoRef.current.srcObject !== webRTC.localStream) {
+        partyLocalVideoRef.current.srcObject = webRTC.localStream;
+      }
       partyLocalVideoRef.current.play().catch(() => {});
     }
   }, [webRTC?.localStream, webRTC?.callState, showFaceCams, faceCamsMinimized]);
 
   useEffect(() => {
     if (partyRemoteVideoRef.current && webRTC?.remoteStream) {
-      partyRemoteVideoRef.current.srcObject = webRTC.remoteStream;
+      if (partyRemoteVideoRef.current.srcObject !== webRTC.remoteStream) {
+        partyRemoteVideoRef.current.srcObject = webRTC.remoteStream;
+      }
       partyRemoteVideoRef.current.play().catch(() => {});
     }
   }, [webRTC?.remoteStream, webRTC?.callState, showFaceCams, faceCamsMinimized]);
@@ -834,16 +838,46 @@ export default function WatchPartyModal({
                       </div>
                     )}
 
-                    {/* Calling / Waiting State */}
+                    {/* Calling / Waiting State with Sender Face Preview */}
                     {webRTC.callState === 'calling' && (
-                      <div className="face-cams-prompt">
-                        <div className="watch-party-spinner" style={{ width: '24px', height: '24px' }} />
-                        <span style={{ fontSize: '0.82rem', color: '#e9edef' }}>
-                          Calling {recipientUser?.nickname || 'Partner'}...
-                        </span>
-                        <button type="button" className="prompt-btn decline" style={{ padding: '3px 10px', fontSize: '0.75rem', marginTop: '4px' }} onClick={webRTC.endCall}>
-                          Cancel
-                        </button>
+                      <div className="face-cams-calling-box" style={{ padding: '8px', minWidth: '180px' }}>
+                        <div className="face-cam-card sender single" style={{ width: '100%', height: '125px', position: 'relative' }}>
+                          {webRTC?.localStream && !webRTC.cameraOff ? (
+                            <video
+                              ref={(el) => {
+                                partyLocalVideoRef.current = el;
+                                if (el && webRTC.localStream && el.srcObject !== webRTC.localStream) {
+                                  el.srcObject = webRTC.localStream;
+                                  el.play().catch(() => {});
+                                }
+                              }}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="face-cam-video"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                            />
+                          ) : (
+                            <div className="face-cam-avatar-fallback">
+                              <span className="avatar-letter">{(currentNickname || 'Me').slice(0, 2).toUpperCase()}</span>
+                              <span className="avatar-status">Live Camera</span>
+                            </div>
+                          )}
+                          <div className="face-cam-tag">
+                            <span className="face-cam-dot active" />
+                            <span>Calling {recipientUser?.nickname || 'Partner'}...</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '6px' }}>
+                          <button
+                            type="button"
+                            className="prompt-btn decline"
+                            style={{ padding: '4px 14px', fontSize: '0.75rem', width: '100%' }}
+                            onClick={webRTC.endCall}
+                          >
+                            Cancel Call
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -853,12 +887,18 @@ export default function WatchPartyModal({
                         {/* Receiver (Partner) Cam */}
                         <div className="face-cam-card receiver">
                           <video
-                            ref={partyRemoteVideoRef}
+                            ref={(el) => {
+                              partyRemoteVideoRef.current = el;
+                              if (el && webRTC?.remoteStream && el.srcObject !== webRTC.remoteStream) {
+                                el.srcObject = webRTC.remoteStream;
+                                el.play().catch(() => {});
+                              }
+                            }}
                             autoPlay
                             playsInline
                             className="face-cam-video"
                           />
-                          {!webRTC.remoteStream && (
+                          {(!webRTC?.remoteStream || !webRTC.remoteStream.getVideoTracks()?.length) && (
                             <div className="face-cam-avatar-fallback">
                               <span className="avatar-letter">{(recipientUser?.nickname || 'P').slice(0, 2).toUpperCase()}</span>
                               <span className="avatar-status">Connecting...</span>
@@ -873,11 +913,18 @@ export default function WatchPartyModal({
                         {/* Sender (You) Cam */}
                         <div className="face-cam-card sender">
                           <video
-                            ref={partyLocalVideoRef}
+                            ref={(el) => {
+                              partyLocalVideoRef.current = el;
+                              if (el && webRTC?.localStream && el.srcObject !== webRTC.localStream) {
+                                el.srcObject = webRTC.localStream;
+                                el.play().catch(() => {});
+                              }
+                            }}
                             autoPlay
                             playsInline
                             muted
                             className={`face-cam-video ${webRTC.cameraOff ? 'cam-off' : ''}`}
+                            style={{ transform: 'scaleX(-1)' }}
                           />
                           {webRTC.cameraOff && (
                             <div className="face-cam-avatar-fallback">

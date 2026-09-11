@@ -205,6 +205,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     pc.ontrack = (e) => {
+      console.log('[WebRTC] ontrack received:', e.track.kind, 'stream count:', e.streams?.length);
       let stream = e.streams && e.streams[0] ? e.streams[0] : null;
       if (!stream) {
         if (!remoteStreamRef.current) {
@@ -212,14 +213,22 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         }
         remoteStreamRef.current.addTrack(e.track);
         stream = remoteStreamRef.current;
+      } else {
+        remoteStreamRef.current = stream;
       }
-      remoteStreamRef.current = stream;
-      setRemoteStream(stream);
+
+      e.track.enabled = true;
+      // Always construct a new MediaStream instance with all tracks so React detects state change
+      const streamInstance = new MediaStream(stream.getTracks());
+      setRemoteStream(streamInstance);
 
       // Handle track mute/unmute so receiver responds immediately when sender changes video tracks
       e.track.onunmute = () => {
-        if (remoteVideoRef.current && remoteStreamRef.current) {
-          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        console.log('[WebRTC] Remote track unmuted:', e.track.kind);
+        const activeStream = new MediaStream(stream.getTracks());
+        setRemoteStream(activeStream);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = stream;
           remoteVideoRef.current.play().catch(() => {});
         }
       };
@@ -418,8 +427,16 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
       });
+      stream.getTracks().forEach((track) => {
+        track.enabled = true;
+      });
       localStreamRef.current = stream;
       setLocalStream(stream);
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(() => {});
+      }
 
       const pc = createPeerConnection();
       const offer = await pc.createOffer();
@@ -441,8 +458,16 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
       });
+      stream.getTracks().forEach((track) => {
+        track.enabled = true;
+      });
       localStreamRef.current = stream;
       setLocalStream(stream);
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(() => {});
+      }
 
       const pc = createPeerConnection();
       if (latestOfferRef.current) {
