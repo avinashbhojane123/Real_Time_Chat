@@ -5,6 +5,61 @@ import './WatchPartyModal.css';
 
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
 
+const formatTime = (seconds) => {
+  if (isNaN(seconds) || seconds < 0) return '00:00';
+  const s = Math.floor(seconds);
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  if (hrs > 0) {
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
+const parseTimeToSeconds = (str) => {
+  if (!str) return 0;
+  const parts = str.trim().split(':').map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  if (parts.length === 2 && !parts.some(isNaN)) {
+    return parts[0] * 60 + parts[1];
+  }
+  if (parts.length === 1 && !isNaN(parts[0])) {
+    return parts[0];
+  }
+  return 0;
+};
+
+const getSyncedEmbedUrl = (url, targetTime) => {
+  if (!url) return '';
+  const cleanSec = Math.max(0, Math.floor(targetTime || 0));
+  if (cleanSec === 0) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('cinemaos.live')) {
+      parsed.searchParams.set('start', cleanSec.toString());
+      parsed.hash = `t=${cleanSec}`;
+      return parsed.toString();
+    }
+    if (parsed.hostname.includes('vidlink.pro')) {
+      parsed.searchParams.set('start', cleanSec.toString());
+      return parsed.toString();
+    }
+    if (parsed.hostname.includes('multiembed.mov')) {
+      parsed.searchParams.set('start', cleanSec.toString());
+      return parsed.toString();
+    }
+    parsed.searchParams.set('start', cleanSec.toString());
+    parsed.hash = `t=${cleanSec}`;
+    return parsed.toString();
+  } catch (_) {
+    return cleanSec > 0 ? `${url}#t=${cleanSec}` : url;
+  }
+};
+
+
 // Supported Movie & Series Platforms
 const SUPPORTED_MOVIE_SITES = [
   {
@@ -103,6 +158,12 @@ export default function WatchPartyModal({
   const modalContainerRef = useRef(null);
   const embedIframeRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDesktopFill, setIsDesktopFill] = useState(true);
+  const [isDraggingPip, setIsDraggingPip] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncInputTime, setSyncInputTime] = useState('');
+  const [syncKey, setSyncKey] = useState(1);
+  const [syncNotice, setSyncNotice] = useState(null);
   const [showStreamBar, setShowStreamBar] = useState(true);
   const streamBarTimeoutRef = useRef(null);
 
@@ -179,6 +240,47 @@ export default function WatchPartyModal({
     } catch (_) {}
   }, []);
 
+  // Execute synchronized scene seek on both partner screens
+  const executeSyncScene = useCallback(
+    (targetSeconds) => {
+      const cleanSec = Math.max(0, Math.floor(targetSeconds || 0));
+      seek(cleanSec);
+      setSyncKey((k) => k + 1);
+
+      sendIframeCommand({ action: 'seek', time: cleanSec, type: 'SEEK' });
+      sendIframeCommand({ type: 'player:seek', data: { time: cleanSec } });
+
+      if (videoElementRef.current) {
+        videoElementRef.current.currentTime = cleanSec;
+      }
+      if (ytPlayerRef?.current?.seekTo) {
+        ytPlayerRef.current.seekTo(cleanSec, true);
+      }
+
+      setSyncNotice(`⚡ Synced scene to ${formatTime(cleanSec)} with ${recipientUser?.nickname || 'Partner'}!`);
+      setTimeout(() => setSyncNotice(null), 4000);
+      setShowSyncModal(false);
+    },
+    [seek, sendIframeCommand, recipientUser?.nickname, videoElementRef, ytPlayerRef]
+  );
+
+  // Partner scene sync update listener
+  const lastSyncTimestamp = watchParty?.lastSyncTimestamp;
+  const prevSyncTsRef = useRef(lastSyncTimestamp);
+
+  useEffect(() => {
+    if (lastSyncTimestamp && lastSyncTimestamp !== prevSyncTsRef.current) {
+      prevSyncTsRef.current = lastSyncTimestamp;
+      if (lastActorNickname && lastActorNickname !== currentNickname) {
+        setSyncKey((k) => k + 1);
+        sendIframeCommand({ action: 'seek', time: currentTime, type: 'SEEK' });
+        sendIframeCommand({ type: 'player:seek', data: { time: currentTime } });
+        setSyncNotice(`⚡ ${lastActorNickname} synced the scene to ${formatTime(currentTime)}!`);
+        setTimeout(() => setSyncNotice(null), 4000);
+      }
+    }
+  }, [lastSyncTimestamp, lastActorNickname, currentNickname, currentTime, sendIframeCommand]);
+
   useEffect(() => {
     const handleMsg = (e) => {
       try {
@@ -199,20 +301,9 @@ export default function WatchPartyModal({
   }, [isPlaying, togglePlay, setCurrentTime]);
 
   const handleResyncScene = (explicitTime = null) => {
-    const targetTime = typeof explicitTime === 'number' ? explicitTime : currentTime;
-    seek(targetTime);
-    sendIframeCommand({ action: 'seek', time: targetTime, type: 'SEEK' });
-    if (videoSource?.url && videoSource.type === 'embed') {
-      let targetUrl = videoSource.url;
-      if (targetUrl.includes('vidlink.pro')) {
-        targetUrl = targetUrl.split('?')[0] + `?start=${Math.floor(targetTime)}&autoplay=${isPlaying}`;
-        changeVideo({ ...videoSource, url: targetUrl });
-      } else if (targetUrl.includes('cinemaos.live')) {
-        targetUrl = targetUrl.split('#')[0] + `#t=${Math.floor(targetTime)}`;
-        changeVideo({ ...videoSource, url: targetUrl });
-      }
-    }
+    executeSyncScene(typeof explicitTime === 'number' ? explicitTime : currentTime);
   };
+
 
   const handleJumpToTimePrompt = () => {
     const input = prompt('Enter scene timestamp to sync both partners (e.g. 0:30 or 15:00 or seconds):', formatTime(currentTime));
@@ -609,13 +700,13 @@ export default function WatchPartyModal({
 
   // FULL THEATER CINEMA MODAL
   return (
-    <div className={`watch-party-overlay ${cinemaMode ? 'cinema-dimmed' : ''}`}>
+    <div className={`watch-party-overlay ${cinemaMode ? 'cinema-dimmed' : ''} ${isDesktopFill || isFullscreen ? 'desktop-edge-to-edge' : ''}`}>
       {/* Dynamic Ambient Glow */}
       <div className="watch-party-ambient-glow" />
 
       <motion.div
         ref={modalContainerRef}
-        className={`watch-party-container ${isFullscreen ? 'is-fullscreen' : ''}`}
+        className={`watch-party-container ${isDesktopFill || isFullscreen ? 'is-fullscreen desktop-edge-to-edge' : ''}`}
         initial={{ scale: 0.92, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.92, opacity: 0, y: 20 }}
@@ -635,6 +726,20 @@ export default function WatchPartyModal({
 
           {/* Header Controls */}
           <div className="watch-party-header-actions">
+            {/* Sync Movie Scene Button */}
+            <button
+              type="button"
+              className="watch-party-sync-scene-btn"
+              onClick={() => {
+                setSyncInputTime(formatTime(currentTime));
+                setShowSyncModal(true);
+              }}
+              title="Sync Movie Timing & Scene with Partner"
+            >
+              <Icon icon="solar:restart-bold-duotone" width="18" />
+              <span className="sync-scene-btn-label">Sync Scene</span>
+            </button>
+
             {/* Live Face Cam (Video Call) Toggle Button */}
             {webRTC && (
               <button
@@ -746,15 +851,28 @@ export default function WatchPartyModal({
               <Icon icon={cinemaMode ? 'solar:lamp-bold-duotone' : 'solar:sun-bold-duotone'} width="20" />
             </button>
 
-            {/* Fullscreen Button in Header */}
+            {/* Desktop Screen Edge-to-Edge Fill Toggle (Zero Gaps) */}
+            <button
+              type="button"
+              className={`watch-party-btn-icon ${isDesktopFill ? 'active' : ''}`}
+              onClick={() => setIsDesktopFill(!isDesktopFill)}
+              title={isDesktopFill ? 'Windowed Modal View' : 'Complete Full Desktop Screen (No Gaps)'}
+            >
+              <Icon
+                icon={isDesktopFill ? 'solar:minimize-square-3-bold-duotone' : 'solar:maximize-square-bold-duotone'}
+                width="20"
+              />
+            </button>
+
+            {/* Native Fullscreen Button in Header */}
             <button
               type="button"
               className={`watch-party-btn-icon ${isFullscreen ? 'active' : ''}`}
               onClick={toggleFullscreen}
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Native Fullscreen (F11)'}
             >
               <Icon
-                icon={isFullscreen ? 'solar:minimize-square-3-bold-duotone' : 'solar:maximize-square-bold-duotone'}
+                icon={isFullscreen ? 'solar:minimize-square-bold' : 'solar:full-screen-bold'}
                 width="20"
               />
             </button>
@@ -947,12 +1065,13 @@ export default function WatchPartyModal({
               allow="autoplay; encrypted-media; fullscreen"
               allowFullScreen
               title="YouTube Watch Party"
+              style={{ pointerEvents: isDraggingPip ? 'none' : 'auto' }}
             />
           ) : videoSource?.type === 'embed' || videoSource?.url ? (
             <iframe
               ref={embedIframeRef}
-              key={videoSource.url}
-              src={videoSource.url}
+              key={`${videoSource.url}-sync-${syncKey}`}
+              src={getSyncedEmbedUrl(videoSource.url, currentTime)}
               className="watch-party-yt-iframe"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share *"
               allowFullScreen
@@ -960,6 +1079,7 @@ export default function WatchPartyModal({
               mozallowfullscreen="true"
               referrerPolicy="no-referrer"
               title={videoSource.title || 'Movie Watch Party'}
+              style={{ pointerEvents: isDraggingPip ? 'none' : 'auto' }}
             />
           ) : null}
 
@@ -1015,149 +1135,84 @@ export default function WatchPartyModal({
               ))}
             </AnimatePresence>
           </div>
+        </div>
 
-          {/* Live Floating Face Cams (Sender & Receiver Live Webcams) */}
-          <AnimatePresence>
-            {webRTC && showFaceCams && (webRTC.callState === 'active' || webRTC.callState === 'calling' || webRTC.callState === 'incoming') && (
-              <motion.div
-                drag
-                dragMomentum={false}
-                className={`watch-party-face-cams ${faceCamsMinimized ? 'minimized' : ''}`}
-                initial={{ opacity: 0, scale: 0.85, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.85, y: 15 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-              >
-                {/* Face Cams Header */}
-                <div className="face-cams-header">
-                  <div className="face-cams-header-badge">
-                    <span className="face-cam-live-indicator" />
-                    <span>Live Faces</span>
-                    {webRTC.callDuration > 0 && (
-                      <span className="face-cams-duration">
-                        {Math.floor(webRTC.callDuration / 60)}:{(webRTC.callDuration % 60).toString().padStart(2, '0')}
-                      </span>
-                    )}
-                  </div>
-                  <div className="face-cams-header-controls">
-                    <button
-                      type="button"
-                      className="face-cam-mini-btn"
-                      onClick={() => setFaceCamsMinimized(!faceCamsMinimized)}
-                      title={faceCamsMinimized ? 'Expand Face Cams' : 'Minimize Face Cams'}
-                    >
-                      <Icon icon={faceCamsMinimized ? 'solar:maximize-square-bold' : 'solar:minimize-square-bold'} width="13" />
-                    </button>
-                    <button
-                      type="button"
-                      className="face-cam-mini-btn end-call"
-                      onClick={webRTC.endCall}
-                      title="Disconnect Face Cams"
-                    >
-                      <Icon icon="line-md:close" width="13" />
-                    </button>
-                  </div>
+        {/* Live Floating Face Cams (Freely draggable everywhere across the desktop screen) */}
+        <AnimatePresence>
+          {webRTC && showFaceCams && (webRTC.callState === 'active' || webRTC.callState === 'calling' || webRTC.callState === 'incoming') && (
+            <motion.div
+              drag
+              dragMomentum={false}
+              dragConstraints={modalContainerRef}
+              onDragStart={() => setIsDraggingPip(true)}
+              onDragEnd={() => setIsDraggingPip(false)}
+              className={`watch-party-face-cams ${faceCamsMinimized ? 'minimized' : ''}`}
+              initial={{ opacity: 0, scale: 0.85, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 15 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            >
+              {/* Face Cams Header */}
+              <div className="face-cams-header">
+                <div className="face-cams-header-badge">
+                  <span className="face-cam-live-indicator" />
+                  <span>Live Faces</span>
+                  {webRTC.callDuration > 0 && (
+                    <span className="face-cams-duration">
+                      {Math.floor(webRTC.callDuration / 60)}:{(webRTC.callDuration % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
                 </div>
+                <div className="face-cams-header-controls">
+                  <button
+                    type="button"
+                    className="face-cam-mini-btn"
+                    onClick={() => setFaceCamsMinimized(!faceCamsMinimized)}
+                    title={faceCamsMinimized ? 'Expand Face Cams' : 'Minimize Face Cams'}
+                  >
+                    <Icon icon={faceCamsMinimized ? 'solar:maximize-square-bold' : 'solar:minimize-square-bold'} width="13" />
+                  </button>
+                  <button
+                    type="button"
+                    className="face-cam-mini-btn end-call"
+                    onClick={webRTC.endCall}
+                    title="Disconnect Face Cams"
+                  >
+                    <Icon icon="line-md:close" width="13" />
+                  </button>
+                </div>
+              </div>
 
-                {!faceCamsMinimized && (
-                  <>
-                    {/* Incoming Call In-Cinema Prompt */}
-                    {webRTC.callState === 'incoming' && (
-                      <div className="face-cams-prompt">
-                        <div className="prompt-caller-info">
-                          <Icon icon="solar:phone-calling-rounded-bold-duotone" width="22" style={{ color: '#00a884' }} />
-                          <span><strong>{webRTC.callerName || 'Partner'}</strong> is video calling!</span>
-                        </div>
-                        <div className="prompt-actions">
-                          <button type="button" className="prompt-btn accept" onClick={webRTC.acceptCall}>
-                            <Icon icon="solar:videocamera-bold" width="15" />
-                            <span>Accept</span>
-                          </button>
-                          <button type="button" className="prompt-btn decline" onClick={webRTC.declineCall}>
-                            <span>Decline</span>
-                          </button>
-                        </div>
+              {!faceCamsMinimized && (
+                <>
+                  {/* Incoming Call In-Cinema Prompt */}
+                  {webRTC.callState === 'incoming' && (
+                    <div className="face-cams-prompt">
+                      <div className="prompt-caller-info">
+                        <Icon icon="solar:phone-calling-rounded-bold-duotone" width="22" style={{ color: '#00a884' }} />
+                        <span><strong>{webRTC.callerName || 'Partner'}</strong> is video calling!</span>
                       </div>
-                    )}
-
-                    {/* Calling / Waiting State with Sender Face Preview */}
-                    {webRTC.callState === 'calling' && (
-                      <div className="face-cams-calling-box" style={{ padding: '8px', minWidth: '180px' }}>
-                        <div className="face-cam-card sender single" style={{ width: '100%', height: '125px', position: 'relative' }}>
-                          {webRTC?.localStream && !webRTC.cameraOff ? (
-                            <video
-                              ref={(el) => {
-                                partyLocalVideoRef.current = el;
-                                if (el && webRTC.localStream && el.srcObject !== webRTC.localStream) {
-                                  el.srcObject = webRTC.localStream;
-                                  el.play().catch(() => {});
-                                }
-                              }}
-                              autoPlay
-                              playsInline
-                              muted
-                              className="face-cam-video"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-                            />
-                          ) : (
-                            <div className="face-cam-avatar-fallback">
-                              <span className="avatar-letter">{(currentNickname || 'Me').slice(0, 2).toUpperCase()}</span>
-                              <span className="avatar-status">Live Camera</span>
-                            </div>
-                          )}
-                          <div className="face-cam-tag">
-                            <span className="face-cam-dot active" />
-                            <span>Calling {recipientUser?.nickname || 'Partner'}...</span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '6px' }}>
-                          <button
-                            type="button"
-                            className="prompt-btn decline"
-                            style={{ padding: '4px 14px', fontSize: '0.75rem', width: '100%' }}
-                            onClick={webRTC.endCall}
-                          >
-                            Cancel Call
-                          </button>
-                        </div>
+                      <div className="prompt-actions">
+                        <button type="button" className="prompt-btn accept" onClick={webRTC.acceptCall}>
+                          <Icon icon="solar:videocamera-bold" width="15" />
+                          <span>Accept</span>
+                        </button>
+                        <button type="button" className="prompt-btn decline" onClick={webRTC.declineCall}>
+                          <span>Decline</span>
+                        </button>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Active Dual Face Cams (Sender & Receiver) */}
-                    {webRTC.callState === 'active' && (
-                      <div className="face-cams-grid">
-                        {/* Receiver (Partner) Cam */}
-                        <div className="face-cam-card receiver">
-                          <video
-                            ref={(el) => {
-                              partyRemoteVideoRef.current = el;
-                              if (el && webRTC?.remoteStream && el.srcObject !== webRTC.remoteStream) {
-                                el.srcObject = webRTC.remoteStream;
-                                el.play().catch(() => {});
-                              }
-                            }}
-                            autoPlay
-                            playsInline
-                            className="face-cam-video"
-                          />
-                          {(!webRTC?.remoteStream || !webRTC.remoteStream.getVideoTracks()?.length) && (
-                            <div className="face-cam-avatar-fallback">
-                              <span className="avatar-letter">{(recipientUser?.nickname || 'P').slice(0, 2).toUpperCase()}</span>
-                              <span className="avatar-status">Connecting...</span>
-                            </div>
-                          )}
-                          <div className="face-cam-tag">
-                            <span className="face-cam-dot active" />
-                            <span>{recipientUser?.nickname || webRTC.remoteUserName || 'Partner'}</span>
-                          </div>
-                        </div>
-
-                        {/* Sender (You) Cam */}
-                        <div className="face-cam-card sender">
+                  {/* Calling / Waiting State with Sender Face Preview */}
+                  {webRTC.callState === 'calling' && (
+                    <div className="face-cams-calling-box" style={{ padding: '8px', minWidth: '180px' }}>
+                      <div className="face-cam-card sender single" style={{ width: '100%', height: '125px', position: 'relative' }}>
+                        {webRTC?.localStream && !webRTC.cameraOff ? (
                           <video
                             ref={(el) => {
                               partyLocalVideoRef.current = el;
-                              if (el && webRTC?.localStream && el.srcObject !== webRTC.localStream) {
+                              if (el && webRTC.localStream && el.srcObject !== webRTC.localStream) {
                                 el.srcObject = webRTC.localStream;
                                 el.play().catch(() => {});
                               }
@@ -1165,71 +1220,139 @@ export default function WatchPartyModal({
                             autoPlay
                             playsInline
                             muted
-                            className={`face-cam-video ${webRTC.cameraOff ? 'cam-off' : ''}`}
-                            style={{ transform: 'scaleX(-1)' }}
+                            className="face-cam-video"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
                           />
-                          {webRTC.cameraOff && (
-                            <div className="face-cam-avatar-fallback">
-                              <span className="avatar-letter">{(currentNickname || 'Me').slice(0, 2).toUpperCase()}</span>
-                              <span className="avatar-status">Camera Off</span>
-                            </div>
-                          )}
-                          <div className="face-cam-tag">
-                            <span className="face-cam-dot" />
-                            <span>You</span>
-                            {webRTC.micMuted && (
-                              <Icon icon="solar:muted-bold" width="12" style={{ color: '#f15c6d', marginLeft: '3px' }} />
-                            )}
+                        ) : (
+                          <div className="face-cam-avatar-fallback">
+                            <span className="avatar-letter">{(currentNickname || 'Me').slice(0, 2).toUpperCase()}</span>
+                            <span className="avatar-status">Live Camera</span>
                           </div>
+                        )}
+                        <div className="face-cam-tag">
+                          <span className="face-cam-dot active" />
+                          <span>Calling {recipientUser?.nickname || 'Partner'}...</span>
                         </div>
                       </div>
-                    )}
-
-                    {/* Live Cam Controls Bar */}
-                    {webRTC.callState === 'active' && (
-                      <div className="face-cams-actions-row">
+                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '6px' }}>
                         <button
                           type="button"
-                          className={`face-cam-action-btn ${webRTC.micMuted ? 'muted' : ''}`}
-                          onClick={webRTC.toggleMic}
-                          title={webRTC.micMuted ? 'Unmute Mic' : 'Mute Mic'}
-                        >
-                          <Icon icon={webRTC.micMuted ? 'solar:muted-bold' : 'solar:microphone-bold'} width="15" />
-                        </button>
-                        <button
-                          type="button"
-                          className={`face-cam-action-btn ${webRTC.cameraOff ? 'muted' : ''}`}
-                          onClick={webRTC.toggleCamera}
-                          title={webRTC.cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
-                        >
-                          <Icon icon={webRTC.cameraOff ? 'solar:videocamera-cross-bold' : 'solar:videocamera-bold'} width="15" />
-                        </button>
-                        {webRTC.flipCamera && (
-                          <button
-                            type="button"
-                            className="face-cam-action-btn"
-                            onClick={webRTC.flipCamera}
-                            title="Flip Camera"
-                          >
-                            <Icon icon="solar:camera-rotate-bold" width="15" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="face-cam-action-btn end-btn"
+                          className="prompt-btn decline"
+                          style={{ padding: '4px 14px', fontSize: '0.75rem', width: '100%' }}
                           onClick={webRTC.endCall}
-                          title="Disconnect Face Cams"
                         >
-                          <Icon icon="solar:phone-calling-rounded-bold" width="15" />
+                          Cancel Call
                         </button>
                       </div>
-                    )}
-                  </>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                    </div>
+                  )}
+
+                  {/* Active Dual Face Cams (Sender & Receiver) */}
+                  {webRTC.callState === 'active' && (
+                    <div className="face-cams-grid">
+                      {/* Receiver (Partner) Cam */}
+                      <div className="face-cam-card receiver">
+                        <video
+                          ref={(el) => {
+                            partyRemoteVideoRef.current = el;
+                            if (el && webRTC?.remoteStream && el.srcObject !== webRTC.remoteStream) {
+                              el.srcObject = webRTC.remoteStream;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          className="face-cam-video"
+                        />
+                        {(!webRTC?.remoteStream || !webRTC.remoteStream.getVideoTracks()?.length) && (
+                          <div className="face-cam-avatar-fallback">
+                            <span className="avatar-letter">{(recipientUser?.nickname || 'P').slice(0, 2).toUpperCase()}</span>
+                            <span className="avatar-status">Connecting...</span>
+                          </div>
+                        )}
+                        <div className="face-cam-tag">
+                          <span className="face-cam-dot active" />
+                          <span>{recipientUser?.nickname || webRTC.remoteUserName || 'Partner'}</span>
+                        </div>
+                      </div>
+
+                      {/* Sender (You) Cam */}
+                      <div className="face-cam-card sender">
+                        <video
+                          ref={(el) => {
+                            partyLocalVideoRef.current = el;
+                            if (el && webRTC?.localStream && el.srcObject !== webRTC.localStream) {
+                              el.srcObject = webRTC.localStream;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          muted
+                          className={`face-cam-video ${webRTC.cameraOff ? 'cam-off' : ''}`}
+                          style={{ transform: 'scaleX(-1)' }}
+                        />
+                        {webRTC.cameraOff && (
+                          <div className="face-cam-avatar-fallback">
+                            <span className="avatar-letter">{(currentNickname || 'Me').slice(0, 2).toUpperCase()}</span>
+                            <span className="avatar-status">Camera Off</span>
+                          </div>
+                        )}
+                        <div className="face-cam-tag">
+                          <span className="face-cam-dot" />
+                          <span>You</span>
+                          {webRTC.micMuted && (
+                            <Icon icon="solar:muted-bold" width="12" style={{ color: '#f15c6d', marginLeft: '3px' }} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live Cam Controls Bar */}
+                  {webRTC.callState === 'active' && (
+                    <div className="face-cams-actions-row">
+                      <button
+                        type="button"
+                        className={`face-cam-action-btn ${webRTC.micMuted ? 'muted' : ''}`}
+                        onClick={webRTC.toggleMic}
+                        title={webRTC.micMuted ? 'Unmute Mic' : 'Mute Mic'}
+                      >
+                        <Icon icon={webRTC.micMuted ? 'solar:muted-bold' : 'solar:microphone-bold'} width="15" />
+                      </button>
+                      <button
+                        type="button"
+                        className={`face-cam-action-btn ${webRTC.cameraOff ? 'muted' : ''}`}
+                        onClick={webRTC.toggleCamera}
+                        title={webRTC.cameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
+                      >
+                        <Icon icon={webRTC.cameraOff ? 'solar:videocamera-cross-bold' : 'solar:videocamera-bold'} width="15" />
+                      </button>
+                      {webRTC.flipCamera && (
+                        <button
+                          type="button"
+                          className="face-cam-action-btn"
+                          onClick={webRTC.flipCamera}
+                          title="Flip Camera"
+                        >
+                          <Icon icon="solar:camera-rotate-bold" width="15" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="face-cam-action-btn end-btn"
+                        onClick={webRTC.endCall}
+                        title="Disconnect Face Cams"
+                      >
+                        <Icon icon="solar:phone-calling-rounded-bold" width="15" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Floating Reactions Bar & In-Party Quick Chat Overlay */}
         <div className="watch-party-interaction-row">
@@ -1302,6 +1425,131 @@ export default function WatchPartyModal({
                   <span>Watch Together</span>
                 </button>
               </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Floating On-Screen Sync Notification Toast */}
+        <AnimatePresence>
+          {syncNotice && (
+            <motion.div
+              className="watch-party-sync-toast"
+              initial={{ opacity: 0, y: -20, x: '-50%' }}
+              animate={{ opacity: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, y: -20, x: '-50%' }}
+              transition={{ duration: 0.25 }}
+            >
+              <Icon icon="solar:restart-circle-bold" width="20" style={{ color: '#00a884', flexShrink: 0 }} />
+              <span>{syncNotice}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Sync Movie Scene Dialog Modal */}
+        <AnimatePresence>
+          {showSyncModal && (
+            <motion.div
+              className="watch-party-sync-modal-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowSyncModal(false);
+              }}
+            >
+              <motion.div
+                className="watch-party-sync-modal"
+                initial={{ scale: 0.9, opacity: 0, y: 15 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 15 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              >
+                <div className="sync-modal-title-row">
+                  <div className="sync-modal-title">
+                    <Icon icon="solar:restart-bold-duotone" width="22" />
+                    <span>Sync Scene with {recipientUser?.nickname || 'Partner'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="watch-party-btn-icon"
+                    style={{ width: '28px', height: '28px' }}
+                    onClick={() => setShowSyncModal(false)}
+                    title="Close"
+                  >
+                    <Icon icon="line-md:close" width="16" />
+                  </button>
+                </div>
+
+                <p className="sync-modal-subtitle">
+                  If the movie got ahead or behind, click below to snap both of your screens to the exact same second instantly.
+                </p>
+
+                {/* Instant One-Click Sync to Current Scene */}
+                <button
+                  type="button"
+                  className="sync-action-btn-primary"
+                  onClick={() => executeSyncScene(currentTime)}
+                >
+                  <Icon icon="solar:bolt-bold" width="18" />
+                  <span>⚡ Sync Both Now to My Scene ({formatTime(currentTime)})</span>
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                  <span style={{ fontSize: '0.72rem', color: '#8696a0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Or Jump Both to Timestamp
+                  </span>
+                  <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                </div>
+
+                {/* Quick Presets Grid */}
+                <div className="sync-presets-grid">
+                  {[
+                    { label: 'Start (0:00)', sec: 0 },
+                    { label: '0:30', sec: 30 },
+                    { label: '1:00', sec: 60 },
+                    { label: '2:00', sec: 120 },
+                    { label: '5:00', sec: 300 },
+                    { label: '10:00', sec: 600 },
+                    { label: '15:00', sec: 900 },
+                    { label: '30:00', sec: 1800 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      className="sync-preset-btn"
+                      onClick={() => {
+                        setSyncInputTime(preset.label.includes('Start') ? '00:00' : preset.label);
+                        executeSyncScene(preset.sec);
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Time Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const sec = parseTimeToSeconds(syncInputTime);
+                    executeSyncScene(sec);
+                  }}
+                  className="sync-input-row"
+                >
+                  <input
+                    type="text"
+                    className="sync-input-field"
+                    placeholder="e.g. 0:40 or 15:30"
+                    value={syncInputTime}
+                    onChange={(e) => setSyncInputTime(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" className="sync-action-btn-primary" style={{ width: 'auto', padding: '10px 18px' }}>
+                    <span>Sync</span>
+                  </button>
+                </form>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

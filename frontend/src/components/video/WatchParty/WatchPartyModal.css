@@ -35,7 +35,15 @@
   transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Fullscreen support */
+/* Edge-to-Edge Desktop Screen & Fullscreen - ZERO GAPS */
+.watch-party-overlay.desktop-edge-to-edge,
+.watch-party-overlay.is-fullscreen {
+  padding: 0 !important;
+  margin: 0 !important;
+  background-color: #000000 !important;
+}
+
+.watch-party-container.desktop-edge-to-edge,
 .watch-party-container.is-fullscreen,
 .watch-party-container:fullscreen {
   max-width: 100vw !important;
@@ -47,6 +55,7 @@
   box-shadow: none !important;
 }
 
+.watch-party-container.desktop-edge-to-edge .watch-party-player-surface,
 .watch-party-container.is-fullscreen .watch-party-player-surface,
 .watch-party-container:fullscreen .watch-party-player-surface {
   flex: 1 1 auto;
@@ -55,10 +64,21 @@
   aspect-ratio: unset !important;
 }
 
+.watch-party-container.desktop-edge-to-edge .watch-party-yt-iframe,
+.watch-party-container.is-fullscreen .watch-party-yt-iframe,
+.watch-party-container.desktop-edge-to-edge .watch-party-video,
+.watch-party-container.is-fullscreen .watch-party-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+
+.watch-party-container.desktop-edge-to-edge .watch-party-header,
 .watch-party-container.is-fullscreen .watch-party-header,
 .watch-party-container:fullscreen .watch-party-header {
   padding: 8px 16px;
 }
+
 
 
 /* Ambient glow effect */
@@ -1087,17 +1107,18 @@
 
 .watch-party-face-cams {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 64px;
+  right: 20px;
   width: 320px;
-  background: rgba(17, 27, 33, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 168, 132, 0.35);
+  background: rgba(17, 27, 33, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 168, 132, 0.45);
   border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
-  z-index: 45;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 168, 132, 0.2);
+  z-index: 1000;
   overflow: hidden;
+  touch-action: none;
   cursor: grab;
   transition: width 0.25s ease, border-color 0.2s ease;
 }
@@ -1383,4 +1404,185 @@
     right: 8px;
   }
 }
+
+/* =========================================================================
+   Sync Scene Button, Modal & On-Screen Notification Banner
+   ========================================================================= */
+.watch-party-sync-scene-btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  width: auto !important;
+  padding: 5px 12px !important;
+  background: linear-gradient(135deg, rgba(0, 168, 132, 0.25) 0%, rgba(37, 211, 102, 0.2) 100%) !important;
+  border: 1px solid #00a884 !important;
+  color: #25d366 !important;
+  font-weight: 700;
+  font-size: 0.8rem;
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(0, 168, 132, 0.3);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.watch-party-sync-scene-btn:hover {
+  background: linear-gradient(135deg, #00a884 0%, #25d366 100%) !important;
+  color: #111b21 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(0, 168, 132, 0.6);
+}
+
+.sync-scene-btn-label {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* Sync Scene Modal Backdrop & Card */
+.watch-party-sync-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.watch-party-sync-modal {
+  width: 100%;
+  max-width: 440px;
+  background: #111b21;
+  border: 1px solid rgba(0, 168, 132, 0.5);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 35px rgba(0, 168, 132, 0.25);
+  padding: 22px;
+  color: #e9edef;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sync-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sync-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #00a884;
+}
+
+.sync-modal-subtitle {
+  font-size: 0.82rem;
+  color: #8696a0;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.sync-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.sync-preset-btn {
+  padding: 6px 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e9edef;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sync-preset-btn:hover {
+  background: rgba(0, 168, 132, 0.22);
+  border-color: #00a884;
+  color: #00a884;
+}
+
+.sync-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-input-field {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(134, 150, 160, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  outline: none;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sync-input-field:focus {
+  border-color: #00a884;
+  box-shadow: 0 0 10px rgba(0, 168, 132, 0.35);
+}
+
+.sync-action-btn-primary {
+  width: 100%;
+  padding: 11px 16px;
+  background: linear-gradient(135deg, #00a884 0%, #25d366 100%);
+  color: #111b21;
+  font-weight: 700;
+  font-size: 0.88rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 15px rgba(0, 168, 132, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.sync-action-btn-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+/* Floating On-Screen Sync Notification Toast */
+.watch-party-sync-toast {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  background: rgba(11, 20, 26, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #00a884;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.75), 0 0 24px rgba(0, 168, 132, 0.45);
+  border-radius: 30px;
+  padding: 8px 22px;
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 
