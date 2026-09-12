@@ -32,7 +32,34 @@
   overflow: hidden;
   color: #e9edef;
   z-index: 2;
+  transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
 }
+
+/* Fullscreen support */
+.watch-party-container.is-fullscreen,
+.watch-party-container:fullscreen {
+  max-width: 100vw !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.watch-party-container.is-fullscreen .watch-party-player-surface,
+.watch-party-container:fullscreen .watch-party-player-surface {
+  flex: 1 1 auto;
+  max-height: none !important;
+  height: 100% !important;
+  aspect-ratio: unset !important;
+}
+
+.watch-party-container.is-fullscreen .watch-party-header,
+.watch-party-container:fullscreen .watch-party-header {
+  padding: 8px 16px;
+}
+
 
 /* Ambient glow effect */
 .watch-party-ambient-glow {
@@ -173,6 +200,22 @@
   font-size: 0.78rem;
   overflow-x: auto;
   flex-shrink: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.35s ease,
+              border 0.35s ease;
+  max-height: 54px;
+  opacity: 1;
+}
+
+.watch-party-stream-bar.stream-bar-hidden {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-color: transparent;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 .stream-bar-provider-badge {
@@ -249,6 +292,109 @@
 .stream-bar-link:hover {
   background: rgba(0, 168, 132, 0.25);
   border-color: #00a884;
+}
+
+/* Hover reveal trigger strip when stream bar is auto-hidden */
+.stream-bar-hover-trigger {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 28;
+  cursor: pointer;
+}
+
+.stream-bar-hover-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(11, 20, 26, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 168, 132, 0.35);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  padding: 3px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #aebac1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+.stream-bar-hover-trigger:hover .stream-bar-hover-badge {
+  transform: translateY(0);
+  background: rgba(17, 27, 33, 0.95);
+  color: #00a884;
+  border-color: #00a884;
+}
+
+/* Synchronized Paused Overlay Banner */
+.watch-party-synced-pause-pill {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(11, 20, 26, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 179, 0, 0.5);
+  border-radius: 30px;
+  padding: 5px 14px;
+  color: #ffb300;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 179, 0, 0.2);
+  pointer-events: auto;
+  animation: fadeInDown 0.25s ease-out;
+}
+
+.synced-pause-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffb300;
+  animation: watchPartyPulse 1.5s infinite ease-in-out;
+}
+
+.synced-pause-play-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #00a884 0%, #25d366 100%);
+  color: #111b21;
+  border: none;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.synced-pause-play-btn:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* Player Surface */
@@ -472,6 +618,44 @@
   min-width: 85px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.clickable-time {
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.clickable-time:hover {
+  color: #00a884;
+  background: rgba(0, 168, 132, 0.12);
+}
+
+.resync-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 5px;
+  width: auto !important;
+  padding: 0 10px !important;
+  background: rgba(0, 168, 132, 0.12) !important;
+  border-color: rgba(0, 168, 132, 0.4) !important;
+  color: #00a884 !important;
+}
+
+.resync-btn:hover {
+  background: rgba(0, 168, 132, 0.25) !important;
+  border-color: #00a884 !important;
+  color: #25d366 !important;
+  box-shadow: 0 0 12px rgba(0, 168, 132, 0.35);
+}
+
+.resync-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .watch-party-buttons-row {

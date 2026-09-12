@@ -69,11 +69,14 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       const oneWayLatencySec = Math.max(0, (clientNow - serverNow) / 1000);
 
       let targetTime = typeof data.currentTime === 'number' ? data.currentTime : 0;
-      if (data.isPlaying && !data.isBuffering) {
+      // Only apply transit latency correction on active updates, not on static pauses or initial sync
+      if (data.isPlaying && !data.isBuffering && data.action !== 'sync' && data.action !== 'pause') {
         const elapsedSec =
           Math.max(0, (clientNow - (data.lastUpdatedTimestamp || clientNow)) / 1000) *
           (data.playbackRate || 1);
-        targetTime += elapsedSec + oneWayLatencySec;
+        if (elapsedSec > 0 && elapsedSec < 3) {
+          targetTime += elapsedSec + oneWayLatencySec;
+        }
       }
       setCurrentTime(targetTime);
 

@@ -100,7 +100,137 @@ export default function WatchPartyModal({
   const activeDanmaku = (hookDanmakuComments && hookDanmakuComments.length > 0)
     ? hookDanmakuComments
     : localDanmakuComments;
-  const scrubberRef = useRef(null);
+  const modalContainerRef = useRef(null);
+  const embedIframeRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showStreamBar, setShowStreamBar] = useState(true);
+  const streamBarTimeoutRef = useRef(null);
+
+  // Auto-hide stream switcher bar after 10 seconds of inactivity
+  const resetStreamBarTimer = useCallback(() => {
+    setShowStreamBar(true);
+    if (streamBarTimeoutRef.current) {
+      clearTimeout(streamBarTimeoutRef.current);
+    }
+    streamBarTimeoutRef.current = setTimeout(() => {
+      setShowStreamBar(false);
+    }, 10000);
+  }, []);
+
+  useEffect(() => {
+    resetStreamBarTimer();
+    return () => {
+      if (streamBarTimeoutRef.current) clearTimeout(streamBarTimeoutRef.current);
+    };
+  }, [videoSource?.url, resetStreamBarTimer]);
+
+  // Fullscreen event listener and toggle
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      modalContainerRef.current?.requestFullscreen?.().catch((err) => {
+        console.warn('Could not enter fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
+
+  // Movie stream duration estimation and timer runner for embeds
+  useEffect(() => {
+    if (videoSource?.type === 'embed' || videoSource?.url) {
+      if (videoSource.url?.includes('1108427')) {
+        setDuration(6939); // Moana: 1h 55m 39s
+      } else if (!duration || duration === 0) {
+        setDuration(videoSource.duration || 7200); // 2 hours default
+      }
+    }
+  }, [videoSource?.url, videoSource?.type, videoSource?.duration, duration]);
+
+  // Timer runner for embed streams: ONLY ticks when isPlaying && !isBuffering (FREEZES when paused!)
+  useEffect(() => {
+    if (!isPlaying || isBuffering || videoSource?.type === 'direct') return;
+
+    const interval = setInterval(() => {
+      setCurrentTime((prev) => {
+        const next = prev + 1 * (playbackRate || 1);
+        if (duration > 0 && next >= duration) {
+          return duration;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, isBuffering, playbackRate, duration, videoSource?.type, setCurrentTime]);
+
+  // PostMessage bridge for player embeds
+  const sendIframeCommand = useCallback((cmd) => {
+    const iframe = embedIframeRef.current;
+    if (!iframe?.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(cmd, '*');
+      iframe.contentWindow.postMessage(JSON.stringify(cmd), '*');
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    const handleMsg = (e) => {
+      try {
+        const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (!d) return;
+        if (d.event === 'pause' || d.type === 'pause' || d.action === 'pause') {
+          if (isPlaying) togglePlay();
+        } else if (d.event === 'play' || d.type === 'play' || d.action === 'play') {
+          if (!isPlaying) togglePlay();
+        } else if ((d.event === 'timeupdate' || d.type === 'timeupdate') && typeof d.currentTime === 'number') {
+          setCurrentTime(d.currentTime);
+          if (d.duration > 0) setDuration(d.duration);
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('message', handleMsg);
+    return () => window.removeEventListener('message', handleMsg);
+  }, [isPlaying, togglePlay, setCurrentTime]);
+
+  const handleResyncScene = (explicitTime = null) => {
+    const targetTime = typeof explicitTime === 'number' ? explicitTime : currentTime;
+    seek(targetTime);
+    sendIframeCommand({ action: 'seek', time: targetTime, type: 'SEEK' });
+    if (videoSource?.url && videoSource.type === 'embed') {
+      let targetUrl = videoSource.url;
+      if (targetUrl.includes('vidlink.pro')) {
+        targetUrl = targetUrl.split('?')[0] + `?start=${Math.floor(targetTime)}&autoplay=${isPlaying}`;
+        changeVideo({ ...videoSource, url: targetUrl });
+      } else if (targetUrl.includes('cinemaos.live')) {
+        targetUrl = targetUrl.split('#')[0] + `#t=${Math.floor(targetTime)}`;
+        changeVideo({ ...videoSource, url: targetUrl });
+      }
+    }
+  };
+
+  const handleJumpToTimePrompt = () => {
+    const input = prompt('Enter scene timestamp to sync both partners (e.g. 0:30 or 15:00 or seconds):', formatTime(currentTime));
+    if (!input) return;
+    const parts = input.trim().split(':').map(Number);
+    let sec = 0;
+    if (parts.length === 3) {
+      sec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      sec = parts[0] * 60 + parts[1];
+    } else if (parts.length === 1 && !isNaN(parts[0])) {
+      sec = parts[0];
+    }
+    if (!isNaN(sec) && sec >= 0) {
+      seek(sec);
+      handleResyncScene(sec);
+    }
+  };
 
   // Close platforms dropdown on outside click
   useEffect(() => {
@@ -484,11 +614,14 @@ export default function WatchPartyModal({
       <div className="watch-party-ambient-glow" />
 
       <motion.div
-        className="watch-party-container"
+        ref={modalContainerRef}
+        className={`watch-party-container ${isFullscreen ? 'is-fullscreen' : ''}`}
         initial={{ scale: 0.92, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.92, opacity: 0, y: 20 }}
         transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+        onMouseMove={resetStreamBarTimer}
+        onTouchStart={resetStreamBarTimer}
       >
         {/* Header */}
         <div className="watch-party-header">
@@ -613,6 +746,19 @@ export default function WatchPartyModal({
               <Icon icon={cinemaMode ? 'solar:lamp-bold-duotone' : 'solar:sun-bold-duotone'} width="20" />
             </button>
 
+            {/* Fullscreen Button in Header */}
+            <button
+              type="button"
+              className={`watch-party-btn-icon ${isFullscreen ? 'active' : ''}`}
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              <Icon
+                icon={isFullscreen ? 'solar:minimize-square-3-bold-duotone' : 'solar:maximize-square-bold-duotone'}
+                width="20"
+              />
+            </button>
+
             <button
               type="button"
               className="watch-party-btn-icon"
@@ -633,9 +779,16 @@ export default function WatchPartyModal({
           </div>
         </div>
 
-        {/* Stream Source & Mirror Switcher Bar for Movie Streams */}
+        {/* Stream Source & Mirror Switcher Bar for Movie Streams (Auto-hides after 10s) */}
         {videoSource && videoSource.type !== 'direct' && (
-          <div className="watch-party-stream-bar">
+          <div
+            className={`watch-party-stream-bar ${!showStreamBar ? 'stream-bar-hidden' : ''}`}
+            onMouseEnter={() => {
+              if (streamBarTimeoutRef.current) clearTimeout(streamBarTimeoutRef.current);
+              setShowStreamBar(true);
+            }}
+            onMouseLeave={resetStreamBarTimer}
+          >
             <div className="stream-bar-provider-badge">
               <Icon icon={videoSource.providerIcon || 'solar:clapperboard-play-bold-duotone'} width="15" style={{ color: videoSource.providerColor || '#00a884' }} />
               <span>{videoSource.provider || 'Movie Stream'}</span>
@@ -742,6 +895,38 @@ export default function WatchPartyModal({
 
         {/* Video Player Surface */}
         <div className="watch-party-player-surface">
+          {/* Top hover trigger zone to reveal hidden stream bar */}
+          {!showStreamBar && (
+            <div
+              className="stream-bar-hover-trigger"
+              onMouseEnter={() => setShowStreamBar(true)}
+              onClick={() => setShowStreamBar(true)}
+              title="Click or hover to show Stream Mirrors (CinemaOS, VidLink, VidSrc, MultiEmbed)"
+            >
+              <div className="stream-bar-hover-badge">
+                <Icon icon="solar:alt-arrow-down-bold" width="12" />
+                <span>{videoSource?.title || 'Movie Servers'}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Synchronized Paused Overlay Banner */}
+          {!isPlaying && videoSource && (
+            <div className="watch-party-synced-pause-pill">
+              <span className="synced-pause-indicator" />
+              <span>Paused at {formatTime(currentTime)} • Synced with {recipientUser?.nickname || 'Partner'}</span>
+              <button
+                type="button"
+                className="synced-pause-play-btn"
+                onClick={togglePlay}
+                title="Resume movie together in sync"
+              >
+                <Icon icon="solar:play-bold" width="14" />
+                <span>Resume Together</span>
+              </button>
+            </div>
+          )}
+
           {videoSource?.type === 'direct' ? (
             <video
               ref={videoElementRef}
@@ -764,11 +949,14 @@ export default function WatchPartyModal({
             />
           ) : videoSource?.type === 'embed' || videoSource?.url ? (
             <iframe
+              ref={embedIframeRef}
               key={videoSource.url}
               src={videoSource.url}
               className="watch-party-yt-iframe"
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share *"
               allowFullScreen
+              webkitallowfullscreen="true"
+              mozallowfullscreen="true"
               referrerPolicy="no-referrer"
               title={videoSource.title || 'Movie Watch Party'}
             />
@@ -1059,7 +1247,12 @@ export default function WatchPartyModal({
                 style={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
               />
             </div>
-            <span className="watch-party-time-text">
+            <span
+              className="watch-party-time-text clickable-time"
+              onClick={handleJumpToTimePrompt}
+              title="Click to jump both partners to a specific timestamp (e.g. 0:30)"
+            >
+              <Icon icon="solar:clock-circle-bold-duotone" width="13" style={{ marginRight: '4px', color: '#00a884' }} />
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
@@ -1091,6 +1284,17 @@ export default function WatchPartyModal({
                 title="Forward 10s (Synced)"
               >
                 <Icon icon="solar:rewind-forward-10-seconds-bold-duotone" width="20" />
+              </button>
+
+              {/* Synchronized Scene Resync Button */}
+              <button
+                type="button"
+                className="watch-party-btn-icon resync-btn"
+                onClick={() => handleResyncScene()}
+                title="Resync Both Partners to Same Exact Second"
+              >
+                <Icon icon="solar:restart-bold-duotone" width="18" />
+                <span className="resync-label">Sync Scene</span>
               </button>
 
               {/* Playback Rate Selector */}
@@ -1140,6 +1344,17 @@ export default function WatchPartyModal({
                   Last action by <strong style={{ color: '#00a884' }}>{lastActorNickname}</strong>
                 </span>
               )}
+
+              {/* Fullscreen Button in Controls Bar */}
+              <button
+                type="button"
+                className="watch-party-btn-icon"
+                style={{ width: '32px', height: '32px' }}
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              >
+                <Icon icon={isFullscreen ? 'solar:minimize-square-3-bold-duotone' : 'solar:maximize-square-bold-duotone'} width="18" />
+              </button>
             </div>
           </div>
         </div>
