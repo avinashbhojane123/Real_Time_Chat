@@ -24,6 +24,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
   const [bufferingUsers, setBufferingUsers] = useState([]);
   const [partnerSyncStatus, setPartnerSyncStatus] = useState('synced'); // 'synced' | 'buffering' | 'drift_correcting'
   const [flyingReactions, setFlyingReactions] = useState([]);
+  const [danmakuComments, setDanmakuComments] = useState([]);
   const [incomingInvite, setIncomingInvite] = useState(null);
 
   // Ref tracking to prevent feedback loops when local action triggers video events
@@ -171,6 +172,24 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
         setFlyingReactions((prev) => prev.filter((r) => r.id !== id));
       }, 2800);
     };
+
+    const onComment = ({ id, from, text, top, timestamp }) => {
+      const commentId = id || `${timestamp || Date.now()}-${Math.random()}`;
+      setDanmakuComments((prev) => [
+        ...prev.slice(-25),
+        {
+          id: commentId,
+          from,
+          text,
+          top: typeof top === 'number' ? top : Math.floor(Math.random() * 60) + 15,
+          createdAt: timestamp || Date.now(),
+        },
+      ]);
+      setTimeout(() => {
+        setDanmakuComments((prev) => prev.filter((c) => c.id !== commentId));
+      }, 7500);
+    };
+
     const onClosed = ({ closedBy }) => {
       setIsActive(false);
       setIsOpen(false);
@@ -208,6 +227,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     socket.on('watchPartyUpdate', onUpdate);
     socket.on('watchPartyState', onState);
     socket.on('watchPartyReaction', onReaction);
+    socket.on('watchPartyComment', onComment);
     socket.on('watchPartyClosed', onClosed);
     socket.on('watchPartyInvite', onInvite);
     socket.on('watchPartyAccepted', onAccepted);
@@ -220,6 +240,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       socket.off('watchPartyUpdate', onUpdate);
       socket.off('watchPartyState', onState);
       socket.off('watchPartyReaction', onReaction);
+      socket.off('watchPartyComment', onComment);
       socket.off('watchPartyClosed', onClosed);
       socket.off('watchPartyInvite', onInvite);
       socket.off('watchPartyAccepted', onAccepted);
@@ -376,6 +397,20 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     [getSocket, passcode]
   );
 
+  const sendComment = useCallback(
+    (text) => {
+      const socket = getSocket();
+      if (!socket || !text?.trim()) return;
+      const topPos = Math.floor(Math.random() * 60) + 15;
+      socket.emit('watchPartyComment', {
+        passcode,
+        text: text.trim(),
+        top: topPos,
+      });
+    },
+    [getSocket, passcode]
+  );
+
   return {
     isActive,
     isOpen,
@@ -395,6 +430,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     bufferingUsers,
     partnerSyncStatus,
     flyingReactions,
+    danmakuComments,
     incomingInvite,
     videoElementRef,
     ytPlayerRef,
@@ -408,6 +444,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     changeVideo,
     notifyBuffering,
     sendReaction,
+    sendComment,
     syncVideoElement,
   };
 }

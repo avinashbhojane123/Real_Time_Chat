@@ -310,46 +310,6 @@ const ChatHeader = memo(function ChatHeader({
             />
           </motion.button>
 
-          {/* Watch Together / Watch Party Action Button */}
-          <motion.button
-            whileHover={{ scale: 1.12 }}
-            whileTap={{ scale: 0.88 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
-            type="button"
-            className="m3-action-btn"
-            onClick={onOpenWatchParty}
-            style={{
-              position: 'relative',
-              backgroundColor: isWatchPartyActive ? 'rgba(0, 168, 132, 0.2)' : 'transparent',
-              color: isWatchPartyActive ? '#00a884' : '#8696a0',
-              border: isWatchPartyActive ? '1px solid rgba(0, 168, 132, 0.5)' : 'none',
-              width: '38px',
-              height: '38px',
-              borderRadius: '50%',
-              cursor: 'pointer',
-            }}
-            title={isWatchPartyActive ? 'Watch Party Active — Click to Open' : 'Start Watch Party (Watch Movies Together in Perfect Sync)'}
-          >
-            <Icon
-              icon="solar:clapperboard-play-bold-duotone"
-              width="21"
-              height="21"
-            />
-            {isWatchPartyActive && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: '#25d366',
-                  boxShadow: '0 0 6px #25d366',
-                }}
-              />
-            )}
-          </motion.button>
 
           {/* Search Icon Button with M3 State Layer & Tactile Motion Feedback */}
           <motion.button

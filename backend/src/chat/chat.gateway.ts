@@ -54,6 +54,7 @@ import {
   WatchPartyActionDto,
   GetWatchPartyDto,
   WatchPartyReactionDto,
+  WatchPartyCommentDto,
 } from './dto/watch-party.dto';
 
 interface WatchPartyState {
@@ -1486,6 +1487,26 @@ export class ChatGateway
     this.server.to(targetPasscode).emit('watchPartyReaction', {
       from: session.nickname,
       reaction: data.reaction,
+      timestamp: Date.now(),
+    });
+  }
+
+  @SubscribeMessage('watchPartyComment')
+  watchPartyComment(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WatchPartyCommentDto,
+  ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return;
+    }
+
+    this.server.to(targetPasscode).emit('watchPartyComment', {
+      id: `${Date.now()}-${Math.random()}`,
+      from: session.nickname,
+      text: data.text,
+      top: typeof data.top === 'number' ? data.top : Math.floor(Math.random() * 60) + 15,
       timestamp: Date.now(),
     });
   }

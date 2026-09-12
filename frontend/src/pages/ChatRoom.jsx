@@ -353,12 +353,15 @@ export default function ChatRoom() {
     setInputText('');
   };
 
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!inputText.trim() && !editingMsg) return;
+  const handleSendMessage = (e, customText) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    const textToSend = typeof e === 'string' ? e.trim() : (customText || inputText).trim();
+    if (!textToSend && !editingMsg) return;
 
-    if (editingMsg) {
-      const updatedText = inputText.trim();
+    if (editingMsg && typeof e !== 'string') {
+      const updatedText = textToSend;
       setMessages((prev) =>
         prev.map((m) =>
           String(m.id) === String(editingMsg.id)
@@ -379,7 +382,7 @@ export default function ChatRoom() {
     const payload = {
       passcode,
       nickname,
-      message: inputText.trim(),
+      message: textToSend,
       replyTo: replyingTo
         ? {
           id: replyingTo.id,
@@ -393,7 +396,7 @@ export default function ChatRoom() {
     const optimisticMsg = {
       id: `temp-${Date.now()}`,
       nickname,
-      message: inputText.trim(),
+      message: textToSend,
       createdAt: new Date().toISOString(),
       timestamp: 'Just now',
       replyTo: payload.replyTo,
@@ -404,9 +407,11 @@ export default function ChatRoom() {
     setMessages((prev) => [...prev, optimisticMsg]);
     socketRef.current?.emit('sendMessage', payload);
     socketRef.current?.emit('stopTyping', { passcode, nickname });
-    setInputText('');
-    setReplyingTo(null);
-    setShowEmojiPicker(false);
+    if (typeof e !== 'string') {
+      setInputText('');
+      setReplyingTo(null);
+      setShowEmojiPicker(false);
+    }
   };
 
   const handleReactToMessage = (messageId, emoji, e) => {

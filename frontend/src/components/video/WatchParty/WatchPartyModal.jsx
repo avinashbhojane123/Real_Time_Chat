@@ -8,18 +8,25 @@ const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
 // Supported Movie & Series Platforms
 const SUPPORTED_MOVIE_SITES = [
   {
-    name: 'CinemaOS',
-    url: 'https://cinemaos.live',
-    tagline: 'HD Movies & Series',
-    icon: 'solar:clapperboard-play-bold-duotone',
-    color: '#00a884',
-  },
-  {
     name: 'CineHD',
     url: 'https://cinehd.vc',
     tagline: '4K Cinema',
     icon: 'solar:videocamera-record-bold-duotone',
     color: '#3b82f6',
+  },
+  {
+    name: 'PRMovies',
+    url: 'https://prmovies.energy/',
+    tagline: 'Bollywood & Hollywood',
+    icon: 'solar:film-strip-bold-duotone',
+    color: '#ef4444',
+  },
+  {
+    name: 'CinemaOS',
+    url: 'https://cinemaos.live',
+    tagline: 'HD Movies & Series',
+    icon: 'solar:clapperboard-play-bold-duotone',
+    color: '#00a884',
   },
   {
     name: 'Cineby',
@@ -41,13 +48,6 @@ const SUPPORTED_MOVIE_SITES = [
     tagline: 'Indian & Global Shows',
     icon: 'solar:play-circle-bold-duotone',
     color: '#f59e0b',
-  },
-  {
-    name: 'PRMovies',
-    url: 'https://prmovies.energy/',
-    tagline: 'Bollywood & Hollywood',
-    icon: 'solar:film-strip-bold-duotone',
-    color: '#ef4444',
   },
 ];
 
@@ -74,6 +74,7 @@ export default function WatchPartyModal({
     isBuffering,
     partnerSyncStatus,
     flyingReactions,
+    danmakuComments: hookDanmakuComments,
     videoElementRef,
     togglePlay,
     seek,
@@ -81,6 +82,7 @@ export default function WatchPartyModal({
     changeVideo,
     notifyBuffering,
     sendReaction,
+    sendComment,
     closeWatchParty,
   } = watchParty;
 
@@ -92,8 +94,28 @@ export default function WatchPartyModal({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [quickComment, setQuickComment] = useState('');
-  const [danmakuComments, setDanmakuComments] = useState([]);
+  const [localDanmakuComments, setLocalDanmakuComments] = useState([]);
+  const [showPlatformsMenu, setShowPlatformsMenu] = useState(false);
+  const platformsDropdownRef = useRef(null);
+  const activeDanmaku = (hookDanmakuComments && hookDanmakuComments.length > 0)
+    ? hookDanmakuComments
+    : localDanmakuComments;
   const scrubberRef = useRef(null);
+
+  // Close platforms dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (platformsDropdownRef.current && !platformsDropdownRef.current.contains(e.target)) {
+        setShowPlatformsMenu(false);
+      }
+    };
+    if (showPlatformsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPlatformsMenu]);
 
   // Live Face Cams (Sender & Receiver) states & refs
   const [showFaceCams, setShowFaceCams] = useState(true);
@@ -314,14 +336,22 @@ export default function WatchPartyModal({
     const text = quickComment.trim();
     if (!text) return;
 
-    const id = Date.now() + Math.random();
-    const topPos = Math.floor(Math.random() * 60) + 15; // Random height percentage
-    setDanmakuComments((prev) => [...prev.slice(-15), { id, text, top: topPos, from: currentNickname }]);
-    setTimeout(() => {
-      setDanmakuComments((prev) => prev.filter((c) => c.id !== id));
-    }, 8000);
+    // 1. Send live on-screen comment across the room to all participants via socket
+    if (sendComment) {
+      sendComment(text);
+    } else {
+      const id = `${Date.now()}-${Math.random()}`;
+      const topPos = Math.floor(Math.random() * 60) + 15;
+      setLocalDanmakuComments((prev) => [
+        ...prev.slice(-20),
+        { id, text, top: topPos, from: currentNickname || 'You' },
+      ]);
+      setTimeout(() => {
+        setLocalDanmakuComments((prev) => prev.filter((c) => c.id !== id));
+      }, 7500);
+    }
 
-    // Send to in-room chat as well
+    // 2. Send to in-room chat history as well
     onSendChatMessage?.(`🎬 [Watch Party] ${text}`);
     setQuickComment('');
   };
@@ -469,18 +499,6 @@ export default function WatchPartyModal({
             </div>
           </div>
 
-          {/* Recipient / Partner Sync Status Pill */}
-          {recipientUser && (
-            <div className={`watch-party-partner-pill ${isBuffering ? 'buffering' : ''}`}>
-              <Icon
-                icon={isBuffering ? 'line-md:loading-loop' : 'solar:users-group-rounded-bold-duotone'}
-                width="16"
-              />
-              <span>
-                {recipientUser.nickname}: {isBuffering ? 'Buffering...' : 'In Perfect Sync'}
-              </span>
-            </div>
-          )}
 
           {/* Header Controls */}
           <div className="watch-party-header-actions">
@@ -523,6 +541,59 @@ export default function WatchPartyModal({
                 />
               </button>
             )}
+
+            {/* Supported Platforms Corner Dropdown */}
+            <div className="watch-party-platforms-dropdown-wrapper" ref={platformsDropdownRef}>
+              <button
+                type="button"
+                className={`watch-party-btn-icon ${showPlatformsMenu ? 'active' : ''}`}
+                onClick={() => setShowPlatformsMenu(!showPlatformsMenu)}
+                title="Select Movie from Supported Platforms"
+              >
+                <Icon icon="solar:clapperboard-play-bold-duotone" width="20" />
+              </button>
+
+              <AnimatePresence>
+                {showPlatformsMenu && (
+                  <motion.div
+                    className="watch-party-platforms-menu"
+                    initial={{ opacity: 0, scale: 0.92, y: 6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.92, y: 6 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <div className="platforms-menu-header">
+                      <Icon icon="solar:clapperboard-play-bold-duotone" width="16" style={{ color: '#00a884' }} />
+                      <span>SELECT MOVIE FROM SUPPORTED PLATFORMS:</span>
+                    </div>
+                    <div className="platforms-menu-list">
+                      {SUPPORTED_MOVIE_SITES.map((site) => (
+                        <a
+                          key={site.name}
+                          href={site.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="platforms-menu-item"
+                          onClick={() => setShowPlatformsMenu(false)}
+                          title={`Browse ${site.name} (${site.tagline}) in new tab`}
+                        >
+                          <div className="platforms-menu-item-left">
+                            <span className="platform-icon-box" style={{ background: `${site.color}20`, color: site.color }}>
+                              <Icon icon={site.icon} width="16" />
+                            </span>
+                            <div className="platform-info">
+                              <span className="platform-name">{site.name}</span>
+                              <span className="platform-tagline">{site.tagline}</span>
+                            </div>
+                          </div>
+                          <Icon icon="solar:arrow-right-up-bold" width="14" className="platform-arrow" />
+                        </a>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <button
               type="button"
@@ -701,26 +772,7 @@ export default function WatchPartyModal({
               referrerPolicy="no-referrer"
               title={videoSource.title || 'Movie Watch Party'}
             />
-          ) : (
-            <div style={{ color: '#8696a0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center', padding: '24px' }}>
-              <Icon icon="solar:clapperboard-play-bold-duotone" width="52" style={{ color: '#00a884' }} />
-              <div style={{ fontSize: '1.05rem', fontWeight: 600, color: '#e9edef' }}>
-                Select a Movie from Supported Platforms
-              </div>
-              <div style={{ fontSize: '0.85rem', color: '#8696a0', maxWidth: '440px', lineHeight: 1.5 }}>
-                Browse CinemaOS, CineHD, Cineby, Cinevice, MX Player, or PRMovies to pick any movie, then paste its link below to watch together.
-              </div>
-              <button
-                type="button"
-                className="custom-url-btn"
-                style={{ marginTop: '8px' }}
-                onClick={() => setShowDrawer(true)}
-              >
-                <Icon icon="solar:link-bold-duotone" width="18" />
-                <span>Add Movie URL</span>
-              </button>
-            </div>
-          )}
+          ) : null}
 
           {/* Zero-Lag Buffering Lock Overlay */}
           <AnimatePresence>
@@ -761,14 +813,15 @@ export default function WatchPartyModal({
           {/* Danmaku Comments Flying Across Video */}
           <div className="watch-party-danmaku-layer">
             <AnimatePresence>
-              {danmakuComments.map((c) => (
+              {activeDanmaku.map((c) => (
                 <div
                   key={c.id}
                   className="watch-party-danmaku-chip"
                   style={{ top: `${c.top}%` }}
                 >
-                  <span style={{ color: '#00a884', marginRight: '6px' }}>{c.from}:</span>
-                  <span>{c.text}</span>
+                  <Icon icon="solar:chat-round-dots-bold-duotone" width="16" style={{ color: '#00a884', flexShrink: 0 }} />
+                  <span className="danmaku-author">{c.from}:</span>
+                  <span className="danmaku-text">{c.text}</span>
                 </div>
               ))}
             </AnimatePresence>
@@ -1139,30 +1192,6 @@ export default function WatchPartyModal({
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             >
-              {/* Quick Supported Movie Platforms Row */}
-              <div className="watch-party-sites-bar">
-                <span className="watch-party-sites-label">
-                  <Icon icon="solar:clapperboard-play-bold-duotone" width="15" />
-                  <span>Select movie from supported platforms:</span>
-                </span>
-                <div className="watch-party-sites-list">
-                  {SUPPORTED_MOVIE_SITES.map((site) => (
-                    <a
-                      key={site.name}
-                      href={site.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="watch-party-site-chip"
-                      title={`Open ${site.name} (${site.tagline}) in new tab`}
-                    >
-                      <Icon icon={site.icon} width="16" style={{ color: site.color }} />
-                      <span className="site-name">{site.name}</span>
-                      <Icon icon="solar:arrow-right-up-bold" width="11" className="site-arrow" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-
               <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
                 <input
                   type="text"

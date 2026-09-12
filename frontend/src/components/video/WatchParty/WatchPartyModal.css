@@ -361,32 +361,55 @@
 /* Danmaku Comments Layer */
 .watch-party-danmaku-layer {
   position: absolute;
-  top: 15%;
+  top: 8%;
   left: 0;
   right: 0;
-  height: 50%;
+  bottom: 12%;
   pointer-events: none;
   overflow: hidden;
-  z-index: 28;
+  z-index: 35;
 }
 
 .watch-party-danmaku-chip {
   position: absolute;
   white-space: nowrap;
-  background: rgba(17, 27, 33, 0.8);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 168, 132, 0.4);
+  background: rgba(11, 20, 26, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 168, 132, 0.55);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 168, 132, 0.25);
   color: #ffffff;
   padding: 6px 14px;
   border-radius: 20px;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  animation: flyAcross 8s linear forwards;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  will-change: transform, left;
+  animation: flyAcross 7.5s linear forwards;
+}
+
+.watch-party-danmaku-chip .danmaku-author {
+  color: #00a884;
+  font-weight: 700;
+}
+
+.watch-party-danmaku-chip .danmaku-text {
+  color: #f0f2f5;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 @keyframes flyAcross {
-  from { transform: translateX(100vw); }
-  to { transform: translateX(-100%); }
+  0% {
+    left: 100%;
+    transform: translateX(0);
+  }
+  100% {
+    left: 0;
+    transform: translateX(-100%);
+  }
 }
 
 /* Custom Video Controls Bar */
@@ -655,67 +678,107 @@
   color: #8696a0;
 }
 
-/* Supported Movie Platform Chips */
-.watch-party-sites-bar {
+/* Supported Platforms Corner Dropdown Menu */
+.watch-party-platforms-dropdown-wrapper {
+  position: relative;
+}
+
+.watch-party-platforms-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 290px;
+  background: rgba(17, 27, 33, 0.97);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 168, 132, 0.4);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 20px rgba(0, 168, 132, 0.2);
+  padding: 10px;
+  z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-bottom: 2px;
+  gap: 6px;
 }
 
-.watch-party-sites-label {
+.platforms-menu-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #8696a0;
+  gap: 7px;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid rgba(134, 150, 160, 0.18);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #00a884;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
-.watch-party-sites-list {
+.platforms-menu-list {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 290px;
+  overflow-y: auto;
 }
 
-.watch-party-site-chip {
-  display: inline-flex;
+.platforms-menu-item {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(134, 150, 160, 0.2);
-  color: #e9edef;
-  font-size: 0.8rem;
-  font-weight: 500;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 9px;
   text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-  cursor: pointer;
+  background: transparent;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
 }
 
-.watch-party-site-chip:hover {
-  background: rgba(0, 168, 132, 0.15);
-  border-color: #00a884;
-  color: #ffffff;
-  transform: translateY(-1px);
+.platforms-menu-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(0, 168, 132, 0.35);
+  transform: translateX(2px);
 }
 
-.watch-party-site-chip .site-name {
-  white-space: nowrap;
+.platforms-menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.watch-party-site-chip .site-arrow {
-  opacity: 0.45;
-  transition: opacity 0.2s, transform 0.2s;
+.platform-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.watch-party-site-chip:hover .site-arrow {
-  opacity: 1;
-  transform: translate(1px, -1px);
+.platform-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.platform-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e9edef;
+}
+
+.platform-tagline {
+  font-size: 0.72rem;
+  color: #8696a0;
+}
+
+.platform-arrow {
+  color: #8696a0;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.platforms-menu-item:hover .platform-arrow {
+  color: #00a884;
+  transform: translate(2px, -2px);
 }
 
 /* Custom URL Input Row */

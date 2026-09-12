@@ -78,3 +78,19 @@ export class WatchPartyReactionDto {
   @IsNotEmpty()
   reaction!: string;
 }
+
+export class WatchPartyCommentDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  text!: string;
+
+  @IsOptional()
+  @IsNumber()
+  top?: number;
+}
+
