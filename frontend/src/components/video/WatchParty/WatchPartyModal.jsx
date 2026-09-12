@@ -131,6 +131,7 @@ export default function WatchPartyModal({
     flyingReactions,
     danmakuComments: hookDanmakuComments,
     videoElementRef,
+    ytPlayerRef,
     togglePlay,
     seek,
     changeRate,
@@ -157,6 +158,7 @@ export default function WatchPartyModal({
     : localDanmakuComments;
   const modalContainerRef = useRef(null);
   const embedIframeRef = useRef(null);
+  const scrubberRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDesktopFill, setIsDesktopFill] = useState(true);
   const [isDraggingPip, setIsDraggingPip] = useState(false);
@@ -306,7 +308,9 @@ export default function WatchPartyModal({
 
 
   const handleJumpToTimePrompt = () => {
-    const input = prompt('Enter scene timestamp to sync both partners (e.g. 0:30 or 15:00 or seconds):', formatTime(currentTime));
+    const input = typeof window !== 'undefined' && window.prompt
+      ? window.prompt('Enter scene timestamp to sync both partners (e.g. 0:30 or 15:00 or seconds):', formatTime(currentTime))
+      : null;
     if (!input) return;
     const parts = input.trim().split(':').map(Number);
     let sec = 0;
