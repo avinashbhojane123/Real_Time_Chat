@@ -937,6 +937,7 @@ export default function WatchPartyModal({
               onWaiting={() => notifyBuffering(true)}
               onPlaying={() => notifyBuffering(false)}
               onClick={togglePlay}
+              controls
               playsInline
             />
           ) : youtubeVideoId ? (
@@ -1228,135 +1229,6 @@ export default function WatchPartyModal({
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* Video Scrubber & Playback Controls Bar */}
-        <div className="watch-party-controls-bar">
-          <div className="watch-party-timeline-row">
-            <div
-              ref={scrubberRef}
-              className="watch-party-scrubber"
-              onClick={handleScrubberClick}
-            >
-              <div
-                className="watch-party-progress-fill"
-                style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-              />
-              <div
-                className="watch-party-scrubber-handle"
-                style={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-              />
-            </div>
-            <span
-              className="watch-party-time-text clickable-time"
-              onClick={handleJumpToTimePrompt}
-              title="Click to jump both partners to a specific timestamp (e.g. 0:30)"
-            >
-              <Icon icon="solar:clock-circle-bold-duotone" width="13" style={{ marginRight: '4px', color: '#00a884' }} />
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-          </div>
-
-          <div className="watch-party-buttons-row">
-            <div className="watch-party-left-controls">
-              <button
-                type="button"
-                className="watch-party-play-btn"
-                onClick={togglePlay}
-                title={isPlaying ? 'Pause (Synced)' : 'Play (Synced)'}
-              >
-                <Icon icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'} width="22" />
-              </button>
-
-              <button
-                type="button"
-                className="watch-party-btn-icon"
-                onClick={() => seek(Math.max(0, currentTime - 10))}
-                title="Rewind 10s (Synced)"
-              >
-                <Icon icon="solar:rewind-back-10-seconds-bold-duotone" width="20" />
-              </button>
-
-              <button
-                type="button"
-                className="watch-party-btn-icon"
-                onClick={() => seek(Math.min(duration, currentTime + 10))}
-                title="Forward 10s (Synced)"
-              >
-                <Icon icon="solar:rewind-forward-10-seconds-bold-duotone" width="20" />
-              </button>
-
-              {/* Synchronized Scene Resync Button */}
-              <button
-                type="button"
-                className="watch-party-btn-icon resync-btn"
-                onClick={() => handleResyncScene()}
-                title="Resync Both Partners to Same Exact Second"
-              >
-                <Icon icon="solar:restart-bold-duotone" width="18" />
-                <span className="resync-label">Sync Scene</span>
-              </button>
-
-              {/* Playback Rate Selector */}
-              <select
-                className="watch-party-rate-select"
-                value={playbackRate}
-                onChange={(e) => changeRate(parseFloat(e.target.value))}
-                title="Synchronized Playback Speed"
-              >
-                <option value="0.5">0.5x</option>
-                <option value="0.75">0.75x</option>
-                <option value="1">1.0x (Normal)</option>
-                <option value="1.25">1.25x</option>
-                <option value="1.5">1.5x</option>
-                <option value="2">2.0x</option>
-              </select>
-
-              {/* Volume Slider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '6px' }}>
-                <button
-                  type="button"
-                  className="watch-party-btn-icon"
-                  style={{ width: '30px', height: '30px' }}
-                  onClick={toggleMute}
-                  title={isMuted ? 'Unmute' : 'Mute'}
-                >
-                  <Icon
-                    icon={isMuted || volume === 0 ? 'solar:volume-cross-bold-duotone' : 'solar:volume-loud-bold-duotone'}
-                    width="18"
-                  />
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  style={{ width: '70px', accentColor: '#00a884', cursor: 'pointer' }}
-                />
-              </div>
-            </div>
-
-            <div className="watch-party-right-controls">
-              {lastActorNickname && (
-                <span style={{ fontSize: '0.75rem', color: '#8696a0' }}>
-                  Last action by <strong style={{ color: '#00a884' }}>{lastActorNickname}</strong>
-                </span>
-              )}
-
-              {/* Fullscreen Button in Controls Bar */}
-              <button
-                type="button"
-                className="watch-party-btn-icon"
-                style={{ width: '32px', height: '32px' }}
-                onClick={toggleFullscreen}
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              >
-                <Icon icon={isFullscreen ? 'solar:minimize-square-3-bold-duotone' : 'solar:maximize-square-bold-duotone'} width="18" />
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Floating Reactions Bar & In-Party Quick Chat Overlay */}
