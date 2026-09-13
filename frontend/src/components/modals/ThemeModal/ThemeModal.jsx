@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { uploadFileApi } from '../../../services/apiService';
+import { compressImageFile } from '../../../utils/imageUtils';
 
 const WALLPAPER_PRESETS = [
   {
@@ -38,6 +39,14 @@ export default function ThemeModal({
   const [imageError, setImageError] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Sync inputUrl when customWallpaper prop changes or modal reopens
+  useEffect(() => {
+    if (customWallpaper) {
+      setInputUrl(customWallpaper);
+      setImageError(false);
+    }
+  }, [customWallpaper, isOpen]);
+
   if (!isOpen) return null;
 
   const handleApplyCustomUrl = (urlToApply) => {
@@ -49,43 +58,58 @@ export default function ThemeModal({
   };
 
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
-    // First try uploading to server for a lightweight, shared URL across devices
-    if (baseUrl) {
-      try {
-        setIsUploading(true);
-        const data = await uploadFileApi(baseUrl, file);
-        if (data && data.fileUrl) {
-          const cleanApiUrl = baseUrl.trim().replace(/\/+$/, '');
-          const fullUrl = data.fileUrl.startsWith('http')
-            ? data.fileUrl
-            : `${cleanApiUrl}${data.fileUrl.startsWith('/') ? '' : '/'}${data.fileUrl}`;
-          setInputUrl(fullUrl);
+    setImageError(false);
+
+    try {
+      setIsUploading(true);
+      // Auto-compress image (ensures standard JPEG and ultra-fast upload under 400KB)
+      const file = await compressImageFile(rawFile, 1920, 1080, 0.85);
+
+      // First try uploading to server for a lightweight, shared URL across devices
+      if (baseUrl) {
+        try {
+          const data = await uploadFileApi(baseUrl, file);
+          if (data && data.fileUrl) {
+            // Strip any trailing /api to ensure static uploads route correctly to /uploads/
+            const serverBaseUrl = baseUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '');
+            const fullUrl = data.fileUrl.startsWith('http')
+              ? data.fileUrl
+              : `${serverBaseUrl}${data.fileUrl.startsWith('/') ? '' : '/'}${data.fileUrl}`;
+            setInputUrl(fullUrl);
+            setImageError(false);
+            setIsUploading(false);
+            onSelectTheme('custom', fullUrl);
+            return;
+          }
+        } catch (uploadErr) {
+          console.warn('Server wallpaper upload failed, falling back to local reader:', uploadErr);
+        }
+      }
+
+      // Fallback: Read local compressed file as Data URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result;
+        if (dataUrl) {
+          setInputUrl(dataUrl);
           setImageError(false);
           setIsUploading(false);
-          onSelectTheme('custom', fullUrl);
-          return;
+          onSelectTheme('custom', dataUrl);
         }
-      } catch (err) {
-        console.warn('Server wallpaper upload failed, falling back to local reader:', err);
-      } finally {
+      };
+      reader.onerror = () => {
+        setImageError(true);
         setIsUploading(false);
-      }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Wallpaper processing failed:', err);
+      setImageError(true);
+      setIsUploading(false);
     }
-
-    // Fallback: Read local file as Data URL
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result;
-      if (dataUrl) {
-        setInputUrl(dataUrl);
-        setImageError(false);
-        onSelectTheme('custom', dataUrl);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   return (
@@ -179,6 +203,7 @@ export default function ThemeModal({
                   key={preset.name}
                   onClick={() => {
                     setInputUrl(preset.url);
+                    setImageError(false);
                     handleApplyCustomUrl(preset.url);
                   }}
                   style={{

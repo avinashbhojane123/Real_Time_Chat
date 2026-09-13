@@ -56,11 +56,23 @@ async function bootstrap() {
     },
   });
 
+  // Also serve uploads under /api/uploads/ to prevent 404 if API prefix is prepended by clients
+  app.useStaticAssets(uploadPath, {
+    prefix: '/api/uploads/',
+    setHeaders: (res: Response) => {
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type');
+      res.set('X-Content-Type-Options', 'nosniff');
+    },
+  });
+
   const globalPrefix = process.env.GLOBAL_PREFIX || 'api';
   const excludePath = `${uploadDirName}/*path`;
+  const apiExcludePath = `api/${uploadDirName}/*path`;
 
   app.setGlobalPrefix(globalPrefix, {
-    exclude: [excludePath, uploadDirName],
+    exclude: [excludePath, uploadDirName, apiExcludePath],
   });
 
   const port = Number(process.env.PORT || 10000);

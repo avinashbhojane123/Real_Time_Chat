@@ -84,6 +84,7 @@ interface WatchPartyState {
   },
   pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 10000),
   pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 5000),
+  maxHttpBufferSize: 1e7,
 })
 export class ChatGateway
   implements
