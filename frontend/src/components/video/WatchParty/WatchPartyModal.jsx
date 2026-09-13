@@ -345,6 +345,12 @@ export default function WatchPartyModal({
   // Live Face Cams (Sender & Receiver) states & refs
   const [showFaceCams, setShowFaceCams] = useState(true);
   const [faceCamsMinimized, setFaceCamsMinimized] = useState(false);
+  const [isCamsDocked, setIsCamsDocked] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
   const partyLocalVideoRef = useRef(null);
   const partyRemoteVideoRef = useRef(null);
 
@@ -356,7 +362,7 @@ export default function WatchPartyModal({
       }
       partyLocalVideoRef.current.play().catch(() => {});
     }
-  }, [webRTC?.localStream, webRTC?.callState, showFaceCams, faceCamsMinimized]);
+  }, [webRTC?.localStream, webRTC?.callState, showFaceCams, faceCamsMinimized, isCamsDocked]);
 
   useEffect(() => {
     if (partyRemoteVideoRef.current && webRTC?.remoteStream) {
@@ -365,7 +371,7 @@ export default function WatchPartyModal({
       }
       partyRemoteVideoRef.current.play().catch(() => {});
     }
-  }, [webRTC?.remoteStream, webRTC?.callState, showFaceCams, faceCamsMinimized]);
+  }, [webRTC?.remoteStream, webRTC?.callState, showFaceCams, faceCamsMinimized, isCamsDocked]);
 
   // Video element sync & event wiring
   const handleTimeUpdate = (e) => {
@@ -723,7 +729,8 @@ export default function WatchPartyModal({
           <div className="watch-party-title-group">
             <div className="watch-party-badge">
               <span className="watch-party-pulse-dot" />
-              <span>Watch Together</span>
+              <span className="badge-text-desktop">Watch Together</span>
+              <span className="badge-text-mobile">Watch</span>
             </div>
           </div>
 
@@ -855,10 +862,10 @@ export default function WatchPartyModal({
               <Icon icon={cinemaMode ? 'solar:lamp-bold-duotone' : 'solar:sun-bold-duotone'} width="20" />
             </button>
 
-            {/* Desktop Screen Edge-to-Edge Fill Toggle (Zero Gaps) */}
+            {/* Desktop Screen Edge-to-Edge Fill Toggle (Zero Gaps - Desktop Only) */}
             <button
               type="button"
-              className={`watch-party-btn-icon ${isDesktopFill ? 'active' : ''}`}
+              className={`watch-party-btn-icon desktop-only-btn ${isDesktopFill ? 'active' : ''}`}
               onClick={() => setIsDesktopFill(!isDesktopFill)}
               title={isDesktopFill ? 'Windowed Modal View' : 'Complete Full Desktop Screen (No Gaps)'}
             >
@@ -1141,16 +1148,16 @@ export default function WatchPartyModal({
           </div>
         </div>
 
-        {/* Live Floating Face Cams (Freely draggable everywhere across the desktop screen) */}
+        {/* Live Floating or Docked Face Cams */}
         <AnimatePresence>
           {webRTC && showFaceCams && (webRTC.callState === 'active' || webRTC.callState === 'calling' || webRTC.callState === 'incoming') && (
             <motion.div
-              drag
+              drag={!isCamsDocked}
               dragMomentum={false}
               dragConstraints={modalContainerRef}
               onDragStart={() => setIsDraggingPip(true)}
               onDragEnd={() => setIsDraggingPip(false)}
-              className={`watch-party-face-cams ${faceCamsMinimized ? 'minimized' : ''}`}
+              className={`watch-party-face-cams ${faceCamsMinimized ? 'minimized' : ''} ${isCamsDocked ? 'is-docked' : 'is-floating'}`}
               initial={{ opacity: 0, scale: 0.85, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.85, y: 15 }}
@@ -1168,6 +1175,14 @@ export default function WatchPartyModal({
                   )}
                 </div>
                 <div className="face-cams-header-controls">
+                  <button
+                    type="button"
+                    className={`face-cam-mini-btn ${isCamsDocked ? 'active' : ''}`}
+                    onClick={() => setIsCamsDocked(!isCamsDocked)}
+                    title={isCamsDocked ? 'Float over Video (PiP)' : 'Dock below Movie'}
+                  >
+                    <Icon icon={isCamsDocked ? 'solar:maximize-square-3-bold-duotone' : 'solar:minimize-square-3-bold-duotone'} width="13" />
+                  </button>
                   <button
                     type="button"
                     className="face-cam-mini-btn"
@@ -1358,80 +1373,82 @@ export default function WatchPartyModal({
           )}
         </AnimatePresence>
 
-        {/* Floating Reactions Bar & In-Party Quick Chat Overlay */}
-        <div className="watch-party-interaction-row">
-          <div className="watch-party-reactions-group">
-            <span style={{ fontSize: '0.8rem', color: '#8696a0', fontWeight: 600, marginRight: '4px' }}>
-              Live React:
-            </span>
-            {REACTION_EMOJIS.map((emoji) => (
+        {/* Scrollable Content Body on Mobile (Reactions, Chat, Drawer) */}
+        <div className="watch-party-content-body">
+          {/* Floating Reactions Bar & In-Party Quick Chat Overlay */}
+          <div className="watch-party-interaction-row">
+            <div className="watch-party-reactions-group">
+              <span style={{ fontSize: '0.8rem', color: '#8696a0', fontWeight: 600, marginRight: '4px' }}>
+                Live React:
+              </span>
+              {REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="reaction-btn-tap"
+                  onClick={() => sendReaction(emoji)}
+                  title={`Send ${emoji} to everyone`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            <form className="watch-party-quick-chat-form" onSubmit={handleSendQuickComment}>
+              <input
+                type="text"
+                className="watch-party-quick-chat-input"
+                placeholder="React live on screen or chat together..."
+                value={quickComment}
+                onChange={(e) => setQuickComment(e.target.value)}
+              />
               <button
-                key={emoji}
-                type="button"
-                className="reaction-btn-tap"
-                onClick={() => sendReaction(emoji)}
-                title={`Send ${emoji} to everyone`}
+                type="submit"
+                className="watch-party-play-btn"
+                style={{ width: '34px', height: '34px' }}
+                title="Send Comment to Screen & Chat"
               >
-                {emoji}
+                <Icon icon="solar:plain-bold" width="18" />
               </button>
-            ))}
+            </form>
           </div>
 
-          <form className="watch-party-quick-chat-form" onSubmit={handleSendQuickComment}>
-            <input
-              type="text"
-              className="watch-party-quick-chat-input"
-              placeholder="React live on screen or chat together..."
-              value={quickComment}
-              onChange={(e) => setQuickComment(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="watch-party-play-btn"
-              style={{ width: '34px', height: '34px' }}
-              title="Send Comment to Screen & Chat"
-            >
-              <Icon icon="solar:plain-bold" width="18" />
-            </button>
-          </form>
+          {/* Source Selection Drawer (Platform Shortcuts & URL Input) */}
+          <AnimatePresence>
+            {showDrawer && (
+              <motion.div
+                className="watch-party-drawer"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+              >
+                <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
+                  <input
+                    type="text"
+                    className="custom-url-input"
+                    placeholder="Paste movie link from CinemaOS, CineHD, Cineby, Cinevice, MX Player, PRMovies, or YouTube..."
+                    value={customInputUrl}
+                    onChange={(e) => setCustomInputUrl(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    className="custom-url-input custom-url-title-input"
+                    placeholder="Movie Title (Optional - auto-detected)"
+                    value={customInputTitle}
+                    onChange={(e) => setCustomInputTitle(e.target.value)}
+                  />
+                  <button type="submit" className="custom-url-btn">
+                    <Icon icon="solar:play-bold" width="18" />
+                    <span>Watch Together</span>
+                  </button>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-
-        {/* Source Selection Drawer (Platform Shortcuts & URL Input) */}
-        <AnimatePresence>
-          {showDrawer && (
-            <motion.div
-              className="watch-party-drawer"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-            >
-              <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
-                <input
-                  type="text"
-                  className="custom-url-input"
-                  placeholder="Paste movie link from CinemaOS, CineHD, Cineby, Cinevice, MX Player, PRMovies, or YouTube..."
-                  value={customInputUrl}
-                  onChange={(e) => setCustomInputUrl(e.target.value)}
-                  required
-                  autoFocus
-                />
-                <input
-                  type="text"
-                  className="custom-url-input"
-                  style={{ flex: 0.5 }}
-                  placeholder="Movie Title (Optional - auto-detected)"
-                  value={customInputTitle}
-                  onChange={(e) => setCustomInputTitle(e.target.value)}
-                />
-                <button type="submit" className="custom-url-btn">
-                  <Icon icon="solar:play-bold" width="18" />
-                  <span>Watch Together</span>
-                </button>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Floating On-Screen Sync Notification Toast */}
         <AnimatePresence>
