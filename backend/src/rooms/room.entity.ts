@@ -39,6 +39,21 @@ export class Room {
   })
   pinnedMessageId!: number | null;
 
+  @Column({
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+    default: 'wa-doodle',
+  })
+  theme!: string | null;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+    default: null,
+  })
+  customWallpaper!: string | null;
+
   @OneToMany(() => User, (user) => user.room)
   users!: User[];
 

@@ -56,6 +56,7 @@ import {
   WatchPartyReactionDto,
   WatchPartyCommentDto,
 } from './dto/watch-party.dto';
+import { UpdateRoomWallpaperDto } from './dto/room-wallpaper.dto';
 
 interface WatchPartyState {
   isActive: boolean;
@@ -200,6 +201,14 @@ export class ChatGateway
   private socketMessageTimes = new Map<string, number[]>();
 
   private watchPartyRooms = new Map<string, WatchPartyState>();
+
+  private roomWallpapers = new Map<
+    string,
+    {
+      theme: string;
+      customWallpaper: string | null;
+    }
+  >();
 
   private getCalculatedWatchPartyPosition(state: WatchPartyState): number {
     if (!state.isPlaying || state.isBuffering) {
@@ -427,6 +436,19 @@ export class ChatGateway
     });
 
     client.emit('chatHistory', messages);
+
+    // Sync room-wide shared theme & wallpaper
+    const activeWallpaper = this.roomWallpapers.get(roomPasscode) || {
+      theme: room.theme || 'wa-doodle',
+      customWallpaper: room.customWallpaper || null,
+    };
+    if (!this.roomWallpapers.has(roomPasscode)) {
+      this.roomWallpapers.set(roomPasscode, activeWallpaper);
+    }
+    client.emit('roomWallpaperSync', {
+      theme: activeWallpaper.theme,
+      customWallpaper: activeWallpaper.customWallpaper,
+    });
 
     const roomUsers = await this.userRepo.find({
       where: {
@@ -1509,5 +1531,65 @@ export class ChatGateway
       top: typeof data.top === 'number' ? data.top : Math.floor(Math.random() * 60) + 15,
       timestamp: Date.now(),
     });
+  }
+
+  @SubscribeMessage('updateRoomWallpaper')
+  async updateRoomWallpaper(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: UpdateRoomWallpaperDto,
+  ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const currentCached = this.roomWallpapers.get(targetPasscode) || {
+      theme: 'wa-doodle',
+      customWallpaper: null,
+    };
+
+    const newTheme =
+      data.theme !== undefined && data.theme !== null
+        ? data.theme
+        : currentCached.theme;
+
+    const newWallpaper =
+      data.customWallpaper !== undefined
+        ? data.customWallpaper
+        : currentCached.customWallpaper;
+
+    const updatedState = {
+      theme: newTheme,
+      customWallpaper: newWallpaper,
+    };
+    this.roomWallpapers.set(targetPasscode, updatedState);
+
+    try {
+      const room = await this.roomRepo.findOne({
+        where: { passcode: targetPasscode },
+      });
+      if (room) {
+        room.theme = newTheme;
+        room.customWallpaper = newWallpaper;
+        await this.roomRepo.save(room);
+      }
+    } catch (err) {
+      console.warn('[RoomWallpaper] Could not persist wallpaper to database:', err);
+    }
+
+    // Broadcast synchronized wallpaper to all participants in this passcode room
+    this.server.to(targetPasscode).emit('roomWallpaperUpdated', {
+      theme: newTheme,
+      customWallpaper: newWallpaper,
+      updatedBy: session.nickname,
+    });
+
+    return {
+      success: true,
+      theme: newTheme,
+      customWallpaper: newWallpaper,
+      updatedBy: session.nickname,
+    };
   }
 }

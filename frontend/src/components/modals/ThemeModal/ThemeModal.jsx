@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { uploadFileApi } from '../../../services/apiService';
 
 const WALLPAPER_PRESETS = [
   {
@@ -23,9 +24,19 @@ const WALLPAPER_PRESETS = [
   },
 ];
 
-export default function ThemeModal({ isOpen, onClose, themes, currentTheme, customWallpaper, onSelectTheme }) {
+export default function ThemeModal({
+  isOpen,
+  onClose,
+  themes,
+  currentTheme,
+  customWallpaper,
+  onSelectTheme,
+  baseUrl,
+  passcode,
+}) {
   const [inputUrl, setInputUrl] = useState(customWallpaper || '');
   const [imageError, setImageError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -37,10 +48,34 @@ export default function ThemeModal({ isOpen, onClose, themes, currentTheme, cust
     }
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // First try uploading to server for a lightweight, shared URL across devices
+    if (baseUrl) {
+      try {
+        setIsUploading(true);
+        const data = await uploadFileApi(baseUrl, file);
+        if (data && data.fileUrl) {
+          const cleanApiUrl = baseUrl.trim().replace(/\/+$/, '');
+          const fullUrl = data.fileUrl.startsWith('http')
+            ? data.fileUrl
+            : `${cleanApiUrl}${data.fileUrl.startsWith('/') ? '' : '/'}${data.fileUrl}`;
+          setInputUrl(fullUrl);
+          setImageError(false);
+          setIsUploading(false);
+          onSelectTheme('custom', fullUrl);
+          return;
+        }
+      } catch (err) {
+        console.warn('Server wallpaper upload failed, falling back to local reader:', err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
+    // Fallback: Read local file as Data URL
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result;
@@ -81,13 +116,19 @@ export default function ThemeModal({ isOpen, onClose, themes, currentTheme, cust
         }}
         className="animate-fade-in"
       >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', color: '#e9edef' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1.1rem' }}>
-            <span className="material-symbols-outlined" style={{ color: '#00a884' }}>palette</span>
-            <span>Chat Themes & Wallpapers</span>
+        {/* Header with Passcode Sync Indicator */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px', color: '#e9edef' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700, fontSize: '1.1rem' }}>
+              <span className="material-symbols-outlined" style={{ color: '#00a884' }}>palette</span>
+              <span>Chat Themes & Wallpapers</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '0.74rem', color: '#00a884' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>sync</span>
+              <span>Shared Room Wallpaper • Synced for Sender & Receiver</span>
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: '4px' }}>
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -210,17 +251,26 @@ export default function ThemeModal({ isOpen, onClose, themes, currentTheme, cust
                   gap: '6px',
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  color: '#e9edef',
+                  backgroundColor: isUploading ? 'rgba(0, 168, 132, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isUploading ? '#00a884' : '#e9edef',
                   fontSize: '0.75rem',
                   fontWeight: 600,
-                  cursor: 'pointer',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  border: `1px solid ${isUploading ? '#00a884' : 'rgba(255, 255, 255, 0.1)'}`,
+                  opacity: isUploading ? 0.7 : 1,
                 }}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#00a884' }}>upload</span>
-                <span>Upload From Device</span>
-                <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+                <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#00a884' }}>
+                  {isUploading ? 'hourglass_top' : 'upload'}
+                </span>
+                <span>{isUploading ? 'Uploading & Syncing...' : 'Upload From Device'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                  style={{ display: 'none' }}
+                />
               </label>
 
               {customWallpaper && (

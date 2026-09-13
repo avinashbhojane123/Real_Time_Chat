@@ -74,6 +74,9 @@ export default function ChatRoom() {
     handleMarkAsRead,
     isSocketConnected,
     socketLatency,
+    roomTheme,
+    roomCustomWallpaper,
+    sendUpdateRoomWallpaper,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User Calculation
@@ -129,11 +132,37 @@ export default function ChatRoom() {
   const DEFAULT_CUSTOM_WALLPAPER =
     'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop';
 
-  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('chat_theme') || 'wa-doodle');
-  const [customWallpaper, setCustomWallpaper] = useState(
-    () => localStorage.getItem('chat_custom_wallpaper') || DEFAULT_CUSTOM_WALLPAPER
-  );
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    return (
+      (passcode && localStorage.getItem(`chat_theme_${passcode}`)) ||
+      sessionStorage.getItem('chat_theme') ||
+      localStorage.getItem('chat_theme') ||
+      'wa-doodle'
+    );
+  });
+
+  const [customWallpaper, setCustomWallpaper] = useState(() => {
+    return (
+      (passcode && localStorage.getItem(`chat_custom_wallpaper_${passcode}`)) ||
+      sessionStorage.getItem('chat_custom_wallpaper') ||
+      localStorage.getItem('chat_custom_wallpaper') ||
+      DEFAULT_CUSTOM_WALLPAPER
+    );
+  });
   const [showThemeModal, setShowThemeModal] = useState(false);
+
+  // Keep local state in sync when room theme / custom wallpaper changes from server or partner
+  useEffect(() => {
+    if (roomTheme && roomTheme !== currentTheme) {
+      setCurrentTheme(roomTheme);
+    }
+  }, [roomTheme]);
+
+  useEffect(() => {
+    if (roomCustomWallpaper && roomCustomWallpaper !== customWallpaper) {
+      setCustomWallpaper(roomCustomWallpaper);
+    }
+  }, [roomCustomWallpaper]);
 
   const THEMES = [
     { key: 'wa-doodle', name: 'WhatsApp Dark', previewColor: '#00a884', icon: 'chat' },
@@ -144,13 +173,23 @@ export default function ChatRoom() {
 
   const handleSelectTheme = (themeKey, customUrl = null) => {
     setCurrentTheme(themeKey);
+    if (passcode) localStorage.setItem(`chat_theme_${passcode}`, themeKey);
     localStorage.setItem('chat_theme', themeKey);
+
+    let finalUrl = customWallpaper;
     if (customUrl !== null && customUrl !== undefined) {
-      const finalUrl = customUrl.trim() || DEFAULT_CUSTOM_WALLPAPER;
+      finalUrl = customUrl.trim() || DEFAULT_CUSTOM_WALLPAPER;
       setCustomWallpaper(finalUrl);
+      if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalUrl);
       localStorage.setItem('chat_custom_wallpaper', finalUrl);
     }
-    showToast(`Applied ${THEMES.find((t) => t.key === themeKey)?.name || themeKey} theme`);
+
+    sendUpdateRoomWallpaper({
+      theme: themeKey,
+      customWallpaper: themeKey === 'custom' ? finalUrl : customWallpaper,
+    });
+
+    showToast(`Applied & synced ${THEMES.find((t) => t.key === themeKey)?.name || themeKey} wallpaper`);
   };
 
   // Voice & Video Notes Recording State
@@ -871,6 +910,8 @@ export default function ChatRoom() {
         currentTheme={currentTheme}
         customWallpaper={customWallpaper}
         onSelectTheme={handleSelectTheme}
+        baseUrl={baseUrl}
+        passcode={passcode}
       />
 
       {/* Create Live Poll Modal */}

@@ -20,6 +20,8 @@ export class RoomsController {
       roomId: room.id,
       passcode: room.passcode,
       nickname: body.nickname.trim(),
+      theme: room.theme || 'wa-doodle',
+      customWallpaper: room.customWallpaper || null,
     };
   }
 }

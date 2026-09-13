@@ -16,6 +16,27 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [isSocketConnected, setIsSocketConnected] = useState(true);
   const [socketLatency, setSocketLatency] = useState(18);
 
+  const DEFAULT_WALLPAPER =
+    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop';
+
+  const [roomTheme, setRoomTheme] = useState(() => {
+    return (
+      (passcode && localStorage.getItem(`chat_theme_${passcode}`)) ||
+      sessionStorage.getItem('chat_theme') ||
+      localStorage.getItem('chat_theme') ||
+      'wa-doodle'
+    );
+  });
+
+  const [roomCustomWallpaper, setRoomCustomWallpaper] = useState(() => {
+    return (
+      (passcode && localStorage.getItem(`chat_custom_wallpaper_${passcode}`)) ||
+      sessionStorage.getItem('chat_custom_wallpaper') ||
+      localStorage.getItem('chat_custom_wallpaper') ||
+      DEFAULT_WALLPAPER
+    );
+  });
+
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingTimersRef = useRef({});
@@ -260,6 +281,38 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
           return s;
         })
       );
+    });
+
+    // Synchronized Room Wallpaper & Theme Listeners
+    socket.on('roomWallpaperSync', ({ theme, customWallpaper }) => {
+      if (theme) {
+        setRoomTheme(theme);
+        if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
+        localStorage.setItem('chat_theme', theme);
+      }
+      if (customWallpaper !== undefined) {
+        const finalWp = customWallpaper || DEFAULT_WALLPAPER;
+        setRoomCustomWallpaper(finalWp);
+        if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalWp);
+        localStorage.setItem('chat_custom_wallpaper', finalWp);
+      }
+    });
+
+    socket.on('roomWallpaperUpdated', ({ theme, customWallpaper, updatedBy }) => {
+      if (theme) {
+        setRoomTheme(theme);
+        if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
+        localStorage.setItem('chat_theme', theme);
+      }
+      if (customWallpaper !== undefined) {
+        const finalWp = customWallpaper || DEFAULT_WALLPAPER;
+        setRoomCustomWallpaper(finalWp);
+        if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalWp);
+        localStorage.setItem('chat_custom_wallpaper', finalWp);
+      }
+      if (updatedBy && updatedBy !== nickname) {
+        showToast(`🎨 ${updatedBy} changed the room wallpaper/theme`);
+      }
     });
 
     return () => {
@@ -538,6 +591,26 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     if (onSuccess) onSuccess();
   };
 
+  const sendUpdateRoomWallpaper = ({ theme, customWallpaper }) => {
+    if (theme) {
+      setRoomTheme(theme);
+      if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
+      localStorage.setItem('chat_theme', theme);
+    }
+    if (customWallpaper !== undefined) {
+      const finalWp = customWallpaper || DEFAULT_WALLPAPER;
+      setRoomCustomWallpaper(finalWp);
+      if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalWp);
+      localStorage.setItem('chat_custom_wallpaper', finalWp);
+    }
+
+    socketRef.current?.emit('updateRoomWallpaper', {
+      passcode,
+      theme,
+      customWallpaper,
+    });
+  };
+
   return {
     messages,
     setMessages,
@@ -565,5 +638,10 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     handleMarkAsRead,
     isSocketConnected,
     socketLatency,
+    roomTheme,
+    setRoomTheme,
+    roomCustomWallpaper,
+    setRoomCustomWallpaper,
+    sendUpdateRoomWallpaper,
   };
 }

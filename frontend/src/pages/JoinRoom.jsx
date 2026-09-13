@@ -85,6 +85,14 @@ export default function JoinRoom() {
         sessionStorage.setItem('nickname', finalNickname);
         sessionStorage.setItem('passcode', passcode.trim());
         if (avatarUrl) sessionStorage.setItem('avatarUrl', avatarUrl);
+        if (data.theme) {
+          sessionStorage.setItem('chat_theme', data.theme);
+          localStorage.setItem(`chat_theme_${passcode.trim()}`, data.theme);
+        }
+        if (data.customWallpaper) {
+          sessionStorage.setItem('chat_custom_wallpaper', data.customWallpaper);
+          localStorage.setItem(`chat_custom_wallpaper_${passcode.trim()}`, data.customWallpaper);
+        }
 
         localStorage.removeItem('passcode');
         localStorage.removeItem('nickname');
