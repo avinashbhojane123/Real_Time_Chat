@@ -160,7 +160,8 @@ export default function WatchPartyModal({
   const embedIframeRef = useRef(null);
   const scrubberRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDesktopFill, setIsDesktopFill] = useState(true);
+  const [isDesktopFill, setIsDesktopFill] = useState(() => (typeof window !== 'undefined' ? window.innerWidth > 768 : false));
+  const isEdgeToEdge = isFullscreen || (isDesktopFill && typeof window !== 'undefined' && window.innerWidth > 768);
   const [isDraggingPip, setIsDraggingPip] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncInputTime, setSyncInputTime] = useState('');
@@ -168,6 +169,13 @@ export default function WatchPartyModal({
   const [syncNotice, setSyncNotice] = useState(null);
   const [showStreamBar, setShowStreamBar] = useState(true);
   const streamBarTimeoutRef = useRef(null);
+
+  // Memoize embed URL so it doesn't reload the iframe on every 1-second timer tick
+  const embedSrc = useMemo(() => {
+    if (!videoSource?.url) return '';
+    return getSyncedEmbedUrl(videoSource.url, currentTime);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoSource?.url, syncKey]);
 
   // Auto-hide stream switcher bar after 10 seconds of inactivity
   const resetStreamBarTimer = useCallback(() => {
@@ -710,13 +718,13 @@ export default function WatchPartyModal({
 
   // FULL THEATER CINEMA MODAL
   return (
-    <div className={`watch-party-overlay ${cinemaMode ? 'cinema-dimmed' : ''} ${isDesktopFill || isFullscreen ? 'desktop-edge-to-edge' : ''}`}>
+    <div className={`watch-party-overlay ${cinemaMode ? 'cinema-dimmed' : ''} ${isEdgeToEdge ? 'desktop-edge-to-edge' : ''}`}>
       {/* Dynamic Ambient Glow */}
       <div className="watch-party-ambient-glow" />
 
       <motion.div
         ref={modalContainerRef}
-        className={`watch-party-container ${isDesktopFill || isFullscreen ? 'is-fullscreen desktop-edge-to-edge' : ''}`}
+        className={`watch-party-container ${isEdgeToEdge ? 'is-fullscreen desktop-edge-to-edge' : ''}`}
         initial={{ scale: 0.92, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.92, opacity: 0, y: 20 }}
@@ -1082,7 +1090,7 @@ export default function WatchPartyModal({
             <iframe
               ref={embedIframeRef}
               key={`${videoSource.url}-sync-${syncKey}`}
-              src={getSyncedEmbedUrl(videoSource.url, currentTime)}
+              src={embedSrc}
               className="watch-party-yt-iframe"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share *"
               allowFullScreen
