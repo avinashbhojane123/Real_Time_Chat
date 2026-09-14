@@ -88,3 +88,13 @@ export class TogglePipDto {
   @IsBoolean()
   isPip!: boolean;
 }
+
+export class ScreenShareStatusDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsBoolean()
+  isSharing!: boolean;
+}

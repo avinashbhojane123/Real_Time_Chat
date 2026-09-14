@@ -1,5 +1,7 @@
 export function getApiBaseUrl() {
-  const stored = localStorage.getItem('baseUrl');
+  const stored =
+    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('baseUrl')) ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('baseUrl'));
   if (stored && stored.trim()) {
     return stored.trim().replace(/\/+$/, '');
   }

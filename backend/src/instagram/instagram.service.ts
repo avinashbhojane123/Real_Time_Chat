@@ -80,9 +80,7 @@ export class InstagramService {
 
     if (match && match[2]) {
       const type =
-        match[1] === 'reels' || match[1] === 'share/reel'
-          ? 'reel'
-          : match[1];
+        match[1] === 'reels' || match[1] === 'share/reel' ? 'reel' : match[1];
       const shortcode = match[2];
       return {
         shortcode,
@@ -517,9 +515,9 @@ export class InstagramService {
 
     const isVideo = Boolean(
       item.is_video ||
-        item.media_type === 2 ||
-        (item.video_versions && item.video_versions.length > 0) ||
-        item.video_url,
+      item.media_type === 2 ||
+      (item.video_versions && item.video_versions.length > 0) ||
+      item.video_url,
     );
 
     let videoUrl: string | undefined;
@@ -572,7 +570,8 @@ export class InstagramService {
     const videoViewCount =
       item.view_count ?? item.video_view_count ?? item.play_count;
 
-    const hasAudio = item.has_audio !== undefined ? Boolean(item.has_audio) : true;
+    const hasAudio =
+      item.has_audio !== undefined ? Boolean(item.has_audio) : true;
     const musicInfo =
       item.clips_metadata?.music_info?.music_asset_info ||
       item.music_metadata?.music_info?.music_asset_info ||
@@ -588,20 +587,24 @@ export class InstagramService {
     } else if (musicInfo?.fast_start_progressive_download_url) {
       audioUrl = musicInfo.fast_start_progressive_download_url;
     } else if (
-      item.clips_metadata?.music_info?.music_asset_info?.progressive_download_url
+      item.clips_metadata?.music_info?.music_asset_info
+        ?.progressive_download_url
     ) {
       audioUrl =
-        item.clips_metadata.music_info.music_asset_info.progressive_download_url;
+        item.clips_metadata.music_info.music_asset_info
+          .progressive_download_url;
     } else if (
       item.clips_metadata?.original_sound_info?.progressive_download_url
     ) {
       audioUrl =
         item.clips_metadata.original_sound_info.progressive_download_url;
     } else if (
-      item.music_metadata?.music_info?.music_asset_info?.progressive_download_url
+      item.music_metadata?.music_info?.music_asset_info
+        ?.progressive_download_url
     ) {
       audioUrl =
-        item.music_metadata.music_info.music_asset_info.progressive_download_url;
+        item.music_metadata.music_info.music_asset_info
+          .progressive_download_url;
     } else if (
       item.audio_versions &&
       Array.isArray(item.audio_versions) &&
@@ -767,7 +770,10 @@ export class InstagramService {
           res.setHeader('Content-Type', upstreamRes.headers['content-type']);
         }
         if (upstreamRes.headers['content-length']) {
-          res.setHeader('Content-Length', upstreamRes.headers['content-length']);
+          res.setHeader(
+            'Content-Length',
+            upstreamRes.headers['content-length'],
+          );
         }
         if (upstreamRes.headers['content-range']) {
           res.setHeader('Content-Range', upstreamRes.headers['content-range']);
@@ -777,6 +783,17 @@ export class InstagramService {
         upstreamRes.pipe(res);
       },
     );
+
+    request.setTimeout(15000, () => {
+      request.destroy();
+      if (!res.headersSent) {
+        res.status(504).json({ error: 'Upstream media server timed out' });
+      }
+    });
+
+    res.on('close', () => {
+      request.destroy();
+    });
 
     request.on('error', (err) => {
       this.logger.error(`Media proxy error: ${err.message}`);

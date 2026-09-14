@@ -86,4 +86,3 @@ bootstrap().catch((err: unknown) => {
   console.error('Fatal error during application startup:', err);
   process.exit(1);
 });
-

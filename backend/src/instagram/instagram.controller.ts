@@ -16,15 +16,16 @@ export class InstagramController {
   constructor(private readonly instagramService: InstagramService) {}
 
   @Get('preview')
-  async getPreview(
-    @Query('url') url: string,
-    @Req() req: Request,
-  ) {
+  async getPreview(@Query('url') url: string, @Req() req: Request) {
     if (!url) {
       throw new BadRequestException('Query parameter "url" is required');
     }
 
-    const protocol = req.protocol || 'http';
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const protocol =
+      (typeof forwardedProto === 'string'
+        ? forwardedProto.split(',')[0].trim()
+        : req.protocol) || 'https';
     const host = req.get('host') || 'localhost:10000';
     const baseUrlPrefix = `${protocol}://${host}`;
 

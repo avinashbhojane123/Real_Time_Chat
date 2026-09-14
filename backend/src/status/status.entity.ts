@@ -53,8 +53,7 @@ export class Status {
   mediaUrl!: string | null;
 
   @Column({
-    type: 'varchar',
-    length: 100,
+    type: 'text',
     nullable: true,
   })
   bgColor!: string | null;

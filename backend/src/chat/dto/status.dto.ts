@@ -19,6 +19,11 @@ export class CreateStatusDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50)
+  nickname?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(5000)
   content?: string;
 

@@ -286,11 +286,16 @@ export default function ChatRoom() {
             const res = await (await fetch(`${cleanApiUrl}/upload`, { method: 'POST', body: formData })).json();
 
             if (res && res.fileUrl) {
+              const serverBaseUrl = cleanApiUrl.replace(/\/api\/?$/, '');
+              const fullFileUrl = res.fileUrl.startsWith('http')
+                ? res.fileUrl
+                : `${serverBaseUrl}${res.fileUrl.startsWith('/') ? '' : '/'}${res.fileUrl}`;
+
               const payload = {
                 passcode,
                 nickname,
                 message: '🎤 Voice Note',
-                fileUrl: res.fileUrl,
+                fileUrl: fullFileUrl,
                 fileName: 'Voice Note.webm',
                 fileType: 'audio/webm',
                 isVoiceNote: true,
@@ -359,11 +364,16 @@ export default function ChatRoom() {
       const res = await (await fetch(`${cleanApiUrl}/upload`, { method: 'POST', body: formData })).json();
 
       if (res && res.fileUrl) {
+        const serverBaseUrl = cleanApiUrl.replace(/\/api\/?$/, '');
+        const fullFileUrl = res.fileUrl.startsWith('http')
+          ? res.fileUrl
+          : `${serverBaseUrl}${res.fileUrl.startsWith('/') ? '' : '/'}${res.fileUrl}`;
+
         const payload = {
           passcode,
           nickname,
           message: withoutSound ? '📹 Video Note (Without Sound)' : '📹 Video Note',
-          fileUrl: res.fileUrl,
+          fileUrl: fullFileUrl,
           fileName: withoutSound ? `Video Note (Without Sound).${ext}` : `Video Note.${ext}`,
           fileType: mimeType || 'video/webm',
           isVideoNote: true,
@@ -574,7 +584,8 @@ export default function ChatRoom() {
           borderRadius: '50%',
           cursor: hasStatus ? 'pointer' : 'default',
           padding: hasStatus ? '2px' : '0px',
-          background: hasStatus ? 'linear-[#00a884]' : 'transparent',
+          border: hasStatus ? '2.5px solid #00a884' : 'none',
+          boxSizing: 'border-box',
           ...extraStyle,
         }}
       >

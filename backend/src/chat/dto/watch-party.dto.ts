@@ -93,4 +93,3 @@ export class WatchPartyCommentDto {
   @IsNumber()
   top?: number;
 }
-

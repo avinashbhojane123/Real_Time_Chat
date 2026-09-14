@@ -109,6 +109,17 @@ export default function StatusModal({
     }
   }, [mode, currentStatus?.id, onViewStatus]);
 
+  // Sync pause state with video element
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isPaused) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [isPaused]);
+
   // Story auto-advance timer
   useEffect(() => {
     if (mode !== 'view' || !currentStatus || isPaused) return;
@@ -488,6 +499,7 @@ export default function StatusModal({
                     controls
                     controlsList="nodownload"
                     playsInline
+                    onEnded={handleNextStory}
                     style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '12px' }}
                   />
                 )}

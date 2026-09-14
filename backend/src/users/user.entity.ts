@@ -80,8 +80,7 @@ export class User {
   os!: string | null;
 
   @Column({
-    type: 'varchar',
-    length: 255,
+    type: 'text',
     nullable: true,
   })
   avatarUrl!: string | null;

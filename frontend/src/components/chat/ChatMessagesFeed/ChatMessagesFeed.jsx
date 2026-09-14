@@ -6,6 +6,7 @@ import AnimatedTypingIndicator from '../../animated/AnimatedTypingIndicator';
 import YouTubePreview from '../../YouTubePreview';
 import InstagramPreview from '../../InstagramPreview';
 import { formatDateHeader, formatMessageTime } from '../../../utils/chatUtils';
+import { getApiBaseUrl } from '../../../utils/apiConfig';
 import './ChatMessagesFeed.css';
 
 const ChatMessagesFeed = memo(function ChatMessagesFeed({
@@ -119,7 +120,11 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
       return url;
     }
     const cleanUrl = url.replace(/^\/?api\//, '/');
-    const storedBase = localStorage.getItem('baseUrl') || import.meta.env.VITE_API_URL || import.meta.env.VITE_DEFAULT_API_URL || '';
+    const storedBase =
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('baseUrl')) ||
+      (typeof localStorage !== 'undefined' && localStorage.getItem('baseUrl')) ||
+      getApiBaseUrl() ||
+      '';
     const serverBase = storedBase.replace(/\/api\/?$/, '').replace(/\/+$/, '');
     if (serverBase) {
       return `${serverBase}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
@@ -621,8 +626,9 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               {(() => {
-                                const totalVotes = msg.pollData.options.reduce((sum, opt) => sum + (opt.votes?.length || 0), 0);
-                                return msg.pollData.options.map((opt) => {
+                                const pollOptions = Array.isArray(msg.pollData?.options) ? msg.pollData.options : [];
+                                const totalVotes = pollOptions.reduce((sum, opt) => sum + (opt.votes?.length || 0), 0);
+                                return pollOptions.map((opt) => {
                                   const voteCount = opt.votes?.length || 0;
                                   const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
                                   const hasVoted = opt.votes?.includes(nickname);

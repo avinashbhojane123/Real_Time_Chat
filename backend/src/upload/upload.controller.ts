@@ -29,8 +29,8 @@ if (!fs.existsSync(uploadDir)) {
 const maxFileSizeMB = Number(process.env.MAX_FILE_SIZE_MB || 100);
 const blockedExtList = process.env.BLOCKED_FILE_EXTENSIONS
   ? process.env.BLOCKED_FILE_EXTENSIONS.split(',').map((e) =>
-    e.trim().toLowerCase(),
-  )
+      e.trim().toLowerCase(),
+    )
   : [
       '.exe',
       '.bat',

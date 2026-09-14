@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsArray,
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -69,4 +70,36 @@ export class PinMessageDto {
 
   @IsOptional()
   messageId?: number | null;
+}
+
+export class MarkReadDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsArray()
+  messageIds!: number[];
+
+  @IsString()
+  @IsOptional()
+  nickname?: string;
+}
+
+export class VotePollDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  messageId!: number;
+
+  @IsNotEmpty()
+  optionId!: string | number;
+
+  @IsString()
+  @IsNotEmpty()
+  nickname!: string;
 }

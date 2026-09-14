@@ -33,6 +33,8 @@ import {
   ClearHistoryDto,
   ReactToMessageDto,
   PinMessageDto,
+  MarkReadDto,
+  VotePollDto,
 } from './dto/message-actions.dto';
 import {
   CallUserDto,
@@ -43,6 +45,7 @@ import {
   WebrtcCandidateDto,
   EndCallDto,
   TogglePipDto,
+  ScreenShareStatusDto,
 } from './dto/call-signal.dto';
 import {
   CreateStatusDto,
@@ -88,10 +91,11 @@ interface WatchPartyState {
 })
 export class ChatGateway
   implements
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  OnApplicationBootstrap,
-  OnModuleDestroy {
+    OnGatewayConnection,
+    OnGatewayDisconnect,
+    OnApplicationBootstrap,
+    OnModuleDestroy
+{
   @WebSocketServer()
   server!: Server;
 
@@ -107,7 +111,7 @@ export class ChatGateway
 
     @InjectRepository(Status)
     private readonly statusRepo: Repository<Status>,
-  ) { }
+  ) {}
 
   private cleanupTimer?: NodeJS.Timeout;
   private isCleaning = false;
@@ -120,17 +124,16 @@ export class ChatGateway
         .update(User)
         .set({ isOnline: false })
         .execute();
-    } catch (e) {
+    } catch {
       console.log('User status reset skipped during startup');
     }
 
     const cleanupInterval = Number(
       process.env.MESSAGE_CLEANUP_INTERVAL || 5000,
     );
-    this.cleanupTimer = setInterval(
-      () => this.cleanupExpiredMessages(),
-      cleanupInterval,
-    );
+    this.cleanupTimer = setInterval(() => {
+      void this.cleanupExpiredMessages();
+    }, cleanupInterval);
   }
 
   onModuleDestroy() {
@@ -179,6 +182,18 @@ export class ChatGateway
           this.server.to(passcode).emit('messagesExpired', { ids: msgIds });
         }
       }
+
+      // Also prune expired 24h status stories to keep database clean
+      try {
+        await this.statusRepo
+          .createQueryBuilder()
+          .delete()
+          .from(Status)
+          .where('expiresAt IS NOT NULL AND expiresAt <= :now', { now })
+          .execute();
+      } catch {
+        // Non-critical if table is not yet initialized
+      }
     } catch (e: any) {
       if (e?.code === '42P01') {
         console.warn('[Self-Destruct] Table "messages" does not exist yet.');
@@ -219,7 +234,10 @@ export class ChatGateway
       ((Date.now() - state.lastUpdatedTimestamp) / 1000) *
       (state.playbackRate || 1);
     const calculated = state.currentTime + elapsedSec;
-    if (state.videoSource?.duration && calculated > state.videoSource.duration) {
+    if (
+      state.videoSource?.duration &&
+      calculated > state.videoSource.duration
+    ) {
       return state.videoSource.duration;
     }
     return Math.max(0, calculated);
@@ -235,7 +253,9 @@ export class ChatGateway
       (t) => now - t < windowMs,
     );
     if (timestamps.length >= maxLimit) {
-      client.emit('error', { message: 'Rate limit exceeded. Please slow down.' });
+      client.emit('error', {
+        message: 'Rate limit exceeded. Please slow down.',
+      });
       return false;
     }
     timestamps.push(now);
@@ -446,7 +466,9 @@ export class ChatGateway
     if (!this.roomWallpapers.has(roomPasscode)) {
       this.roomWallpapers.set(roomPasscode, activeWallpaper);
     }
-    const isRoomDefault = !activeWallpaper.customWallpaper && (activeWallpaper.theme === 'wa-doodle' || !activeWallpaper.theme);
+    const isRoomDefault =
+      !activeWallpaper.customWallpaper &&
+      (activeWallpaper.theme === 'wa-doodle' || !activeWallpaper.theme);
     client.emit('roomWallpaperSync', {
       theme: activeWallpaper.theme,
       customWallpaper: activeWallpaper.customWallpaper,
@@ -492,7 +514,9 @@ export class ChatGateway
     const activeStatuses = await this.statusRepo
       .createQueryBuilder('status')
       .where('status.roomId = :roomId', { roomId: room.id })
-      .andWhere('(status.expiresAt IS NULL OR status.expiresAt > :now)', { now })
+      .andWhere('(status.expiresAt IS NULL OR status.expiresAt > :now)', {
+        now,
+      })
       .orderBy('status.createdAt', 'ASC')
       .getMany();
 
@@ -622,7 +646,8 @@ export class ChatGateway
   @SubscribeMessage('markRead')
   async markRead(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { passcode: string; messageIds: number[]; nickname: string },
+    @MessageBody()
+    payload: MarkReadDto,
   ) {
     if (!payload || !payload.messageIds || !payload.messageIds.length) {
       return { success: false };
@@ -637,7 +662,9 @@ export class ChatGateway
 
     const updatedMessageIds: number[] = [];
     for (const msg of messages) {
-      const currentReadBy = Array.isArray(msg.readBy) ? msg.readBy : [msg.nickname];
+      const currentReadBy = Array.isArray(msg.readBy)
+        ? msg.readBy
+        : [msg.nickname];
       if (!currentReadBy.includes(reader)) {
         msg.readBy = [...currentReadBy, reader];
         await this.messageRepo.save(msg);
@@ -645,8 +672,8 @@ export class ChatGateway
       }
     }
 
-    if (updatedMessageIds.length > 0 && payload.passcode) {
-      const roomPasscode = payload.passcode.trim();
+    const roomPasscode = (payload.passcode || session?.passcode || '').trim();
+    if (updatedMessageIds.length > 0 && roomPasscode) {
       this.server.to(roomPasscode).emit('messagesRead', {
         messageIds: updatedMessageIds,
         readByNick: reader,
@@ -659,8 +686,19 @@ export class ChatGateway
   @SubscribeMessage('votePoll')
   async votePoll(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { passcode: string; messageId: number; optionId: number; nickname: string },
+    @MessageBody()
+    payload: VotePollDto,
   ) {
+    const session = this.users.get(client.id);
+    const targetPasscode = (
+      payload?.passcode ||
+      session?.passcode ||
+      ''
+    ).trim();
+    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+      return { success: false, message: 'Unauthorized' };
+    }
+
     const message = await this.messageRepo.findOne({
       where: { id: payload.messageId },
     });
@@ -668,17 +706,21 @@ export class ChatGateway
     if (!message || !message.pollData) return { success: false };
 
     const poll = message.pollData;
-    poll.options.forEach((opt) => {
-      opt.votes = (opt.votes || []).filter((nick) => nick !== payload.nickname);
-      if (opt.id === payload.optionId) {
-        opt.votes.push(payload.nickname);
-      }
-    });
+    if (poll.options && Array.isArray(poll.options)) {
+      poll.options.forEach((opt: any) => {
+        opt.votes = (opt.votes || []).filter(
+          (nick: string) => nick !== payload.nickname,
+        );
+        if (String(opt.id) === String(payload.optionId)) {
+          opt.votes.push(payload.nickname);
+        }
+      });
+    }
 
     message.pollData = poll;
     await this.messageRepo.save(message);
 
-    this.server.to(payload.passcode).emit('messageUpdated', {
+    this.server.to(targetPasscode).emit('messageUpdated', {
       id: message.id,
       pollData: message.pollData,
     });
@@ -809,7 +851,10 @@ export class ChatGateway
     console.log(
       `[CallUser] ${session.nickname} is calling in room: ${data.passcode}`,
     );
-    const callPayload = { callerName: session.nickname, from: session.nickname };
+    const callPayload = {
+      callerName: session.nickname,
+      from: session.nickname,
+    };
     client.to(data.passcode).emit('userCalling', callPayload);
     client.to(data.passcode).emit('callUser', callPayload);
   }
@@ -825,7 +870,10 @@ export class ChatGateway
     console.log(
       `[AcceptCall] ${session.nickname} accepted the call in room: ${data.passcode}`,
     );
-    const acceptPayload = { receiverName: session.nickname, from: session.nickname };
+    const acceptPayload = {
+      receiverName: session.nickname,
+      from: session.nickname,
+    };
     client.to(data.passcode).emit('callAccepted', acceptPayload);
     client.to(data.passcode).emit('acceptCall', acceptPayload);
   }
@@ -841,7 +889,10 @@ export class ChatGateway
     console.log(
       `[DeclineCall] ${session.nickname} declined the call in room: ${data.passcode}`,
     );
-    const declinePayload = { receiverName: session.nickname, from: session.nickname };
+    const declinePayload = {
+      receiverName: session.nickname,
+      from: session.nickname,
+    };
     client.to(data.passcode).emit('callDeclined', declinePayload);
     client.to(data.passcode).emit('declineCall', declinePayload);
   }
@@ -934,7 +985,7 @@ export class ChatGateway
   @SubscribeMessage('screenShareStatus')
   screenShareStatus(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { passcode: string; isSharing: boolean },
+    @MessageBody() data: ScreenShareStatusDto,
   ) {
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) return;
@@ -1112,7 +1163,11 @@ export class ChatGateway
   ) {
     const session = this.users.get(client.id);
     if (!session) return;
-    if (session.passcode.trim().toLowerCase() !== (data.passcode || '').trim().toLowerCase()) return;
+    if (
+      session.passcode.trim().toLowerCase() !==
+      (data.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = await this.roomRepo.findOne({
       where: { passcode: session.passcode },
@@ -1301,7 +1356,7 @@ export class ChatGateway
   }
 
   @SubscribeMessage('watchPartyAction')
-  async handleWatchPartyAction(
+  handleWatchPartyAction(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WatchPartyActionDto,
   ) {
@@ -1336,7 +1391,8 @@ export class ChatGateway
       case 'invite':
         state.isActive = true;
         if (data.videoSource) state.videoSource = data.videoSource;
-        if (data.currentTime !== undefined) state.currentTime = data.currentTime;
+        if (data.currentTime !== undefined)
+          state.currentTime = data.currentTime;
         state.lastActorNickname = session.nickname;
         state.lastUpdatedTimestamp = now;
         // Notify other participant(s) in the room with an invitation popup
@@ -1351,7 +1407,9 @@ export class ChatGateway
         state.isActive = true;
         state.isPlaying = true;
         state.currentTime =
-          data.currentTime !== undefined ? data.currentTime : (state.currentTime || 0);
+          data.currentTime !== undefined
+            ? data.currentTime
+            : state.currentTime || 0;
         state.lastUpdatedTimestamp = now;
         state.lastActorNickname = session.nickname;
         state.isBuffering = false;
@@ -1531,7 +1589,10 @@ export class ChatGateway
       id: `${Date.now()}-${Math.random()}`,
       from: session.nickname,
       text: data.text,
-      top: typeof data.top === 'number' ? data.top : Math.floor(Math.random() * 60) + 15,
+      top:
+        typeof data.top === 'number'
+          ? data.top
+          : Math.floor(Math.random() * 60) + 15,
       timestamp: Date.now(),
     });
   }
@@ -1543,7 +1604,11 @@ export class ChatGateway
   ) {
     const session = this.users.get(client.id);
     const targetPasscode = (data?.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode.trim() !== targetPasscode) {
+    if (
+      !session ||
+      !targetPasscode ||
+      session.passcode.trim() !== targetPasscode
+    ) {
       return { success: false, message: 'Unauthorized session' };
     }
 
@@ -1582,7 +1647,10 @@ export class ChatGateway
       room.customWallpaper = newWallpaper;
       await this.roomRepo.save(room);
     } catch (err) {
-      console.warn('[RoomWallpaper] Could not persist wallpaper to database:', err);
+      console.warn(
+        '[RoomWallpaper] Could not persist wallpaper to database:',
+        err,
+      );
     }
 
     // Broadcast synchronized wallpaper to all participants in this passcode room

@@ -4,6 +4,7 @@ import {
   MaxLength,
   IsOptional,
   IsObject,
+  IsNumber,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -61,8 +62,12 @@ export class SendMessageDto {
   expiresIn?: number | null;
 
   @IsOptional()
-  pollData?: any | null;
+  pollData?: any;
 
   @IsOptional()
   locationData?: { lat: number; lng: number } | null;
+
+  @IsOptional()
+  @IsNumber()
+  duration?: number;
 }

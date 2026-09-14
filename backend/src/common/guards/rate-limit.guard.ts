@@ -29,6 +29,14 @@ export class RateLimitGuard implements CanActivate {
 
     const record = this.hits.get(clientIp);
 
+    if (this.hits.size > 1000) {
+      for (const [key, val] of this.hits.entries()) {
+        if (now > val.resetTime) {
+          this.hits.delete(key);
+        }
+      }
+    }
+
     if (!record || now > record.resetTime) {
       this.hits.set(clientIp, {
         count: 1,
