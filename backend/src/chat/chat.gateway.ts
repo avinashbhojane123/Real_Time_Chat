@@ -338,6 +338,13 @@ export class ChatGateway
       );
     }
 
+    this.server.to(userInfo.passcode).emit('userStoppedTyping', {
+      nickname: userInfo.nickname,
+    });
+    this.server.to(userInfo.passcode).emit('userStopTyping', {
+      nickname: userInfo.nickname,
+    });
+
     this.server.to(userInfo.passcode).emit('userOffline', {
       nickname: userInfo.nickname,
       lastSeen: new Date(),
@@ -346,6 +353,14 @@ export class ChatGateway
     this.server.to(userInfo.passcode).emit('userLeft', {
       nickname: userInfo.nickname,
     });
+
+    // Clean up in-memory Watch Party state if no users remain in this room
+    const anyUserInRoom = Array.from(this.users.values()).some(
+      (info) => info.passcode === userInfo.passcode,
+    );
+    if (!anyUserInRoom) {
+      this.watchPartyRooms.delete(userInfo.passcode);
+    }
   }
 
   @SubscribeMessage('joinRoom')
@@ -786,6 +801,9 @@ export class ChatGateway
 
     const trimmedPasscode = (data.passcode || session.passcode).trim();
     client.to(trimmedPasscode).emit('userStoppedTyping', {
+      nickname: session.nickname,
+    });
+    client.to(trimmedPasscode).emit('userStopTyping', {
       nickname: session.nickname,
     });
   }

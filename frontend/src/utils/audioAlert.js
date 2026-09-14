@@ -34,6 +34,13 @@ export function playMovieInviteChime() {
       osc.start(now + time);
       osc.stop(now + time + dur);
     });
+
+    // Automatically close AudioContext to prevent hardware context leaks
+    setTimeout(() => {
+      try {
+        ctx.close().catch(() => {});
+      } catch (_) {}
+    }, 1600);
   } catch (err) {
     // Autoplay or AudioContext restriction fallback
     console.debug('[AudioAlert] Web Audio playback skipped:', err);

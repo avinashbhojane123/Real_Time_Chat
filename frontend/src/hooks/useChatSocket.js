@@ -179,13 +179,16 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
     });
 
-    socket.on('userStopTyping', ({ nickname: typingUser }) => {
+    const handleStopTyping = ({ nickname: typingUser }) => {
       if (typingTimersRef.current[typingUser]) {
         clearTimeout(typingTimersRef.current[typingUser]);
         delete typingTimersRef.current[typingUser];
       }
       setTypingUsers((prev) => prev.filter((u) => u !== typingUser));
-    });
+    };
+
+    socket.on('userStopTyping', handleStopTyping);
+    socket.on('userStoppedTyping', handleStopTyping);
 
     // Read Receipts Listener (Double Blue Ticks)
     socket.on('messagesRead', ({ messageIds, readByNick }) => {
