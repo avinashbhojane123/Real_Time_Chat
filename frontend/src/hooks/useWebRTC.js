@@ -212,38 +212,67 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     pc.ontrack = (e) => {
-      console.log('[WebRTC] ontrack received:', e.track.kind, 'stream count:', e.streams?.length);
-      let stream = e.streams && e.streams[0] ? e.streams[0] : null;
-      if (!stream) {
-        if (!remoteStreamRef.current) {
-          remoteStreamRef.current = new MediaStream();
-        }
-        remoteStreamRef.current.addTrack(e.track);
-        stream = remoteStreamRef.current;
-      } else {
-        remoteStreamRef.current = stream;
+      console.log('[WebRTC] ontrack received:', e.track.kind, 'id:', e.track.id, 'streams:', e.streams?.length);
+      e.track.enabled = true;
+
+      // 1. Maintain a single permanent MediaStream container for remote tracks
+      if (!remoteStreamRef.current) {
+        remoteStreamRef.current = new MediaStream();
       }
 
-      e.track.enabled = true;
-      // Always construct a new MediaStream instance with all tracks so React detects state change
-      const streamInstance = new MediaStream(stream.getTracks());
-      setRemoteStream(streamInstance);
+      // Remove any existing track of same kind if ID changed to avoid stream collision
+      const existing = remoteStreamRef.current.getTracks().find((t) => t.kind === e.track.kind && t.id !== e.track.id);
+      if (existing) {
+        remoteStreamRef.current.removeTrack(existing);
+      }
 
-      // Handle track mute/unmute so receiver responds immediately when sender changes video tracks
+      // Add newly received track if not yet present
+      if (!remoteStreamRef.current.getTracks().some((t) => t.id === e.track.id)) {
+        remoteStreamRef.current.addTrack(e.track);
+      }
+
+      // Ingest any accompanying tracks from e.streams[0] if provided
+      if (e.streams && e.streams[0]) {
+        e.streams[0].getTracks().forEach((st) => {
+          st.enabled = true;
+          if (!remoteStreamRef.current.getTracks().some((t) => t.id === st.id)) {
+            remoteStreamRef.current.addTrack(st);
+          }
+        });
+      }
+
+      // 2. Clone into a fresh MediaStream instance with all current tracks so React state updates
+      const updatedStream = new MediaStream(remoteStreamRef.current.getTracks());
+      remoteStreamRef.current = updatedStream;
+      setRemoteStream(updatedStream);
+
+      // 3. Immediately assign to active remote video node with autoplay fallback
+      const targetVideo = isStreamSwapped ? localVideoRef.current : remoteVideoRef.current;
+      if (targetVideo) {
+        if (targetVideo.srcObject !== updatedStream) {
+          targetVideo.srcObject = updatedStream;
+        }
+        targetVideo.play().catch((playErr) => {
+          console.warn('[WebRTC] Autoplay blocked, playing muted as fallback:', playErr);
+          targetVideo.muted = true;
+          targetVideo.play().catch(() => {});
+        });
+      }
+
+      // 4. Listen for track unmute to guarantee video renders the instant receiver frames arrive
       e.track.onunmute = () => {
         console.log('[WebRTC] Remote track unmuted:', e.track.kind);
-        const activeStream = new MediaStream(stream.getTracks());
+        const activeStream = new MediaStream(remoteStreamRef.current.getTracks());
+        remoteStreamRef.current = activeStream;
         setRemoteStream(activeStream);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = stream;
-          remoteVideoRef.current.play().catch(() => {});
+        const node = isStreamSwapped ? localVideoRef.current : remoteVideoRef.current;
+        if (node) {
+          if (node.srcObject !== activeStream) {
+            node.srcObject = activeStream;
+          }
+          node.play().catch(() => {});
         }
       };
-
-      if (remoteVideoRef.current && stream) {
-        remoteVideoRef.current.srcObject = stream;
-        remoteVideoRef.current.play().catch(() => {});
-      }
     };
 
     pc.oniceconnectionstatechange = () => {
@@ -260,7 +289,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [passcode, socketRef, triggerIceRestart]);
+  }, [passcode, socketRef, triggerIceRestart, isStreamSwapped]);
 
   // Sync localStream and remoteStream to main video nodes
   useEffect(() => {
@@ -271,11 +300,21 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     const pipStream = isStreamSwapped ? remoteStream : localStream;
 
     if (mainNode && mainStream) {
-      mainNode.srcObject = mainStream;
-      mainNode.play().catch((err) => console.warn('[WebRTC] Main video play error:', err));
+      if (mainNode.srcObject !== mainStream) {
+        mainNode.srcObject = mainStream;
+      }
+      mainNode.play().catch((err) => {
+        console.warn('[WebRTC] Main video play error, attempting muted fallback:', err);
+        if (!isStreamSwapped && mainNode) {
+          mainNode.muted = true;
+          mainNode.play().catch(() => {});
+        }
+      });
     }
     if (pipNode && pipStream) {
-      pipNode.srcObject = pipStream;
+      if (pipNode.srcObject !== pipStream) {
+        pipNode.srcObject = pipStream;
+      }
       pipNode.play().catch((err) => console.warn('[WebRTC] PIP video play error:', err));
     }
   }, [localStream, remoteStream, callState, showVideoPanel, isStreamSwapped, pipMode]);
@@ -332,12 +371,17 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
     const handleCallUser = ({ callerName: cName, from }) => {
       if (Date.now() - lastCallEndedAtRef.current < 2500) return;
-      setCallerName(cName || from || 'Participant');
+      const peerName = cName || from || 'Participant';
+      setCallerName(peerName);
+      setRemoteUserName(peerName);
       updateCallState('incoming');
       setShowVideoPanel(true);
     };
 
-    const handleCallAccepted = () => {
+    const handleCallAccepted = ({ receiverName: rName, from } = {}) => {
+      if (rName || from) {
+        setRemoteUserName(rName || from);
+      }
       updateCallState('active');
     };
 
@@ -346,26 +390,36 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       latestOfferRef.current = offer;
 
       if (callStateRef.current === 'idle') {
-        setCallerName(cName || from || 'Participant');
+        const peerName = cName || from || 'Participant';
+        setCallerName(peerName);
+        setRemoteUserName(peerName);
         updateCallState('incoming');
         setShowVideoPanel(true);
       } else if (callStateRef.current === 'active') {
-        const pc = peerConnectionRef.current || createPeerConnection();
-        try {
-          if (pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            processPendingIceCandidates();
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socket.emit('webrtcAnswer', { passcode, answer, receiverName: nickname });
+        let pc = peerConnectionRef.current;
+        if (!pc && localStreamRef.current) {
+          pc = createPeerConnection();
+        }
+        if (pc && pc.signalingState !== 'closed') {
+          try {
+            if (pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer') {
+              await pc.setRemoteDescription(new RTCSessionDescription(offer));
+              processPendingIceCandidates();
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              socketRef.current?.emit('webrtcAnswer', { passcode, answer, receiverName: nickname });
+            }
+          } catch (err) {
+            console.warn('[WebRTC] Handling offer error:', err);
           }
-        } catch (err) {
-          console.warn('[WebRTC] Handling offer error:', err);
         }
       }
     };
 
-    const handleWebrtcAnswer = async ({ answer }) => {
+    const handleWebrtcAnswer = async ({ answer, receiverName: rName, from }) => {
+      if (rName || from) {
+        setRemoteUserName(rName || from);
+      }
       const pc = peerConnectionRef.current;
       if (pc && pc.signalingState === 'have-local-offer') {
         try {
@@ -458,9 +512,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   };
 
   const acceptCall = async () => {
-    updateCallState('active');
-    socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
     try {
+      // 1. Acquire camera and microphone FIRST before transitioning state or creating peer connection
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
@@ -471,12 +524,20 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       localStreamRef.current = stream;
       setLocalStream(stream);
 
+      // 2. Now transition to active call state
+      updateCallState('active');
+      socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
+
+      // 3. Create peer connection with local tracks already attached
+      const pc = createPeerConnection();
+
+      // 4. Attach local camera feed preview
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(() => {});
       }
 
-      const pc = createPeerConnection();
+      // 5. If caller offer is ready, set remote description and emit answer
       if (latestOfferRef.current) {
         await pc.setRemoteDescription(new RTCSessionDescription(latestOfferRef.current));
         processPendingIceCandidates();

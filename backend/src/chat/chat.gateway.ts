@@ -869,17 +869,18 @@ export class ChatGateway
     @MessageBody() data: CallUserDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[CallUser] ${session.nickname} is calling in room: ${data.passcode}`,
+      `[CallUser] ${session.nickname} is calling in room: ${room}`,
     );
     const callPayload = {
-      callerName: session.nickname,
+      callerName: data.callerName || session.nickname,
       from: session.nickname,
     };
-    client.to(data.passcode).emit('userCalling', callPayload);
-    client.to(data.passcode).emit('callUser', callPayload);
+    client.to(room).emit('userCalling', callPayload);
+    client.to(room).emit('callUser', callPayload);
   }
 
   @SubscribeMessage('acceptCall')
@@ -888,17 +889,18 @@ export class ChatGateway
     @MessageBody() data: AcceptCallDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[AcceptCall] ${session.nickname} accepted the call in room: ${data.passcode}`,
+      `[AcceptCall] ${session.nickname} accepted the call in room: ${room}`,
     );
     const acceptPayload = {
-      receiverName: session.nickname,
+      receiverName: data.receiverName || session.nickname,
       from: session.nickname,
     };
-    client.to(data.passcode).emit('callAccepted', acceptPayload);
-    client.to(data.passcode).emit('acceptCall', acceptPayload);
+    client.to(room).emit('callAccepted', acceptPayload);
+    client.to(room).emit('acceptCall', acceptPayload);
   }
 
   @SubscribeMessage('declineCall')
@@ -907,17 +909,18 @@ export class ChatGateway
     @MessageBody() data: DeclineCallDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[DeclineCall] ${session.nickname} declined the call in room: ${data.passcode}`,
+      `[DeclineCall] ${session.nickname} declined the call in room: ${room}`,
     );
     const declinePayload = {
-      receiverName: session.nickname,
+      receiverName: data.receiverName || session.nickname,
       from: session.nickname,
     };
-    client.to(data.passcode).emit('callDeclined', declinePayload);
-    client.to(data.passcode).emit('declineCall', declinePayload);
+    client.to(room).emit('callDeclined', declinePayload);
+    client.to(room).emit('declineCall', declinePayload);
   }
 
   @SubscribeMessage('webrtcOffer')
@@ -926,18 +929,19 @@ export class ChatGateway
     @MessageBody() data: WebrtcOfferDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[WebRTCOffer] Relaying WebRTC offer from ${session.nickname} in room: ${data.passcode}`,
+      `[WebRTCOffer] Relaying WebRTC offer from ${session.nickname} in room: ${room}`,
     );
     const offerPayload = {
       offer: data.offer,
       from: session.nickname,
-      callerName: session.nickname,
+      callerName: data.callerName || session.nickname,
     };
-    client.to(data.passcode).emit('webrtcOfferRelay', offerPayload);
-    client.to(data.passcode).emit('webrtcOffer', offerPayload);
+    client.to(room).emit('webrtcOfferRelay', offerPayload);
+    client.to(room).emit('webrtcOffer', offerPayload);
   }
 
   @SubscribeMessage('webrtcAnswer')
@@ -946,18 +950,24 @@ export class ChatGateway
     @MessageBody() data: WebrtcAnswerDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[WebRTCAnswer] Relaying WebRTC answer from ${session.nickname} in room: ${data.passcode}`,
+      `[WebRTCAnswer] Relaying WebRTC answer from ${session.nickname} in room: ${room}`,
     );
     const answerPayload = {
       answer: data.answer,
       from: session.nickname,
-      receiverName: session.nickname,
+      receiverName: data.receiverName || session.nickname,
     };
-    client.to(data.passcode).emit('webrtcAnswerRelay', answerPayload);
-    client.to(data.passcode).emit('webrtcAnswer', answerPayload);
+    client.to(room).emit('webrtcAnswerRelay', answerPayload);
+    client.to(room).emit('webrtcAnswer', answerPayload);
+    // Also broadcast callAccepted as an extra guarantee that caller transitions to active state
+    client.to(room).emit('callAccepted', {
+      receiverName: data.receiverName || session.nickname,
+      from: session.nickname,
+    });
   }
 
   @SubscribeMessage('webrtcCandidate')
@@ -966,24 +976,26 @@ export class ChatGateway
     @MessageBody() data: WebrtcCandidateDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${data.passcode}`,
+      `[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${room}`,
     );
     const candidatePayload = { candidate: data.candidate };
-    client.to(data.passcode).emit('webrtcCandidateRelay', candidatePayload);
-    client.to(data.passcode).emit('webrtcCandidate', candidatePayload);
+    client.to(room).emit('webrtcCandidateRelay', candidatePayload);
+    client.to(room).emit('webrtcCandidate', candidatePayload);
   }
 
   @SubscribeMessage('endCall')
   endCall(@ConnectedSocket() client: Socket, @MessageBody() data: EndCallDto) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
-    console.log(`[EndCall] Relaying endCall in room: ${data.passcode}`);
-    client.to(data.passcode).emit('callEnded');
-    client.to(data.passcode).emit('endCall');
+    const room = session.passcode.trim();
+    console.log(`[EndCall] Relaying endCall in room: ${room}`);
+    client.to(room).emit('callEnded');
+    client.to(room).emit('endCall');
   }
 
   @SubscribeMessage('togglePip')
@@ -992,14 +1004,15 @@ export class ChatGateway
     @MessageBody() data: TogglePipDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
     session.isPip = data.isPip;
+    const room = session.passcode.trim();
 
     console.log(
-      `[TogglePip] ${session.nickname} set PIP mode to ${data.isPip} in room: ${data.passcode}`,
+      `[TogglePip] ${session.nickname} set PIP mode to ${data.isPip} in room: ${room}`,
     );
-    client.to(data.passcode).emit('pipStateChanged', {
+    client.to(room).emit('pipStateChanged', {
       nickname: session.nickname,
       isPip: data.isPip,
     });
@@ -1011,14 +1024,15 @@ export class ChatGateway
     @MessageBody() data: ScreenShareStatusDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) return;
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
+    const room = session.passcode.trim();
     console.log(
-      `[ScreenShareStatus] ${session.nickname} screen sharing: ${data.isSharing} in room: ${data.passcode}`,
+      `[ScreenShareStatus] ${session.nickname} screen sharing: ${data.isSharing} in room: ${room}`,
     );
-    client.to(data.passcode).emit('screenShareStatus', {
-      from: session.nickname,
+    client.to(room).emit('screenShareStatus', {
       isSharing: data.isSharing,
+      from: session.nickname,
     });
   }
 

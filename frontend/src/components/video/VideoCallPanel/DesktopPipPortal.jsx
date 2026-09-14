@@ -39,11 +39,21 @@ export default function DesktopPipPortal({
     const miniStream = isStreamSwapped ? remoteStream : localStream;
 
     if (mainNode && mainStream) {
-      mainNode.srcObject = mainStream;
-      mainNode.play().catch((err) => console.warn('[DesktopPiP] Main video play warning:', err));
+      if (mainNode.srcObject !== mainStream) {
+        mainNode.srcObject = mainStream;
+      }
+      mainNode.play().catch((err) => {
+        console.warn('[DesktopPiP] Main video play warning:', err);
+        if (mainNode && !isStreamSwapped) {
+          mainNode.muted = true;
+          mainNode.play().catch(() => {});
+        }
+      });
     }
     if (miniNode && miniStream) {
-      miniNode.srcObject = miniStream;
+      if (miniNode.srcObject !== miniStream) {
+        miniNode.srcObject = miniStream;
+      }
       miniNode.play().catch((err) => console.warn('[DesktopPiP] Mini video play warning:', err));
     }
   }, [pipWindow, localStream, remoteStream, isStreamSwapped]);

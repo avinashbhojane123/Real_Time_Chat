@@ -10,6 +10,10 @@ export class CallUserDto {
   @IsOptional()
   @IsString()
   callerName?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
 }
 
 export class AcceptCallDto {
@@ -21,6 +25,10 @@ export class AcceptCallDto {
   @IsOptional()
   @IsString()
   receiverName?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
 }
 
 export class DeclineCallDto {
@@ -32,6 +40,10 @@ export class DeclineCallDto {
   @IsOptional()
   @IsString()
   receiverName?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
 }
 
 export class WebrtcOfferDto {
@@ -46,6 +58,10 @@ export class WebrtcOfferDto {
   @IsOptional()
   @IsString()
   callerName?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
 }
 
 export class WebrtcAnswerDto {
@@ -60,6 +76,10 @@ export class WebrtcAnswerDto {
   @IsOptional()
   @IsString()
   receiverName?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
 }
 
 export class WebrtcCandidateDto {
@@ -70,6 +90,10 @@ export class WebrtcCandidateDto {
 
   @IsOptional()
   candidate?: any;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
 }
 
 export class EndCallDto {

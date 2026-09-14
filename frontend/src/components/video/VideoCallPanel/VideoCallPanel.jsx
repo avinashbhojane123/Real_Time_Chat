@@ -80,7 +80,12 @@ export default function VideoCallPanel({
       if (remoteVideoRef.current.srcObject !== mainStream) {
         remoteVideoRef.current.srcObject = mainStream;
       }
-      remoteVideoRef.current.play().catch(() => {});
+      remoteVideoRef.current.play().catch(() => {
+        if (!isStreamSwapped && remoteVideoRef.current) {
+          remoteVideoRef.current.muted = true;
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      });
     }
 
     if (localVideoRef?.current && pipStream) {
@@ -235,11 +240,24 @@ export default function VideoCallPanel({
               const streamToAttach = isStreamSwapped ? localStream : remoteStream;
               if (el && streamToAttach && el.srcObject !== streamToAttach) {
                 el.srcObject = streamToAttach;
-                el.play().catch(() => {});
+                el.play().catch(() => {
+                  if (!isStreamSwapped) {
+                    el.muted = true;
+                    el.play().catch(() => {});
+                  }
+                });
               }
             }}
             autoPlay
             playsInline
+            onLoadedMetadata={(e) => {
+              e.target.play().catch(() => {
+                if (!isStreamSwapped) {
+                  e.target.muted = true;
+                  e.target.play().catch(() => {});
+                }
+              });
+            }}
             style={{
               width: '100%',
               height: '100%',
@@ -831,7 +849,14 @@ export default function VideoCallPanel({
 
         {/* Active Call View */}
         {callState === 'active' && (
-          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+          <div
+            style={{ width: '100%', height: '100%', position: 'relative' }}
+            onClick={() => {
+              if (remoteVideoRef?.current && remoteVideoRef.current.muted && !isStreamSwapped) {
+                remoteVideoRef.current.muted = false;
+              }
+            }}
+          >
             {/* Remote Stream Video */}
             <video
               ref={(el) => {
@@ -839,11 +864,24 @@ export default function VideoCallPanel({
                 const streamToAttach = isStreamSwapped ? localStream : remoteStream;
                 if (el && streamToAttach && el.srcObject !== streamToAttach) {
                   el.srcObject = streamToAttach;
-                  el.play().catch(() => {});
+                  el.play().catch(() => {
+                    if (!isStreamSwapped) {
+                      el.muted = true;
+                      el.play().catch(() => {});
+                    }
+                  });
                 }
               }}
               autoPlay
               playsInline
+              onLoadedMetadata={(e) => {
+                e.target.play().catch(() => {
+                  if (!isStreamSwapped) {
+                    e.target.muted = true;
+                    e.target.play().catch(() => {});
+                  }
+                });
+              }}
               style={{
                 width: '100%',
                 height: '100%',
@@ -856,7 +894,7 @@ export default function VideoCallPanel({
             />
 
             {/* Connecting Remote Video Overlay if remote video stream has not yet arrived */}
-            {(!remoteStream || (!isStreamSwapped && !remoteStream.getVideoTracks()?.length)) && (
+            {(!isStreamSwapped && (!remoteStream || !remoteStream.getVideoTracks()?.length || !remoteStream.getVideoTracks().some((t) => t.readyState === 'live'))) && (
               <div
                 style={{
                   position: 'absolute',
