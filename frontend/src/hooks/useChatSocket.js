@@ -4,6 +4,7 @@ import axios from 'axios';
 import { getSocketBaseUrl } from '../utils/apiConfig';
 import { detectClientDevice, getBatteryInfo } from '../utils/deviceUtils';
 import { compressImageFile } from '../utils/imageUtils';
+import { saveWallpaperOffline, getWallpaperOffline } from '../utils/wallpaperStorage';
 
 export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [messages, setMessages] = useState([]);
@@ -36,6 +37,24 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       DEFAULT_WALLPAPER
     );
   });
+
+  // Load durable IndexedDB wallpaper on mount
+  useEffect(() => {
+    if (!passcode) return;
+    let isCancelled = false;
+    getWallpaperOffline(passcode).then((offline) => {
+      if (isCancelled || !offline) return;
+      if (offline.preferred) {
+        setRoomCustomWallpaper((curr) => (curr === DEFAULT_WALLPAPER ? offline.preferred : curr));
+      }
+      if (offline.theme && offline.theme === 'custom') {
+        setRoomTheme((curr) => (curr === 'wa-doodle' ? 'custom' : curr));
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [passcode]);
 
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -284,32 +303,63 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
 
     // Synchronized Room Wallpaper & Theme Listeners
-    socket.on('roomWallpaperSync', ({ theme, customWallpaper }) => {
+    socket.on('roomWallpaperSync', async ({ theme, customWallpaper }) => {
+      // Check if user already has an offline custom wallpaper for this passcode
+      const offline = passcode ? await getWallpaperOffline(passcode) : null;
+      const hasLocalCustom = Boolean(offline && (offline.url || offline.dataUrl));
+
+      // If server sent a valid non-empty custom wallpaper string, sync it
+      if (typeof customWallpaper === 'string' && customWallpaper.trim() !== '') {
+        const finalWp = customWallpaper.trim();
+        setRoomCustomWallpaper(finalWp);
+        if (theme) setRoomTheme(theme);
+        if (passcode) {
+          await saveWallpaperOffline(passcode, { url: finalWp, theme: theme || 'custom' });
+        }
+        return;
+      }
+
+      // If server sent null / empty wallpaper (e.g. server restart on Render or unconfigured):
+      // DO NOT clobber the user's active local wallpaper!
+      if (hasLocalCustom) {
+        // Re-announce our offline wallpaper so server caches it and syncs to room
+        const activeUrl = offline.url || offline.dataUrl;
+        socket.emit('updateRoomWallpaper', {
+          passcode,
+          theme: offline.theme || 'custom',
+          customWallpaper: activeUrl,
+        });
+        return;
+      }
+
+      // If neither server nor client has a custom wallpaper, apply server theme safely
       if (theme) {
         setRoomTheme(theme);
-        if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
-        localStorage.setItem('chat_theme', theme);
-      }
-      if (customWallpaper !== undefined) {
-        const finalWp = customWallpaper || DEFAULT_WALLPAPER;
-        setRoomCustomWallpaper(finalWp);
-        if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalWp);
-        localStorage.setItem('chat_custom_wallpaper', finalWp);
+        try {
+          if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
+          localStorage.setItem('chat_theme', theme);
+        } catch {}
       }
     });
 
-    socket.on('roomWallpaperUpdated', ({ theme, customWallpaper, updatedBy }) => {
+    socket.on('roomWallpaperUpdated', async ({ theme, customWallpaper, updatedBy }) => {
       if (theme) {
         setRoomTheme(theme);
-        if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
-        localStorage.setItem('chat_theme', theme);
+        try {
+          if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
+          localStorage.setItem('chat_theme', theme);
+        } catch {}
       }
-      if (customWallpaper !== undefined) {
-        const finalWp = customWallpaper || DEFAULT_WALLPAPER;
+      if (typeof customWallpaper === 'string' && customWallpaper.trim() !== '') {
+        const finalWp = customWallpaper.trim();
         setRoomCustomWallpaper(finalWp);
-        if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalWp);
-        localStorage.setItem('chat_custom_wallpaper', finalWp);
+        if (passcode) {
+          await saveWallpaperOffline(passcode, { url: finalWp, theme: theme || 'custom' });
+        }
+      } else if (customWallpaper === null || customWallpaper === '') {
+        setRoomCustomWallpaper(DEFAULT_WALLPAPER);
       }
+
       if (updatedBy && updatedBy !== nickname) {
         showToast(`🎨 ${updatedBy} changed the room wallpaper/theme`);
       }
@@ -591,17 +641,20 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     if (onSuccess) onSuccess();
   };
 
-  const sendUpdateRoomWallpaper = ({ theme, customWallpaper }) => {
+  const sendUpdateRoomWallpaper = async ({ theme, customWallpaper }) => {
     if (theme) {
       setRoomTheme(theme);
-      if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
-      localStorage.setItem('chat_theme', theme);
+      try {
+        if (passcode) localStorage.setItem(`chat_theme_${passcode}`, theme);
+        localStorage.setItem('chat_theme', theme);
+      } catch {}
     }
     if (customWallpaper !== undefined) {
       const finalWp = customWallpaper || DEFAULT_WALLPAPER;
       setRoomCustomWallpaper(finalWp);
-      if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalWp);
-      localStorage.setItem('chat_custom_wallpaper', finalWp);
+      if (passcode) {
+        await saveWallpaperOffline(passcode, { url: finalWp, theme: theme || 'custom' });
+      }
     }
 
     socketRef.current?.emit('updateRoomWallpaper', {

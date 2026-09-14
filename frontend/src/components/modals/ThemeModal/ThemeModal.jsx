@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { uploadFileApi } from '../../../services/apiService';
 import { compressImageFile } from '../../../utils/imageUtils';
+import { saveWallpaperOffline, removeWallpaperOffline } from '../../../utils/wallpaperStorage';
 
 const WALLPAPER_PRESETS = [
   {
@@ -49,10 +50,13 @@ export default function ThemeModal({
 
   if (!isOpen) return null;
 
-  const handleApplyCustomUrl = (urlToApply) => {
+  const handleApplyCustomUrl = async (urlToApply) => {
     const targetUrl = (urlToApply || inputUrl).trim();
     if (targetUrl) {
       setImageError(false);
+      if (passcode) {
+        await saveWallpaperOffline(passcode, { url: targetUrl, dataUrl: '', theme: 'custom' });
+      }
       onSelectTheme('custom', targetUrl);
     }
   };
@@ -68,7 +72,20 @@ export default function ThemeModal({
       // Auto-compress image (ensures standard JPEG and ultra-fast upload under 400KB)
       const file = await compressImageFile(rawFile, 1920, 1080, 0.85);
 
-      // First try uploading to server for a lightweight, shared URL across devices
+      // Read compressed image as Data URL so we have an instant, permanent local fallback
+      const dataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+      });
+
+      // Instantly cache into IndexedDB to guarantee persistence against server restarts
+      if (passcode && dataUrl) {
+        await saveWallpaperOffline(passcode, { url: '', dataUrl, theme: 'custom' });
+      }
+
+      // Try uploading to server for a lightweight, shared URL across devices
       if (baseUrl) {
         try {
           const data = await uploadFileApi(baseUrl, file);
@@ -78,6 +95,12 @@ export default function ThemeModal({
             const fullUrl = data.fileUrl.startsWith('http')
               ? data.fileUrl
               : `${serverBaseUrl}${data.fileUrl.startsWith('/') ? '' : '/'}${data.fileUrl}`;
+
+            // Save both fullUrl and dataUrl in IndexedDB so client can fall back if server 404s
+            if (passcode) {
+              await saveWallpaperOffline(passcode, { url: fullUrl, dataUrl, theme: 'custom' });
+            }
+
             setInputUrl(fullUrl);
             setImageError(false);
             setIsUploading(false);
@@ -85,26 +108,19 @@ export default function ThemeModal({
             return;
           }
         } catch (uploadErr) {
-          console.warn('Server wallpaper upload failed, falling back to local reader:', uploadErr);
+          console.warn('Server wallpaper upload failed, using local offline copy:', uploadErr);
         }
       }
 
-      // Fallback: Read local compressed file as Data URL
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result;
-        if (dataUrl) {
-          setInputUrl(dataUrl);
-          setImageError(false);
-          setIsUploading(false);
-          onSelectTheme('custom', dataUrl);
-        }
-      };
-      reader.onerror = () => {
-        setImageError(true);
+      // Fallback: Use permanent offline Data URL if server upload was unavailable or failed
+      if (dataUrl) {
+        setInputUrl(dataUrl);
+        setImageError(false);
         setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+        onSelectTheme('custom', dataUrl);
+      } else {
+        throw new Error('Failed to read image data');
+      }
     } catch (err) {
       console.error('Wallpaper processing failed:', err);
       setImageError(true);
@@ -301,8 +317,11 @@ export default function ThemeModal({
               {customWallpaper && (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setInputUrl('');
+                    if (passcode) {
+                      await removeWallpaperOffline(passcode);
+                    }
                     onSelectTheme('wa-doodle');
                   }}
                   style={{ background: 'none', border: 'none', color: '#f15c6d', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}

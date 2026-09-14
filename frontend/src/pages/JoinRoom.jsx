@@ -85,13 +85,26 @@ export default function JoinRoom() {
         sessionStorage.setItem('nickname', finalNickname);
         sessionStorage.setItem('passcode', passcode.trim());
         if (avatarUrl) sessionStorage.setItem('avatarUrl', avatarUrl);
-        if (data.theme) {
-          sessionStorage.setItem('chat_theme', data.theme);
-          localStorage.setItem(`chat_theme_${passcode.trim()}`, data.theme);
-        }
-        if (data.customWallpaper) {
-          sessionStorage.setItem('chat_custom_wallpaper', data.customWallpaper);
-          localStorage.setItem(`chat_custom_wallpaper_${passcode.trim()}`, data.customWallpaper);
+        const cleanPass = passcode.trim();
+        const existingLocalTheme = localStorage.getItem(`chat_theme_${cleanPass}`);
+        const existingLocalWp = localStorage.getItem(`chat_custom_wallpaper_${cleanPass}`);
+
+        try {
+          if (data.customWallpaper) {
+            sessionStorage.setItem('chat_custom_wallpaper', data.customWallpaper);
+            localStorage.setItem(`chat_custom_wallpaper_${cleanPass}`, data.customWallpaper);
+            sessionStorage.setItem('chat_theme', data.theme || 'custom');
+            localStorage.setItem(`chat_theme_${cleanPass}`, data.theme || 'custom');
+          } else if (existingLocalTheme === 'custom' && existingLocalWp) {
+            // Keep existing custom wallpaper preference instead of falling back to default
+            sessionStorage.setItem('chat_theme', 'custom');
+            sessionStorage.setItem('chat_custom_wallpaper', existingLocalWp);
+          } else if (data.theme) {
+            sessionStorage.setItem('chat_theme', data.theme);
+            localStorage.setItem(`chat_theme_${cleanPass}`, data.theme);
+          }
+        } catch (storageErr) {
+          console.warn('Storage quota notice on join:', storageErr);
         }
 
         localStorage.removeItem('passcode');

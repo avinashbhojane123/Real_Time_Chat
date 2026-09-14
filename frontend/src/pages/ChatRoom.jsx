@@ -6,6 +6,7 @@ import './ChatRoom.css';
 // Utilities & Config
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { formatTimer } from '../utils/chatUtils';
+import { saveWallpaperOffline, getWallpaperOffline, checkImageUrlValid } from '../utils/wallpaperStorage';
 
 // Hooks
 import { useChatSocket } from '../hooks/useChatSocket';
@@ -151,6 +152,56 @@ export default function ChatRoom() {
   });
   const [showThemeModal, setShowThemeModal] = useState(false);
 
+  // Restore offline custom wallpaper from IndexedDB on mount
+  useEffect(() => {
+    if (!passcode) return;
+    let isCancelled = false;
+    getWallpaperOffline(passcode).then((offline) => {
+      if (isCancelled || !offline) return;
+      if (offline.preferred) {
+        setCustomWallpaper((curr) =>
+          curr === DEFAULT_CUSTOM_WALLPAPER || curr.includes('/uploads/') ? offline.preferred : curr
+        );
+      }
+      if (offline.theme && offline.theme === 'custom') {
+        setCurrentTheme((curr) => (curr === 'wa-doodle' ? 'custom' : curr));
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [passcode]);
+
+  // Image verification check: if remote wallpaper returns 404 (e.g. Render restart), fall back automatically
+  useEffect(() => {
+    if (!customWallpaper || customWallpaper.startsWith('data:')) return;
+    let isCancelled = false;
+
+    checkImageUrlValid(customWallpaper, 4000).then(async (isValid) => {
+      if (isCancelled) return;
+      if (!isValid) {
+        console.warn(`[Wallpaper] Remote wallpaper failed to load (404/expired): ${customWallpaper}`);
+        // Check if we have an offline dataUrl fallback stored in IndexedDB
+        if (passcode) {
+          const offline = await getWallpaperOffline(passcode);
+          if (!isCancelled && offline?.dataUrl) {
+            console.log('[Wallpaper] Seamlessly recovered wallpaper from offline IndexedDB cache');
+            setCustomWallpaper(offline.dataUrl);
+            return;
+          }
+        }
+        // Fallback to default if no offline data is available
+        if (!isCancelled) {
+          setCustomWallpaper(DEFAULT_CUSTOM_WALLPAPER);
+        }
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [customWallpaper, passcode]);
+
   // Keep local state in sync when room theme / custom wallpaper changes from server or partner
   useEffect(() => {
     if (roomTheme && roomTheme !== currentTheme) {
@@ -173,15 +224,22 @@ export default function ChatRoom() {
 
   const handleSelectTheme = (themeKey, customUrl = null) => {
     setCurrentTheme(themeKey);
-    if (passcode) localStorage.setItem(`chat_theme_${passcode}`, themeKey);
-    localStorage.setItem('chat_theme', themeKey);
+    try {
+      if (passcode) localStorage.setItem(`chat_theme_${passcode}`, themeKey);
+      localStorage.setItem('chat_theme', themeKey);
+    } catch {}
 
     let finalUrl = customWallpaper;
     if (customUrl !== null && customUrl !== undefined) {
       finalUrl = customUrl.trim() || DEFAULT_CUSTOM_WALLPAPER;
       setCustomWallpaper(finalUrl);
-      if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalUrl);
-      localStorage.setItem('chat_custom_wallpaper', finalUrl);
+      try {
+        if (passcode) localStorage.setItem(`chat_custom_wallpaper_${passcode}`, finalUrl);
+        localStorage.setItem('chat_custom_wallpaper', finalUrl);
+      } catch {}
+      if (passcode) {
+        saveWallpaperOffline(passcode, { url: finalUrl, theme: themeKey });
+      }
     }
 
     sendUpdateRoomWallpaper({

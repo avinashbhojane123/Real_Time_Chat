@@ -446,9 +446,11 @@ export class ChatGateway
     if (!this.roomWallpapers.has(roomPasscode)) {
       this.roomWallpapers.set(roomPasscode, activeWallpaper);
     }
+    const isRoomDefault = !activeWallpaper.customWallpaper && (activeWallpaper.theme === 'wa-doodle' || !activeWallpaper.theme);
     client.emit('roomWallpaperSync', {
       theme: activeWallpaper.theme,
       customWallpaper: activeWallpaper.customWallpaper,
+      isDefault: isRoomDefault,
     });
 
     const roomUsers = await this.userRepo.find({
@@ -1541,7 +1543,7 @@ export class ChatGateway
   ) {
     const session = this.users.get(client.id);
     const targetPasscode = (data?.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    if (!session || !targetPasscode || session.passcode.trim() !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
@@ -1567,14 +1569,18 @@ export class ChatGateway
     this.roomWallpapers.set(targetPasscode, updatedState);
 
     try {
-      const room = await this.roomRepo.findOne({
+      let room = await this.roomRepo.findOne({
         where: { passcode: targetPasscode },
       });
-      if (room) {
-        room.theme = newTheme;
-        room.customWallpaper = newWallpaper;
-        await this.roomRepo.save(room);
+      if (!room) {
+        room = this.roomRepo.create({
+          passcode: targetPasscode,
+          roomName: `Room-${targetPasscode}`,
+        });
       }
+      room.theme = newTheme;
+      room.customWallpaper = newWallpaper;
+      await this.roomRepo.save(room);
     } catch (err) {
       console.warn('[RoomWallpaper] Could not persist wallpaper to database:', err);
     }
