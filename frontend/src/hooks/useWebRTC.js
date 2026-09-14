@@ -136,6 +136,13 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setPipMode('none');
   }, [closeAllPipWindows]);
 
+  // Clean up all media tracks, timers, and connections on unmount
+  useEffect(() => {
+    return () => {
+      cleanUpCall();
+    };
+  }, [cleanUpCall]);
+
   const triggerIceRestart = useCallback(() => {
     const pc = peerConnectionRef.current;
     if (!pc || pc.signalingState === 'closed') return;

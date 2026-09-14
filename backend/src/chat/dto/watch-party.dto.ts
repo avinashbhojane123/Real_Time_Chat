@@ -59,6 +59,10 @@ export class WatchPartyActionDto {
   @IsString()
   @IsOptional()
   reaction?: string;
+
+  @IsString()
+  @IsOptional()
+  nickname?: string;
 }
 
 export class GetWatchPartyDto {

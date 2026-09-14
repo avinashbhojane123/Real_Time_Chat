@@ -705,14 +705,15 @@ export class ChatGateway
 
     if (!message || !message.pollData) return { success: false };
 
+    const voterNickname = session.nickname;
     const poll = message.pollData;
     if (poll.options && Array.isArray(poll.options)) {
       poll.options.forEach((opt: any) => {
         opt.votes = (opt.votes || []).filter(
-          (nick: string) => nick !== payload.nickname,
+          (nick: string) => nick !== voterNickname,
         );
         if (String(opt.id) === String(payload.optionId)) {
-          opt.votes.push(payload.nickname);
+          opt.votes.push(voterNickname);
         }
       });
     }

@@ -172,7 +172,7 @@ export async function removeWallpaperOffline(passcode) {
  */
 export function checkImageUrlValid(url, timeoutMs = 4000) {
   if (!url) return Promise.resolve(false);
-  if (url.startsWith('data:image/')) return Promise.resolve(true);
+  if (url.startsWith('data:')) return Promise.resolve(true);
 
   return new Promise((resolve) => {
     let resolved = false;

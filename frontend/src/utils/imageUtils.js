@@ -53,6 +53,7 @@ export async function compressImageFile(file, maxWidth = 1920, maxHeight = 1080,
     };
 
     img.onerror = () => resolve(file);
+    reader.onerror = () => resolve(file);
     reader.readAsDataURL(file);
   });
 }

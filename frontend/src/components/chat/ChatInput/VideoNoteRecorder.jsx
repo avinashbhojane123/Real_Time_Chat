@@ -21,6 +21,7 @@ export default function VideoNoteRecorder({
   const recordedChunksRef = useRef([]);
   const timerIntervalRef = useRef(null);
   const withoutSoundRef = useRef(withoutSound);
+  const durationRef = useRef(0);
 
   useEffect(() => {
     withoutSoundRef.current = withoutSound;
@@ -82,17 +83,16 @@ export default function VideoNoteRecorder({
       recorder.start(100);
       setIsRecording(true);
       setDuration(0);
+      durationRef.current = 0;
 
       // Start timer
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = setInterval(() => {
-        setDuration((prev) => {
-          if (prev >= 60) {
-            handleFinishRecording();
-            return 60;
-          }
-          return prev + 1;
-        });
+        durationRef.current += 1;
+        setDuration(durationRef.current);
+        if (durationRef.current >= 60) {
+          handleFinishRecording();
+        }
       }, 1000);
     } catch (err) {
       console.error('Camera stream error:', err);
@@ -181,7 +181,7 @@ export default function VideoNoteRecorder({
       if (blob.size > 0) {
         onSend({
           blob,
-          duration,
+          duration: durationRef.current || duration || 1,
           withoutSound: withoutSoundRef.current,
           mimeType,
         });

@@ -257,6 +257,23 @@ export default function ChatRoom() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recTimerRef = useRef(null);
+  const isVoiceCancelledRef = useRef(false);
+
+  // Clean up recording tracks and timers on unmount
+  useEffect(() => {
+    return () => {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (_) {}
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
+    };
+  }, []);
 
   // Video Notes Recording State
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
@@ -265,6 +282,7 @@ export default function ChatRoom() {
   // Voice Recording Functions
   const startRecording = async () => {
     try {
+      isVoiceCancelledRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
 
@@ -276,6 +294,15 @@ export default function ChatRoom() {
       };
 
       mediaRecorderRef.current.onstop = async () => {
+        if (isVoiceCancelledRef.current) {
+          audioChunksRef.current = [];
+          if (audioStreamRef.current) {
+            audioStreamRef.current.getTracks().forEach((t) => t.stop());
+            audioStreamRef.current = null;
+          }
+          return;
+        }
+
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         if (audioBlob.size > 0 && audioChunksRef.current.length > 0) {
           showToast('Uploading voice note...');
@@ -330,9 +357,12 @@ export default function ChatRoom() {
   };
 
   const cancelRecording = () => {
+    isVoiceCancelledRef.current = true;
     if (mediaRecorderRef.current && isRecordingAudio) {
       audioChunksRef.current = [];
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (_) {}
       setIsRecordingAudio(false);
       if (recTimerRef.current) clearInterval(recTimerRef.current);
       if (audioStreamRef.current) {

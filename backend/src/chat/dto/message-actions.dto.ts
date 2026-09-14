@@ -100,6 +100,6 @@ export class VotePollDto {
   optionId!: string | number;
 
   @IsString()
-  @IsNotEmpty()
-  nickname!: string;
+  @IsOptional()
+  nickname?: string;
 }
