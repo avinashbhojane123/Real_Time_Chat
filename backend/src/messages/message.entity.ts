@@ -44,7 +44,7 @@ export class Message {
     nullable: true,
   })
   replyTo!: {
-    id?: number;
+    id?: number | string;
     nickname: string;
     message: string;
   } | null;

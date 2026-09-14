@@ -675,6 +675,7 @@ export class ChatGateway
       where: payload.messageIds.map((id) => ({ id })),
     });
 
+    const updatedMessages: Message[] = [];
     const updatedMessageIds: number[] = [];
     for (const msg of messages) {
       const currentReadBy = Array.isArray(msg.readBy)
@@ -682,9 +683,12 @@ export class ChatGateway
         : [msg.nickname];
       if (!currentReadBy.includes(reader)) {
         msg.readBy = [...currentReadBy, reader];
-        await this.messageRepo.save(msg);
+        updatedMessages.push(msg);
         updatedMessageIds.push(msg.id);
       }
+    }
+    if (updatedMessages.length > 0) {
+      await this.messageRepo.save(updatedMessages);
     }
 
     const roomPasscode = (payload.passcode || session?.passcode || '').trim();

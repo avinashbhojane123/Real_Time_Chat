@@ -99,7 +99,7 @@ export class UploadController {
         );
         if (hasBlockedExt) {
           return cb(
-            new Error(
+            new BadRequestException(
               `Executable or blocked file extension detected in filename (${file.originalname})`,
             ),
             false,

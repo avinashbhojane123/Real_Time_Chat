@@ -29,7 +29,7 @@ export class SendMessageDto {
   @IsOptional()
   @IsObject()
   replyTo?: {
-    id?: number;
+    id?: number | string;
     nickname: string;
     message: string;
   } | null;

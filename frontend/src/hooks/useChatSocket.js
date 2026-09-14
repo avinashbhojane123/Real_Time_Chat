@@ -577,7 +577,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
           fileUrl: fullFileUrl,
           fileName: file.name,
           fileType: derivedFileType,
-          expiresIn: null,
+          expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
         };
         socketRef.current?.emit('sendMessage', payload);
         showToast('File attached & sent');

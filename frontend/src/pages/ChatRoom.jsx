@@ -527,7 +527,7 @@ export default function ChatRoom() {
           message: replyingTo.message || 'Media / Attachment',
         }
         : null,
-      expiresIn: null,
+      expiresIn: disappearingTimer > 0 ? disappearingTimer : null,
     };
 
     const optimisticMsg = {
@@ -539,6 +539,7 @@ export default function ChatRoom() {
       replyTo: payload.replyTo,
       readBy: [nickname],
       reactions: {},
+      expiresAt: disappearingTimer > 0 ? new Date(Date.now() + disappearingTimer * 1000).toISOString() : null,
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
