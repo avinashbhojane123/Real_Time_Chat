@@ -1,10 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  startIncomingRingtone,
-  startOutgoingDialTone,
-  playCallEndedTone,
-  playCallDeclinedTone,
-} from '../utils/audioAlert';
 
 export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast }) {
   const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
@@ -46,10 +40,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
   // Dynamic ICE servers from backend
   const customIceServersRef = useRef(null);
-
-  // Audio tone cleanup handlers
-  const ringtoneCleanupRef = useRef(null);
-  const dialToneCleanupRef = useRef(null);
 
   // Peer targeting socket ID ref
   const targetSocketIdRef = useRef(null);
@@ -209,38 +199,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
   }, [socketRef]);
 
-  // Stop all active ringtones/dialtones
-  const stopAllAudioAlerts = useCallback(() => {
-    if (ringtoneCleanupRef.current) {
-      try {
-        ringtoneCleanupRef.current();
-      } catch (_) {}
-      ringtoneCleanupRef.current = null;
-    }
-    if (dialToneCleanupRef.current) {
-      try {
-        dialToneCleanupRef.current();
-      } catch (_) {}
-      dialToneCleanupRef.current = null;
-    }
-  }, []);
-
-  // Manage call state sound effects (outgoing ringing / incoming ringing)
-  useEffect(() => {
-    if (callState === 'calling') {
-      stopAllAudioAlerts();
-      dialToneCleanupRef.current = startOutgoingDialTone();
-    } else if (callState === 'incoming') {
-      stopAllAudioAlerts();
-      ringtoneCleanupRef.current = startIncomingRingtone();
-    } else {
-      stopAllAudioAlerts();
-    }
-    return () => {
-      stopAllAudioAlerts();
-    };
-  }, [callState, stopAllAudioAlerts]);
-
   // Maintain dedicated remote audio playback element
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -281,7 +239,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   }, []);
 
   const cleanUpCall = useCallback(() => {
-    stopAllAudioAlerts();
     releaseWakeLock();
     targetSocketIdRef.current = null;
 
@@ -340,7 +297,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setShowVideoPanel(false);
     setIsVoiceOnlyCall(false);
     setPipMode('none');
-  }, [closeAllPipWindows, stopAllAudioAlerts, releaseWakeLock]);
+  }, [closeAllPipWindows, releaseWakeLock]);
 
   // Clean up all media tracks, timers, and connections on unmount
   useEffect(() => {
@@ -719,13 +676,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     const handleCallBusy = ({ nickname: busyUser, reason }) => {
-      playCallDeclinedTone();
       if (showToast) showToast(`${busyUser || 'Participant'} is busy on another call`);
       cleanUpCall();
     };
 
     const handleCallTimeout = ({ reason }) => {
-      playCallDeclinedTone();
       if (showToast) showToast(reason || 'Call timed out (no answer)');
       cleanUpCall();
     };
@@ -741,13 +696,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     const handleCallEnd = ({ reason } = {}) => {
-      playCallEndedTone();
       if (showToast) showToast(reason || 'Call ended');
       cleanUpCall();
     };
 
     const handleCallDeclined = ({ reason } = {}) => {
-      playCallDeclinedTone();
       if (showToast) showToast(reason || 'Call was declined');
       cleanUpCall();
     };
@@ -886,7 +839,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   };
 
   const declineCall = () => {
-    playCallDeclinedTone();
     socketRef.current?.emit('declineCall', {
       passcode,
       receiverName: nickname,
@@ -896,7 +848,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   };
 
   const endCall = useCallback(() => {
-    playCallEndedTone();
     socketRef.current?.emit('endCall', {
       passcode,
       targetSocketId: targetSocketIdRef.current,
