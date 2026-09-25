@@ -705,6 +705,32 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       cleanUpCall();
     };
 
+    const handlePeerReconnecting = ({ nickname: peerName } = {}) => {
+      console.log(`[WebRTC] Peer ${peerName || 'Participant'} is reconnecting...`);
+      if (showToast) {
+        showToast(`Network unstable: ${peerName || 'Participant'} reconnecting...`);
+      }
+    };
+
+    const handlePeerReconnected = ({ socketId, nickname: peerName } = {}) => {
+      console.log(`[WebRTC] Peer ${peerName || 'Participant'} reconnected with socket:`, socketId);
+      if (socketId) {
+        targetSocketIdRef.current = socketId;
+      }
+      if (showToast) {
+        showToast(`${peerName || 'Participant'} reconnected!`);
+      }
+      triggerIceRestart();
+    };
+
+    const handleCallRestored = ({ targetSocketId: restoredTargetId } = {}) => {
+      console.log(`[WebRTC] Call restored after socket reconnect, target:`, restoredTargetId);
+      if (restoredTargetId) {
+        targetSocketIdRef.current = restoredTargetId;
+      }
+      triggerIceRestart();
+    };
+
     socket.on('callUser', handleCallUser);
     socket.on('acceptCall', handleCallAccepted);
     socket.on('callAccepted', handleCallAccepted);
@@ -720,6 +746,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     socket.on('endCall', handleCallEnd);
     socket.on('callDeclined', handleCallDeclined);
     socket.on('declineCall', handleCallDeclined);
+    socket.on('peerReconnecting', handlePeerReconnecting);
+    socket.on('peerReconnected', handlePeerReconnected);
+    socket.on('callRestored', handleCallRestored);
 
     return () => {
       socket.off('callUser', handleCallUser);
@@ -737,6 +766,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       socket.off('endCall', handleCallEnd);
       socket.off('callDeclined', handleCallDeclined);
       socket.off('declineCall', handleCallDeclined);
+      socket.off('peerReconnecting', handlePeerReconnecting);
+      socket.off('peerReconnected', handlePeerReconnected);
+      socket.off('callRestored', handleCallRestored);
     };
   }, [
     socketRef,
@@ -746,6 +778,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     processPendingIceCandidates,
     addIceCandidateSafely,
     cleanUpCall,
+    triggerIceRestart,
     showToast,
   ]);
 

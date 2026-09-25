@@ -74,14 +74,18 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     const socketUrl = getSocketBaseUrl();
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 10,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
     socketRef.current = socket;
 
     socket.on('connect', async () => {
       setIsSocketConnected(true);
       const startTime = Date.now();
-      socket.emit('ping', () => {
+      socket.emit('clientPing', () => {
         setSocketLatency(Math.max(8, Date.now() - startTime));
       });
       const clientDevice = detectClientDevice();
@@ -101,9 +105,27 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       socket.emit('getUsers', { passcode });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      console.warn('[Socket] Disconnected from server. Reason:', reason);
       setIsSocketConnected(false);
+      if (reason === 'io server disconnect') {
+        socket.connect();
+      }
     });
+
+    socket.on('connect_error', (err) => {
+      console.warn('[Socket] Connection error:', err?.message || err);
+    });
+
+    // Periodic heartbeat to keep reverse proxies alive and monitor real latency
+    const pingInterval = setInterval(() => {
+      if (socket.connected) {
+        const pingStart = Date.now();
+        socket.emit('clientPing', () => {
+          setSocketLatency(Math.max(8, Date.now() - pingStart));
+        });
+      }
+    }, 25000);
 
     // Chat History Event Listeners
     socket.on('chatHistory', (history) => {
@@ -369,6 +391,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
 
     return () => {
+      clearInterval(pingInterval);
       if (socket.connected) {
         socket.disconnect();
       }

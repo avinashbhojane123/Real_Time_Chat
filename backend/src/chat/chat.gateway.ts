@@ -98,8 +98,8 @@ export interface ActiveCallSession {
       ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
       : '*',
   },
-  pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 10000),
-  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 5000),
+  pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 25000),
+  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 20000),
   maxHttpBufferSize: 1e7,
 })
 export class ChatGateway
@@ -142,7 +142,7 @@ export class ChatGateway
     }
 
     const cleanupInterval = Number(
-      process.env.MESSAGE_CLEANUP_INTERVAL || 5000,
+      process.env.MESSAGE_CLEANUP_INTERVAL || 30000,
     );
     this.cleanupTimer = setInterval(() => {
       void this.cleanupExpiredMessages();
@@ -240,6 +240,15 @@ export class ChatGateway
   >();
 
   private activeCallSessions = new Map<string, ActiveCallSession>();
+  private callDisconnectTimers = new Map<string, NodeJS.Timeout>();
+
+  private clearCallDisconnectTimer(callId: string) {
+    const timer = this.callDisconnectTimers.get(callId);
+    if (timer) {
+      clearTimeout(timer);
+      this.callDisconnectTimers.delete(callId);
+    }
+  }
 
   private findCallBySocketId(socketId: string): ActiveCallSession | undefined {
     for (const session of this.activeCallSessions.values()) {
@@ -319,32 +328,83 @@ export class ChatGateway
 
     if (!userInfo) return;
 
-    // Clean up any active or pending call for this socket immediately
+    // Handle active or pending call for this disconnecting socket with a grace period
     const existingCall = this.findCallBySocketId(client.id);
     if (existingCall) {
-      if (existingCall.ringTimer) {
-        clearTimeout(existingCall.ringTimer);
-      }
-      this.activeCallSessions.delete(existingCall.callId);
+      if (existingCall.state === 'calling') {
+        // If still ringing and unanswered, end the ringing call immediately
+        if (existingCall.ringTimer) {
+          clearTimeout(existingCall.ringTimer);
+        }
+        this.clearCallDisconnectTimer(existingCall.callId);
+        this.activeCallSessions.delete(existingCall.callId);
 
-      const peerSocketId =
-        existingCall.callerSocketId === client.id
-          ? existingCall.calleeSocketId
-          : existingCall.callerSocketId;
+        const peerSocketId =
+          existingCall.callerSocketId === client.id
+            ? existingCall.calleeSocketId
+            : existingCall.callerSocketId;
 
-      if (peerSocketId) {
-        this.server.to(peerSocketId).emit('callEnded', {
-          reason: 'Participant disconnected abruptly',
-          from: userInfo.nickname,
-          callId: existingCall.callId,
-        });
-      }
-      if (existingCall.room) {
-        this.server.to(existingCall.room).emit('callEnded', {
-          reason: 'Participant disconnected abruptly',
-          from: userInfo.nickname,
-          callId: existingCall.callId,
-        });
+        if (peerSocketId) {
+          this.server.to(peerSocketId).emit('callEnded', {
+            reason: 'Call cancelled: participant disconnected',
+            from: userInfo.nickname,
+            callId: existingCall.callId,
+          });
+        }
+      } else if (existingCall.state === 'active') {
+        // Active call in progress: grant a 12-second grace period for the socket to reconnect!
+        // During WebRTC video calls, high CPU/network jitter can momentarily drop the socket
+        // while UDP media tracks stay alive. Do NOT kill the call immediately!
+        console.log(
+          `[CallGracePeriod] Socket ${client.id} (${userInfo.nickname}) disconnected during active call ${existingCall.callId}. Starting 12s grace period.`,
+        );
+
+        const peerSocketId =
+          existingCall.callerSocketId === client.id
+            ? existingCall.calleeSocketId
+            : existingCall.callerSocketId;
+
+        if (peerSocketId) {
+          this.server.to(peerSocketId).emit('peerReconnecting', {
+            nickname: userInfo.nickname,
+            callId: existingCall.callId,
+          });
+        }
+
+        const callId = existingCall.callId;
+        this.clearCallDisconnectTimer(callId);
+
+        const timer = setTimeout(() => {
+          this.callDisconnectTimers.delete(callId);
+          const currentCall = this.activeCallSessions.get(callId);
+          if (currentCall && currentCall.state === 'active') {
+            console.log(
+              `[CallGracePeriod] Grace period expired for call ${callId}. Ending call.`,
+            );
+            this.activeCallSessions.delete(callId);
+            const remainingPeer =
+              currentCall.callerSocketId === client.id
+                ? currentCall.calleeSocketId
+                : currentCall.callerSocketId;
+
+            if (remainingPeer) {
+              this.server.to(remainingPeer).emit('callEnded', {
+                reason: 'Call ended: participant disconnected',
+                from: userInfo.nickname,
+                callId,
+              });
+            }
+            if (currentCall.room) {
+              this.server.to(currentCall.room).emit('callEnded', {
+                reason: 'Call ended: participant disconnected',
+                from: userInfo.nickname,
+                callId,
+              });
+            }
+          }
+        }, 12000);
+
+        this.callDisconnectTimers.set(callId, timer);
       }
     }
 
@@ -536,6 +596,44 @@ export class ChatGateway
       nickname: data.nickname,
       passcode: roomPasscode,
     });
+
+    // Re-bind reconnecting user to any active call session in this room
+    for (const session of this.activeCallSessions.values()) {
+      if (session.room === roomPasscode && session.state === 'active') {
+        let reconnected = false;
+        let peerId: string | undefined;
+
+        if (session.callerNickname === data.nickname) {
+          session.callerSocketId = client.id;
+          peerId = session.calleeSocketId;
+          reconnected = true;
+        } else if (session.calleeNickname === data.nickname) {
+          session.calleeSocketId = client.id;
+          peerId = session.callerSocketId;
+          reconnected = true;
+        }
+
+        if (reconnected) {
+          console.log(
+            `[CallReconnected] ${data.nickname} reconnected to active call ${session.callId} with socket ${client.id}`,
+          );
+          this.clearCallDisconnectTimer(session.callId);
+
+          if (peerId) {
+            this.server.to(peerId).emit('peerReconnected', {
+              nickname: data.nickname,
+              callId: session.callId,
+              socketId: client.id,
+            });
+          }
+          client.emit('callRestored', {
+            callId: session.callId,
+            targetSocketId: peerId,
+            isVoiceOnly: session.isVoiceOnly,
+          });
+        }
+      }
+    }
 
     const messages = await this.messageRepo.find({
       where: {
@@ -1101,6 +1199,7 @@ export class ChatGateway
     const callSession = this.findCallBySocketId(client.id);
     if (callSession) {
       if (callSession.ringTimer) clearTimeout(callSession.ringTimer);
+      this.clearCallDisconnectTimer(callSession.callId);
       this.activeCallSessions.delete(callSession.callId);
     }
 
@@ -1150,10 +1249,8 @@ export class ChatGateway
       (callSession && callSession.callerSocketId === client.id ? callSession.calleeSocketId : undefined);
 
     if (targetSocketId) {
-      this.server.to(targetSocketId).emit('webrtcOfferRelay', offerPayload);
       this.server.to(targetSocketId).emit('webrtcOffer', offerPayload);
     } else {
-      client.to(room).emit('webrtcOfferRelay', offerPayload);
       client.to(room).emit('webrtcOffer', offerPayload);
     }
   }
@@ -1186,14 +1283,12 @@ export class ChatGateway
       (callSession && callSession.calleeSocketId === client.id ? callSession.callerSocketId : undefined);
 
     if (targetSocketId) {
-      this.server.to(targetSocketId).emit('webrtcAnswerRelay', answerPayload);
       this.server.to(targetSocketId).emit('webrtcAnswer', answerPayload);
       this.server.to(targetSocketId).emit('callAccepted', {
         receiverName: data.receiverName || session.nickname,
         from: session.nickname,
       });
     } else {
-      client.to(room).emit('webrtcAnswerRelay', answerPayload);
       client.to(room).emit('webrtcAnswer', answerPayload);
       client.to(room).emit('callAccepted', {
         receiverName: data.receiverName || session.nickname,
@@ -1226,10 +1321,8 @@ export class ChatGateway
         : undefined);
 
     if (targetSocketId) {
-      this.server.to(targetSocketId).emit('webrtcCandidateRelay', candidatePayload);
       this.server.to(targetSocketId).emit('webrtcCandidate', candidatePayload);
     } else {
-      client.to(room).emit('webrtcCandidateRelay', candidatePayload);
       client.to(room).emit('webrtcCandidate', candidatePayload);
     }
   }
@@ -1245,6 +1338,7 @@ export class ChatGateway
     const callSession = this.findCallBySocketId(client.id);
     if (callSession) {
       if (callSession.ringTimer) clearTimeout(callSession.ringTimer);
+      this.clearCallDisconnectTimer(callSession.callId);
       this.activeCallSessions.delete(callSession.callId);
 
       const peerSocketId =
@@ -1321,6 +1415,11 @@ export class ChatGateway
     }
 
     client.emit('iceServers', { iceServers });
+  }
+
+  @SubscribeMessage('clientPing')
+  clientPing(@ConnectedSocket() client: Socket) {
+    return { success: true, timestamp: Date.now() };
   }
 
   @SubscribeMessage('togglePip')
