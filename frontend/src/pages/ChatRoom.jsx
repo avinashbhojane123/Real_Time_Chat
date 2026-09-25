@@ -89,7 +89,7 @@ export default function ChatRoom() {
   const webRTC = useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast });
 
   // Watch Party (Watch Together) Zero-Lag Synchronized Movie Player Hook
-  const watchParty = useWatchParty({ socketRef, passcode, nickname, showToast });
+  const watchParty = useWatchParty({ socketRef, passcode, nickname, showToast, socketLatency });
 
 
   // Responsive Roster & Rail Sidebar Toggle State

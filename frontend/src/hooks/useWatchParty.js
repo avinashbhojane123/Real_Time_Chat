@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * Drift correction (subtle micro-adjustments), Zero-lag buffering lock,
  * YouTube and HTML5 direct video players, and synchronized flying reactions.
  */
-export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
+export function useWatchParty({ socketRef, passcode, nickname, showToast, socketLatency }) {
   const [isActive, setIsActive] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -19,6 +19,8 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [lastActorNickname, setLastActorNickname] = useState('');
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState(Date.now());
+  const [hostNickname, setHostNickname] = useState('');
+  const [isHostOnly, setIsHostOnly] = useState(false);
 
   const [isBuffering, setIsBuffering] = useState(false);
   const [bufferingUsers, setBufferingUsers] = useState([]);
@@ -123,6 +125,11 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
         return;
       }
 
+      if (data.action === 'partner_disconnected') {
+        setIsPlaying(false);
+        showToast?.('🎬 Partner left or disconnected. Movie playback auto-paused.');
+      }
+
       setIsActive(true);
       if (data.videoSource) {
         setVideoSource(data.videoSource);
@@ -131,13 +138,15 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       setIsPlaying(Boolean(data.isPlaying));
       setPlaybackRate(data.playbackRate || 1);
       setLastActorNickname(data.lastActorNickname || '');
+      if (data.hostNickname) setHostNickname(data.hostNickname);
+      if (typeof data.isHostOnly === 'boolean') setIsHostOnly(data.isHostOnly);
       setLastSyncTimestamp(data.lastUpdatedTimestamp || Date.now());
       setIsBuffering(Boolean(data.isBuffering));
       setBufferingUsers(data.bufferingUsers || []);
 
-      const serverNow = data.serverTime || Date.now();
       const clientNow = Date.now();
-      const oneWayLatencySec = Math.max(0, (clientNow - serverNow) / 1000);
+      // Use actual WebSocket RTT latency instead of system clock diff to eliminate local clock skew
+      const oneWayLatencySec = (typeof socketLatency === 'number' && socketLatency > 0 ? socketLatency / 2 : 50) / 1000;
 
       let targetTime = typeof data.currentTime === 'number' ? data.currentTime : 0;
       // Only apply transit latency correction on active updates, not on static pauses or initial sync
@@ -428,6 +437,10 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     [getSocket, passcode]
   );
 
+  const toggleHostLock = useCallback(() => {
+    emitAction('toggle_host_lock');
+  }, [emitAction]);
+
   return {
     isActive,
     isOpen,
@@ -443,6 +456,8 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     playbackRate,
     lastActorNickname,
     lastSyncTimestamp,
+    hostNickname,
+    isHostOnly,
     isBuffering,
     bufferingUsers,
     partnerSyncStatus,
@@ -467,5 +482,6 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     sendReaction,
     sendComment,
     syncVideoElement,
+    toggleHostLock,
   };
 }

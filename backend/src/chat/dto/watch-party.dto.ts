@@ -29,6 +29,7 @@ export class WatchPartyActionDto {
     'buffering',
     'ready',
     'close',
+    'toggle_host_lock',
   ])
   action!: string;
 

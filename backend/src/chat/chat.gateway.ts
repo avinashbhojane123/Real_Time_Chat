@@ -79,6 +79,7 @@ interface WatchPartyState {
   isBuffering: boolean;
   bufferingUsers: string[];
   hostNickname?: string;
+  isHostOnly?: boolean;
 }
 
 export interface ActiveCallSession {
@@ -525,6 +526,27 @@ export class ChatGateway
         lastUpdatedTimestamp: wpState.lastUpdatedTimestamp,
         lastActorNickname: userInfo.nickname,
         hostNickname: wpState.hostNickname,
+        serverTime: Date.now(),
+      });
+    }
+
+    // Auto-pause Watch Party if a user leaves/disconnects during active movie playback
+    if (wpState && wpState.isActive && wpState.isPlaying) {
+      wpState.isPlaying = false;
+      wpState.currentTime = this.getCalculatedWatchPartyPosition(wpState);
+      wpState.lastUpdatedTimestamp = Date.now();
+      this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
+        action: 'partner_disconnected',
+        videoSource: wpState.videoSource,
+        currentTime: wpState.currentTime,
+        isPlaying: false,
+        playbackRate: wpState.playbackRate,
+        isBuffering: false,
+        bufferingUsers: wpState.bufferingUsers || [],
+        lastUpdatedTimestamp: wpState.lastUpdatedTimestamp,
+        lastActorNickname: userInfo.nickname,
+        hostNickname: wpState.hostNickname,
+        isHostOnly: wpState.isHostOnly,
         serverTime: Date.now(),
       });
     }
@@ -1897,10 +1919,24 @@ export class ChatGateway
         playbackRate: data.playbackRate || 1,
         lastUpdatedTimestamp: now,
         lastActorNickname: session.nickname,
+        hostNickname: session.nickname,
+        isHostOnly: false,
         isBuffering: false,
         bufferingUsers: [],
       };
       this.watchPartyRooms.set(targetPasscode, state);
+    }
+
+    // Enforce host-only permissions when lock is active
+    if (
+      state.isHostOnly &&
+      session.nickname !== state.hostNickname &&
+      ['play', 'pause', 'seek', 'rate', 'change_video'].includes(data.action)
+    ) {
+      return {
+        success: false,
+        message: 'Only the party host can control movie playback',
+      };
     }
 
     const currentPos = this.getCalculatedWatchPartyPosition(state);
@@ -2049,6 +2085,13 @@ export class ChatGateway
           closedBy: session.nickname,
         });
         return { success: true };
+
+      case 'toggle_host_lock':
+        if (session.nickname === state.hostNickname) {
+          state.isHostOnly = !state.isHostOnly;
+          state.lastUpdatedTimestamp = now;
+        }
+        break;
     }
 
     const payload = {
@@ -2062,6 +2105,7 @@ export class ChatGateway
       lastUpdatedTimestamp: state.lastUpdatedTimestamp,
       lastActorNickname: session.nickname,
       hostNickname: state.hostNickname,
+      isHostOnly: Boolean(state.isHostOnly),
       serverTime: now,
     };
 
@@ -2099,6 +2143,7 @@ export class ChatGateway
       lastUpdatedTimestamp: state.lastUpdatedTimestamp,
       lastActorNickname: state.lastActorNickname,
       hostNickname: state.hostNickname,
+      isHostOnly: Boolean(state.isHostOnly),
       serverTime: Date.now(),
     };
 

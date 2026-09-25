@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
+import Hls from 'hls.js';
 import './WatchPartyModal.css';
 
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
@@ -153,6 +154,7 @@ export default function WatchPartyModal({
   // Local UI states
   const [customInputUrl, setCustomInputUrl] = useState('');
   const [customInputTitle, setCustomInputTitle] = useState('');
+  const [customSubtitleUrl, setCustomSubtitleUrl] = useState('');
   const [showDrawer, setShowDrawer] = useState(!videoSource);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -213,9 +215,15 @@ export default function WatchPartyModal({
   }, []);
 
   const toggleFullscreen = () => {
+    // If mobile or narrow screen, toggle edge-to-edge cinema fill to prevent iOS native AVPlayer from hiding face cams & UI
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsDesktopFill((prev) => !prev);
+      return;
+    }
     if (!document.fullscreenElement) {
       modalContainerRef.current?.requestFullscreen?.().catch((err) => {
         console.warn('Could not enter fullscreen:', err);
+        setIsDesktopFill(true);
       });
     } else {
       document.exitFullscreen?.().catch(() => {});
@@ -249,6 +257,42 @@ export default function WatchPartyModal({
 
     return () => clearInterval(interval);
   }, [isPlaying, isBuffering, playbackRate, duration, videoSource?.type, setCurrentTime]);
+
+  // HLS (.m3u8) Stream Engine Integration for Chrome/Edge/Firefox/Android compatibility
+  useEffect(() => {
+    const video = videoElementRef.current;
+    if (!video || !videoSource?.url) return;
+
+    const isHls = /\.m3u8(\?.*)?$/i.test(videoSource.url) || videoSource.provider === 'HLS Stream';
+    let hls = null;
+
+    if (isHls) {
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+        });
+        hls.loadSource(videoSource.url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (currentTime > 0) {
+            video.currentTime = currentTime;
+          }
+          if (isPlaying) {
+            video.play().catch(() => {});
+          }
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = videoSource.url;
+      }
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy();
+      }
+    };
+  }, [videoSource?.url, isPlaying]);
 
   // Real YouTube IFrame API Integration for zero-lag bidirectional synchronization
   useEffect(() => {
@@ -500,7 +544,32 @@ export default function WatchPartyModal({
     }
   };
 
+  const isControlLocked = Boolean(watchParty?.isHostOnly && watchParty?.hostNickname && watchParty?.hostNickname !== currentNickname);
+
+  const handleTogglePlay = () => {
+    if (isControlLocked) {
+      setSyncNotice(`🔒 Only the party host (${watchParty?.hostNickname || 'Host'}) can control playback`);
+      setTimeout(() => setSyncNotice(null), 3500);
+      return;
+    }
+    togglePlay();
+  };
+
+  const handleSeekSafe = (target) => {
+    if (isControlLocked) {
+      setSyncNotice(`🔒 Only the party host (${watchParty?.hostNickname || 'Host'}) can seek the movie`);
+      setTimeout(() => setSyncNotice(null), 3500);
+      return;
+    }
+    seek(target);
+  };
+
   const handleScrubberClick = (e) => {
+    if (isControlLocked) {
+      setSyncNotice(`🔒 Only the party host (${watchParty?.hostNickname || 'Host'}) can seek the movie`);
+      setTimeout(() => setSyncNotice(null), 3500);
+      return;
+    }
     if (!scrubberRef.current || !duration) return;
     const rect = scrubberRef.current.getBoundingClientRect();
     const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -591,6 +660,11 @@ export default function WatchPartyModal({
       provider = 'YouTube';
       providerColor = '#ff4444';
       providerIcon = 'solar:play-circle-bold-duotone';
+    } else if (/\.m3u8(\?.*)?$/i.test(rawUrl)) {
+      videoType = 'direct';
+      provider = 'HLS Stream';
+      providerColor = '#10b981';
+      providerIcon = 'solar:play-stream-bold-duotone';
     } else if (isDirectVideo) {
       videoType = 'direct';
       provider = 'Direct Stream';
@@ -691,10 +765,12 @@ export default function WatchPartyModal({
       imdbId: extractedImdbId,
       season,
       episode,
+      subtitlesUrl: customSubtitleUrl.trim() || undefined,
     };
     changeVideo(source);
     setCustomInputUrl('');
     setCustomInputTitle('');
+    setCustomSubtitleUrl('');
     setShowDrawer(false);
   };
 
@@ -853,6 +929,28 @@ export default function WatchPartyModal({
 
           {/* Header Controls */}
           <div className="watch-party-header-actions">
+            {/* Host-Only Controls Lock Toggle */}
+            {watchParty?.hostNickname === currentNickname ? (
+              <button
+                type="button"
+                className={`watch-party-btn-icon ${watchParty.isHostOnly ? 'active' : ''}`}
+                onClick={watchParty.toggleHostLock}
+                title={watchParty.isHostOnly ? 'Controls Locked to Host (Click to allow anyone to control)' : 'Controls Open to All (Click to lock controls to host)'}
+                style={{ color: watchParty.isHostOnly ? '#f59e0b' : '#8696a0' }}
+              >
+                <Icon icon={watchParty.isHostOnly ? 'solar:lock-bold-duotone' : 'solar:lock-unlocked-bold-duotone'} width="18" />
+              </button>
+            ) : watchParty?.isHostOnly ? (
+              <div
+                className="watch-party-badge"
+                style={{ padding: '3px 8px', fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b', color: '#fbbf24' }}
+                title={`Playback controls are locked by Host (${watchParty.hostNickname})`}
+              >
+                <Icon icon="solar:lock-bold" width="12" />
+                <span>Host Locked</span>
+              </div>
+            ) : null}
+
             {/* Sync Movie Scene Button */}
             <button
               type="button"
@@ -1175,7 +1273,7 @@ export default function WatchPartyModal({
           {videoSource?.type === 'direct' ? (
             <video
               ref={videoElementRef}
-              src={videoSource.url}
+              src={/\.m3u8(\?.*)?$/i.test(videoSource.url) ? undefined : videoSource.url}
               className="watch-party-video"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
@@ -1183,24 +1281,34 @@ export default function WatchPartyModal({
               onPlaying={() => {
                 notifyBuffering(false);
                 if (!isPlaying && !isLocalActionRef?.current) {
-                  togglePlay();
+                  handleTogglePlay();
                 }
               }}
               onPause={() => {
                 if (isPlaying && !isLocalActionRef?.current) {
-                  togglePlay();
+                  handleTogglePlay();
                 }
               }}
               onSeeked={(e) => {
                 const time = e.currentTarget.currentTime;
                 if (Math.abs(time - currentTime) > 0.8 && !isLocalActionRef?.current) {
-                  seek(time);
+                  handleSeekSafe(time);
                 }
               }}
-              onClick={togglePlay}
+              onClick={handleTogglePlay}
               controls
               playsInline
-            />
+            >
+              {(videoSource?.subtitlesUrl || customSubtitleUrl) && (
+                <track
+                  kind="subtitles"
+                  src={videoSource?.subtitlesUrl || customSubtitleUrl}
+                  srcLang="en"
+                  label="English Subtitles"
+                  default
+                />
+              )}
+            </video>
           ) : youtubeVideoId ? (
             <div
               id="yt-watch-party-player-element"
@@ -1343,7 +1451,7 @@ export default function WatchPartyModal({
               <button
                 type="button"
                 className="watch-party-play-btn"
-                onClick={togglePlay}
+                onClick={handleTogglePlay}
                 title={isPlaying ? 'Pause Video for Both' : 'Play Video for Both'}
               >
                 <Icon
@@ -1357,7 +1465,7 @@ export default function WatchPartyModal({
                 type="button"
                 className="watch-party-btn-icon"
                 style={{ width: '34px', height: '34px' }}
-                onClick={() => seek(Math.max(0, currentTime - 10))}
+                onClick={() => handleSeekSafe(Math.max(0, currentTime - 10))}
                 title="Rewind 10 Seconds Together"
               >
                 <Icon icon="solar:rewind-10-seconds-bold" width="18" />
@@ -1368,7 +1476,7 @@ export default function WatchPartyModal({
                 type="button"
                 className="watch-party-btn-icon"
                 style={{ width: '34px', height: '34px' }}
-                onClick={() => seek(Math.min(duration || 99999, currentTime + 10))}
+                onClick={() => handleSeekSafe(Math.min(duration || 99999, currentTime + 10))}
                 title="Forward 10 Seconds Together"
               >
                 <Icon icon="solar:forward-10-seconds-bold" width="18" />
@@ -1731,6 +1839,13 @@ export default function WatchPartyModal({
                     placeholder="Movie Title (Optional - auto-detected)"
                     value={customInputTitle}
                     onChange={(e) => setCustomInputTitle(e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    className="custom-url-input custom-url-title-input"
+                    placeholder="Subtitle WebVTT URL (.vtt) (Optional)"
+                    value={customSubtitleUrl}
+                    onChange={(e) => setCustomSubtitleUrl(e.target.value)}
                   />
                   <button type="submit" className="custom-url-btn">
                     <Icon icon="solar:play-bold" width="18" />
