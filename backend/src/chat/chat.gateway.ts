@@ -1276,6 +1276,53 @@ export class ChatGateway
     });
   }
 
+  @SubscribeMessage('getIceServers')
+  getIceServers(@ConnectedSocket() client: Socket) {
+    const stunServers = [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+    ];
+
+    const turnUrl = process.env.TURN_SERVER_URL;
+    const turnSecret = process.env.TURN_SECRET;
+    const session = this.users.get(client.id);
+
+    const iceServers: any[] = [...stunServers];
+
+    if (turnUrl && turnSecret && session) {
+      try {
+        const ttl = 86400;
+        const timestamp = Math.floor(Date.now() / 1000) + ttl;
+        const username = `${timestamp}:${session.nickname}`;
+        const crypto = require('crypto');
+        const hmac = crypto.createHmac('sha1', turnSecret);
+        hmac.update(username);
+        const credential = hmac.digest('base64');
+
+        iceServers.push({
+          urls: turnUrl.split(',').map((u) => u.trim()),
+          username,
+          credential,
+        });
+      } catch (err) {
+        console.warn('Failed generating dynamic HMAC TURN credential:', err);
+      }
+    } else {
+      iceServers.push({
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp',
+        ],
+        username: 'openrelay',
+        credential: 'openrelay',
+      });
+    }
+
+    client.emit('iceServers', { iceServers });
+  }
+
   @SubscribeMessage('togglePip')
   togglePip(
     @ConnectedSocket() client: Socket,

@@ -46,6 +46,10 @@ export default function VideoCallPanel({
   declineCall,
   endCall,
   isVoiceOnlyCall = false,
+  availableAudioDevices = [],
+  currentAudioDeviceId = '',
+  switchAudioOutput,
+  cycleAudioOutput,
 }) {
   const [showPipMenu, setShowPipMenu] = useState(false);
   const [pipSize, setPipSize] = useState('standard'); // 'compact' | 'standard' | 'expanded'
@@ -1026,6 +1030,19 @@ export default function VideoCallPanel({
               >
                 <span className="material-symbols-outlined">{isScreenSharing ? 'stop_screen_share' : 'screen_share'}</span>
               </button>
+
+              {/* Speaker / Audio Output Switcher (if multiple output devices detected) */}
+              {availableAudioDevices?.length > 1 && (
+                <button
+                  type="button"
+                  onClick={cycleAudioOutput}
+                  className="wa-control-btn"
+                  title="Switch Audio Output (Speaker / Headphones)"
+                  style={{ color: '#00a884' }}
+                >
+                  <span className="material-symbols-outlined">volume_up</span>
+                </button>
+              )}
 
               {/* Pop to Desktop OS PiP (on desktop screens) */}
               <button

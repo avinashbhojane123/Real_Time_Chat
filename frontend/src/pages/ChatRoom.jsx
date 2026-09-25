@@ -965,6 +965,10 @@ export default function ChatRoom() {
           declineCall={webRTC.declineCall}
           endCall={webRTC.endCall}
           isVoiceOnlyCall={webRTC.isVoiceOnlyCall}
+          availableAudioDevices={webRTC.availableAudioDevices}
+          currentAudioDeviceId={webRTC.currentAudioDeviceId}
+          switchAudioOutput={webRTC.switchAudioOutput}
+          cycleAudioOutput={webRTC.cycleAudioOutput}
         />
       )}
 

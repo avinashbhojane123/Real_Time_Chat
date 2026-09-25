@@ -22,6 +22,10 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const [showVideoPanel, setShowVideoPanel] = useState(false);
   const [isVoiceOnlyCall, setIsVoiceOnlyCall] = useState(false);
 
+  // Audio output device routing state (setSinkId)
+  const [availableAudioDevices, setAvailableAudioDevices] = useState([]);
+  const [currentAudioDeviceId, setCurrentAudioDeviceId] = useState('');
+
   // Unified PiP State: 'none' | 'in-app' | 'desktop-os'
   const [pipMode, setPipMode] = useState('none');
   const [pipWindow, setPipWindow] = useState(null);
@@ -36,6 +40,12 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
   // Dedicated HTMLAudioElement for pristine, uninterrupted remote audio
   const remoteAudioElRef = useRef(null);
+
+  // Screen WakeLock ref (prevents phone sleeping during active call)
+  const wakeLockRef = useRef(null);
+
+  // Dynamic ICE servers from backend
+  const customIceServersRef = useRef(null);
 
   // Audio tone cleanup handlers
   const ringtoneCleanupRef = useRef(null);
@@ -89,6 +99,115 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setCallState(state);
     callStateRef.current = state;
   };
+
+  // Screen WakeLock management: keeps screen awake during active call
+  const acquireWakeLock = useCallback(async () => {
+    try {
+      if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && !wakeLockRef.current) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
+        console.log('[WebRTC] Screen WakeLock acquired');
+      }
+    } catch (err) {
+      console.debug('[WebRTC] WakeLock error/denied:', err);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    if (wakeLockRef.current) {
+      try {
+        wakeLockRef.current.release();
+      } catch (_) {}
+      wakeLockRef.current = null;
+      console.log('[WebRTC] Screen WakeLock released');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (callState === 'active') {
+      acquireWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [callState, acquireWakeLock, releaseWakeLock]);
+
+  // Re-acquire WakeLock when coming back from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && callState === 'active') {
+        acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [callState, acquireWakeLock]);
+
+  // Audio output device enumeration & switching
+  const refreshAudioDevices = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const outputs = devices.filter((d) => d.kind === 'audiooutput');
+        setAvailableAudioDevices(outputs);
+      } catch (e) {}
+    }
+  }, []);
+
+  const switchAudioOutput = useCallback(
+    async (deviceId) => {
+      if (remoteAudioElRef.current && typeof remoteAudioElRef.current.setSinkId === 'function') {
+        try {
+          await remoteAudioElRef.current.setSinkId(deviceId);
+          setCurrentAudioDeviceId(deviceId);
+          if (showToast) showToast('Switched audio output device');
+        } catch (err) {
+          console.warn('[WebRTC] Failed to switch audio output device:', err);
+        }
+      }
+    },
+    [showToast]
+  );
+
+  const cycleAudioOutput = useCallback(() => {
+    if (availableAudioDevices.length <= 1) return;
+    const currentIndex = availableAudioDevices.findIndex((d) => d.deviceId === currentAudioDeviceId);
+    const nextIndex = (currentIndex + 1) % availableAudioDevices.length;
+    const nextDevice = availableAudioDevices[nextIndex];
+    if (nextDevice) {
+      switchAudioOutput(nextDevice.deviceId);
+    }
+  }, [availableAudioDevices, currentAudioDeviceId, switchAudioOutput]);
+
+  useEffect(() => {
+    refreshAudioDevices();
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      navigator.mediaDevices.addEventListener('devicechange', refreshAudioDevices);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', refreshAudioDevices);
+      };
+    }
+  }, [refreshAudioDevices]);
+
+  // Query dynamic ICE servers from backend on socket connect
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    socket.emit('getIceServers');
+
+    const handleIceServers = ({ iceServers }) => {
+      if (iceServers && Array.isArray(iceServers) && iceServers.length > 0) {
+        customIceServersRef.current = iceServers;
+      }
+    };
+
+    socket.on('iceServers', handleIceServers);
+    return () => {
+      socket.off('iceServers', handleIceServers);
+    };
+  }, [socketRef]);
 
   // Stop all active ringtones/dialtones
   const stopAllAudioAlerts = useCallback(() => {
@@ -163,6 +282,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
   const cleanUpCall = useCallback(() => {
     stopAllAudioAlerts();
+    releaseWakeLock();
     targetSocketIdRef.current = null;
 
     if (callTimerRef.current) {
@@ -220,7 +340,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setShowVideoPanel(false);
     setIsVoiceOnlyCall(false);
     setPipMode('none');
-  }, [closeAllPipWindows, stopAllAudioAlerts]);
+  }, [closeAllPipWindows, stopAllAudioAlerts, releaseWakeLock]);
 
   // Clean up all media tracks, timers, and connections on unmount
   useEffect(() => {
@@ -308,21 +428,23 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       } catch (e) {}
     }
 
+    const iceServers = customIceServersRef.current || [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      {
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp',
+        ],
+        username: 'openrelay',
+        credential: 'openrelay',
+      },
+    ];
+
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' },
-        {
-          urls: [
-            'turn:openrelay.metered.ca:80',
-            'turn:openrelay.metered.ca:443',
-            'turn:openrelay.metered.ca:443?transport=tcp',
-          ],
-          username: 'openrelay',
-          credential: 'openrelay',
-        },
-      ],
+      iceServers,
       iceCandidatePoolSize: 10,
     });
 
@@ -414,7 +536,14 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current);
+        const sender = pc.addTrack(track, localStreamRef.current);
+        if (track.kind === 'video' && sender) {
+          try {
+            const params = sender.getParameters();
+            params.degradationPreference = 'maintain-framerate';
+            sender.setParameters(params).catch(() => {});
+          } catch (_) {}
+        }
       });
     }
 
@@ -1129,6 +1258,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     showVideoPanel,
     setShowVideoPanel,
     isVoiceOnlyCall,
+    // Audio device routing
+    availableAudioDevices,
+    currentAudioDeviceId,
+    switchAudioOutput,
+    cycleAudioOutput,
     // Unified PiP System
     pipMode,
     setPipMode,
