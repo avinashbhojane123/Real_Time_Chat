@@ -37,63 +37,8 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
   // Helper to get socket safely
   const getSocket = useCallback(() => socketRef?.current, [socketRef]);
 
-  // Handle incoming watchPartyUpdate event from server
-  const handleWatchPartyUpdate = useCallback(
-    (data) => {
-      if (!data) return;
-
-      if (data.action === 'close') {
-        setIsActive(false);
-        setIsOpen(false);
-        setIsPlaying(false);
-        if (data.lastActorNickname && data.lastActorNickname !== nickname) {
-          showToast?.(`${data.lastActorNickname} ended the Watch Party`);
-        }
-        return;
-      }
-
-      setIsActive(true);
-      if (data.videoSource) {
-        setVideoSource(data.videoSource);
-      }
-
-      setIsPlaying(Boolean(data.isPlaying));
-      setPlaybackRate(data.playbackRate || 1);
-      setLastActorNickname(data.lastActorNickname || '');
-      setLastSyncTimestamp(data.lastUpdatedTimestamp || Date.now());
-      setIsBuffering(Boolean(data.isBuffering));
-      setBufferingUsers(data.bufferingUsers || []);
-
-      const serverNow = data.serverTime || Date.now();
-      const clientNow = Date.now();
-      const oneWayLatencySec = Math.max(0, (clientNow - serverNow) / 1000);
-
-      let targetTime = typeof data.currentTime === 'number' ? data.currentTime : 0;
-      // Only apply transit latency correction on active updates, not on static pauses or initial sync
-      if (data.isPlaying && !data.isBuffering && data.action !== 'sync' && data.action !== 'pause') {
-        const elapsedSec =
-          Math.max(0, (clientNow - (data.lastUpdatedTimestamp || clientNow)) / 1000) *
-          (data.playbackRate || 1);
-        if (elapsedSec > 0 && elapsedSec < 3) {
-          targetTime += elapsedSec + oneWayLatencySec;
-        }
-      }
-      setCurrentTime(targetTime);
-
-      // Perform synchronized player control on active video element or YouTube player
-      if (!isLocalActionRef.current) {
-        syncVideoElement(targetTime, Boolean(data.isPlaying), data.playbackRate || 1, Boolean(data.isBuffering));
-      }
-
-      if (data.action === 'change_video' && data.lastActorNickname && data.lastActorNickname !== nickname) {
-        showToast?.(`${data.lastActorNickname} changed the video to "${data.videoSource?.title || 'a new movie'}"`);
-      }
-    },
-    [nickname, showToast]
-  );
-
-  // Sync the physical HTML5 video element with target state
-  const syncVideoElement = (targetTime, targetPlaying, targetRate, targetBuffering) => {
+  // Sync the physical HTML5 video element with target state (declared before handleWatchPartyUpdate)
+  const syncVideoElement = useCallback((targetTime, targetPlaying, targetRate, targetBuffering) => {
     const video = videoElementRef.current;
     if (video) {
       video.playbackRate = targetRate;
@@ -147,7 +92,62 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
         console.warn('[WatchParty] Error syncing YouTube player', err);
       }
     }
-  };
+  }, []);
+
+  // Handle incoming watchPartyUpdate event from server
+  const handleWatchPartyUpdate = useCallback(
+    (data) => {
+      if (!data) return;
+
+      if (data.action === 'close') {
+        setIsActive(false);
+        setIsOpen(false);
+        setIsPlaying(false);
+        if (data.lastActorNickname && data.lastActorNickname !== nickname) {
+          showToast?.(`${data.lastActorNickname} ended the Watch Party`);
+        }
+        return;
+      }
+
+      setIsActive(true);
+      if (data.videoSource) {
+        setVideoSource(data.videoSource);
+      }
+
+      setIsPlaying(Boolean(data.isPlaying));
+      setPlaybackRate(data.playbackRate || 1);
+      setLastActorNickname(data.lastActorNickname || '');
+      setLastSyncTimestamp(data.lastUpdatedTimestamp || Date.now());
+      setIsBuffering(Boolean(data.isBuffering));
+      setBufferingUsers(data.bufferingUsers || []);
+
+      const serverNow = data.serverTime || Date.now();
+      const clientNow = Date.now();
+      const oneWayLatencySec = Math.max(0, (clientNow - serverNow) / 1000);
+
+      let targetTime = typeof data.currentTime === 'number' ? data.currentTime : 0;
+      // Only apply transit latency correction on active updates, not on static pauses or initial sync
+      if (data.isPlaying && !data.isBuffering && data.action !== 'sync' && data.action !== 'pause') {
+        const elapsedSec =
+          Math.max(0, (clientNow - (data.lastUpdatedTimestamp || clientNow)) / 1000) *
+          (data.playbackRate || 1);
+        if (elapsedSec > 0 && elapsedSec < 3) {
+          targetTime += elapsedSec + oneWayLatencySec;
+        }
+      }
+      setCurrentTime(targetTime);
+
+      // Perform synchronized player control on active video element or YouTube player
+      if (!isLocalActionRef.current) {
+        syncVideoElement(targetTime, Boolean(data.isPlaying), data.playbackRate || 1, Boolean(data.isBuffering));
+      }
+
+      if (data.action === 'change_video' && data.lastActorNickname && data.lastActorNickname !== nickname) {
+        showToast?.(`${data.lastActorNickname} changed the video to "${data.videoSource?.title || 'a new movie'}"`);
+      }
+    },
+    [nickname, showToast, syncVideoElement]
+  );
 
   // Socket event subscriptions
   useEffect(() => {

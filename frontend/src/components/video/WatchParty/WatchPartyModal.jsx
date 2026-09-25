@@ -6,7 +6,7 @@ import './WatchPartyModal.css';
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
 
 const formatTime = (seconds) => {
-  if (isNaN(seconds) || seconds < 0) return '00:00';
+  if (isNaN(seconds) || seconds < 0 || seconds === null || seconds === undefined) return '00:00';
   const s = Math.floor(seconds);
   const hrs = Math.floor(s / 3600);
   const mins = Math.floor((s % 3600) / 60);
@@ -142,6 +142,13 @@ export default function WatchPartyModal({
     sendComment,
     closeWatchParty,
   } = watchParty;
+
+  // YouTube Video ID extractor (declared early to prevent TDZ in effects)
+  const youtubeVideoId = useMemo(() => {
+    if (videoSource?.type !== 'youtube' || !videoSource?.url) return null;
+    const match = videoSource.url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+    return match ? match[1] : null;
+  }, [videoSource]);
 
   // Local UI states
   const [customInputUrl, setCustomInputUrl] = useState('');
@@ -683,26 +690,6 @@ export default function WatchPartyModal({
     onSendChatMessage?.(`🎬 [Watch Party] ${text}`);
     setQuickComment('');
   };
-
-  const formatTime = (secs) => {
-    if (isNaN(secs) || secs === null) return '00:00';
-    const total = Math.floor(secs);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    const h = Math.floor(m / 60);
-    if (h > 0) {
-      const remM = m % 60;
-      return `${h}:${remM < 10 ? '0' : ''}${remM}:${s < 10 ? '0' : ''}${s}`;
-    }
-    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  // YouTube Video ID extractor
-  const youtubeVideoId = useMemo(() => {
-    if (videoSource?.type !== 'youtube' || !videoSource?.url) return null;
-    const match = videoSource.url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-    return match ? match[1] : null;
-  }, [videoSource]);
 
   if (!isOpen) return null;
 
