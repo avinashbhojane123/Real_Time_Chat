@@ -234,6 +234,15 @@ export class ChatGateway
 
   private watchPartyRooms = new Map<string, WatchPartyState>();
   private watchPartyCleanupTimers = new Map<string, NodeJS.Timeout>();
+  private watchPartyBufferTimers = new Map<string, NodeJS.Timeout>();
+
+  private clearWatchPartyBufferTimer(passcode: string) {
+    const timer = this.watchPartyBufferTimers.get(passcode);
+    if (timer) {
+      clearTimeout(timer);
+      this.watchPartyBufferTimers.delete(passcode);
+    }
+  }
 
   private roomWallpapers = new Map<
     string,
@@ -503,6 +512,7 @@ export class ChatGateway
       if (wpState.bufferingUsers.length === 0) {
         wpState.isBuffering = false;
         wpState.lastUpdatedTimestamp = Date.now();
+        this.clearWatchPartyBufferTimer(userInfo.passcode);
       }
       this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
         action: 'ready',
@@ -1981,12 +1991,7 @@ export class ChatGateway
         state.isBuffering = false;
         state.bufferingUsers = [];
         state.isActive = true;
-        // Notify other participant(s) so they receive the new movie invitation
-        client.to(targetPasscode).emit('watchPartyInvite', {
-          from: session.nickname,
-          videoSource: state.videoSource,
-          timestamp: now,
-        });
+        this.clearWatchPartyBufferTimer(targetPasscode);
         break;
 
       case 'buffering':
@@ -1996,6 +2001,32 @@ export class ChatGateway
         state.isBuffering = true;
         state.currentTime = currentPos;
         state.lastUpdatedTimestamp = now;
+
+        // Auto-release watchdog: after 10s of buffering without ready, auto-unblock room
+        this.clearWatchPartyBufferTimer(targetPasscode);
+        const bufWatchdog = setTimeout(() => {
+          this.watchPartyBufferTimers.delete(targetPasscode);
+          const st = this.watchPartyRooms.get(targetPasscode);
+          if (st && st.isBuffering) {
+            st.isBuffering = false;
+            st.bufferingUsers = [];
+            st.lastUpdatedTimestamp = Date.now();
+            this.server.to(targetPasscode).emit('watchPartyUpdate', {
+              action: 'ready',
+              videoSource: st.videoSource,
+              currentTime: st.currentTime,
+              isPlaying: st.isPlaying,
+              playbackRate: st.playbackRate,
+              isBuffering: false,
+              bufferingUsers: [],
+              lastUpdatedTimestamp: st.lastUpdatedTimestamp,
+              lastActorNickname: 'Auto-Watchdog',
+              hostNickname: st.hostNickname,
+              serverTime: Date.now(),
+            });
+          }
+        }, 10000);
+        this.watchPartyBufferTimers.set(targetPasscode, bufWatchdog);
         break;
 
       case 'ready':
@@ -2005,12 +2036,14 @@ export class ChatGateway
         if (state.bufferingUsers.length === 0) {
           state.isBuffering = false;
           state.lastUpdatedTimestamp = now;
+          this.clearWatchPartyBufferTimer(targetPasscode);
         }
         break;
 
       case 'close':
         state.isActive = false;
         state.isPlaying = false;
+        this.clearWatchPartyBufferTimer(targetPasscode);
         this.watchPartyRooms.delete(targetPasscode);
         this.server.to(targetPasscode).emit('watchPartyClosed', {
           closedBy: session.nickname,

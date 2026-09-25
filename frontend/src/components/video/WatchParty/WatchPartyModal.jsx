@@ -256,6 +256,7 @@ export default function WatchPartyModal({
 
     let player = null;
     let isCancelled = false;
+    let pollInterval = null;
 
     const setupPlayer = () => {
       if (isCancelled || !window.YT || !window.YT.Player) return;
@@ -288,7 +289,7 @@ export default function WatchPartyModal({
               if (dur && dur > 0) setDuration(dur);
             },
             onStateChange: (event) => {
-              if (isLocalActionRef?.current) return;
+              if (isLocalActionRef?.current || watchParty?.isRemoteSyncRef?.current) return;
               if (event.data === window.YT.PlayerState.PLAYING) {
                 const time = event.target.getCurrentTime();
                 if (typeof time === 'number') setCurrentTime(time);
@@ -316,9 +317,17 @@ export default function WatchPartyModal({
         tag.src = 'https://www.youtube.com/iframe_api';
         document.body.appendChild(tag);
       }
+      pollInterval = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          clearInterval(pollInterval);
+          setupPlayer();
+        }
+      }, 60);
+
       const prevReady = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
         if (prevReady) prevReady();
+        if (pollInterval) clearInterval(pollInterval);
         setupPlayer();
       };
     } else {
@@ -327,6 +336,7 @@ export default function WatchPartyModal({
 
     return () => {
       isCancelled = true;
+      if (pollInterval) clearInterval(pollInterval);
       if (player && typeof player.destroy === 'function') {
         try {
           player.destroy();
@@ -334,7 +344,7 @@ export default function WatchPartyModal({
       }
       ytPlayerRef.current = null;
     };
-  }, [youtubeVideoId]);
+  }, [youtubeVideoId, isMinimized]);
 
   // PostMessage bridge for player embeds
   const sendIframeCommand = useCallback((cmd) => {
@@ -506,6 +516,14 @@ export default function WatchPartyModal({
       videoElementRef.current.volume = val;
       videoElementRef.current.muted = val === 0;
     }
+    if (ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === 'function') {
+      ytPlayerRef.current.setVolume(Math.round(val * 100));
+      if (val === 0) {
+        ytPlayerRef.current.mute?.();
+      } else {
+        ytPlayerRef.current.unMute?.();
+      }
+    }
   };
 
   const toggleMute = () => {
@@ -517,6 +535,20 @@ export default function WatchPartyModal({
         setVolume(0.5);
         videoElementRef.current.volume = 0.5;
       }
+    }
+    if (ytPlayerRef.current) {
+      if (nextMuted) {
+        ytPlayerRef.current.mute?.();
+      } else {
+        ytPlayerRef.current.unMute?.();
+        if (volume === 0) {
+          ytPlayerRef.current.setVolume?.(50);
+          setVolume(0.5);
+        }
+      }
+    }
+    if (watchParty?.autoplayBlocked) {
+      watchParty.setAutoplayBlocked(false);
     }
   };
 
@@ -1190,6 +1222,32 @@ export default function WatchPartyModal({
               style={{ pointerEvents: isDraggingPip ? 'none' : 'auto' }}
             />
           ) : null}
+
+          {/* Autoplay Unmute Notification Banner */}
+          <AnimatePresence>
+            {watchParty?.autoplayBlocked && (
+              <motion.div
+                initial={{ opacity: 0, y: -15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="watch-party-autoplay-banner"
+                onClick={() => {
+                  if (videoElementRef.current) {
+                    videoElementRef.current.muted = false;
+                  }
+                  if (ytPlayerRef.current?.unMute) {
+                    ytPlayerRef.current.unMute();
+                  }
+                  setIsMuted(false);
+                  watchParty?.setAutoplayBlocked?.(false);
+                }}
+                title="Browser muted video sound. Click to enable audio"
+              >
+                <Icon icon="solar:volume-cross-bold-duotone" width="18" />
+                <span>Audio muted by browser autoplay policy. Click to unmute sound 🔊</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Zero-Lag Buffering Lock Overlay */}
           <AnimatePresence>

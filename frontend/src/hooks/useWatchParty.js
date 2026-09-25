@@ -26,9 +26,11 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
   const [flyingReactions, setFlyingReactions] = useState([]);
   const [danmakuComments, setDanmakuComments] = useState([]);
   const [incomingInvite, setIncomingInvite] = useState(null);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   // Ref tracking to prevent feedback loops when local action triggers video events
   const isLocalActionRef = useRef(false);
+  const isRemoteSyncRef = useRef(false);
   const videoElementRef = useRef(null);
   const ytPlayerRef = useRef(null);
   const lastEmittedTimeRef = useRef(0);
@@ -39,6 +41,11 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
 
   // Sync the physical HTML5 video element with target state (declared before handleWatchPartyUpdate)
   const syncVideoElement = useCallback((targetTime, targetPlaying, targetRate, targetBuffering) => {
+    isRemoteSyncRef.current = true;
+    setTimeout(() => {
+      isRemoteSyncRef.current = false;
+    }, 450);
+
     const video = videoElementRef.current;
     if (video) {
       video.playbackRate = targetRate;
@@ -46,26 +53,36 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       const drift = Math.abs(video.currentTime - targetTime);
 
       if (drift > 1.2) {
-        // High drift (seek or fast-forward) -> hard seek
+        // High drift -> hard seek
         video.currentTime = targetTime;
         setPartnerSyncStatus('drift_correcting');
-        setTimeout(() => setPartnerSyncStatus('synced'), 800);
+        setTimeout(() => setPartnerSyncStatus('synced'), 600);
       } else if (drift > 0.35) {
-        // Subtle drift (network jitter) -> gently nudge speed to smoothly realign
-        video.playbackRate = video.currentTime < targetTime ? targetRate * 1.08 : targetRate * 0.92;
+        // Subtle drift -> gentle 5% nudge to avoid audio pitch wobble
+        video.playbackRate = video.currentTime < targetTime ? targetRate * 1.05 : targetRate * 0.95;
         setPartnerSyncStatus('drift_correcting');
         setTimeout(() => {
           if (videoElementRef.current) {
             videoElementRef.current.playbackRate = targetRate;
             setPartnerSyncStatus('synced');
           }
-        }, 1200);
+        }, 800);
       } else {
         setPartnerSyncStatus('synced');
       }
 
       if (targetPlaying && !targetBuffering) {
-        video.play().catch(() => {});
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            if (err?.name === 'NotAllowedError') {
+              console.warn('[WatchParty] Browser blocked unmuted autoplay. Muting to autoplay...');
+              setAutoplayBlocked(true);
+              video.muted = true;
+              video.play().catch(() => {});
+            }
+          });
+        }
       } else {
         video.pause();
       }
@@ -77,11 +94,8 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
       try {
         const ytTime = yt.getCurrentTime() || 0;
         const drift = Math.abs(ytTime - targetTime);
-        if (drift > 1.5) {
+        if (drift > 1.2) {
           yt.seekTo(targetTime, true);
-        }
-        if (targetRate && typeof yt.setPlaybackRate === 'function') {
-          yt.setPlaybackRate(targetRate);
         }
         if (targetPlaying && !targetBuffering) {
           yt.playVideo();
@@ -377,11 +391,6 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
         currentTime: 0,
         isPlaying: false,
       });
-      emitAction('invite', {
-        videoSource: source,
-        currentTime: 0,
-        isPlaying: false,
-      });
     },
     [emitAction]
   );
@@ -440,9 +449,12 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     flyingReactions,
     danmakuComments,
     incomingInvite,
+    autoplayBlocked,
+    setAutoplayBlocked,
     videoElementRef,
     ytPlayerRef,
     isLocalActionRef,
+    isRemoteSyncRef,
     startWatchParty,
     acceptWatchPartyInvite,
     declineWatchPartyInvite,
