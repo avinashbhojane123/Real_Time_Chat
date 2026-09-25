@@ -76,6 +76,8 @@ interface WatchPartyState {
   lastActorNickname: string;
   isBuffering: boolean;
   bufferingUsers: string[];
+}
+
 export interface ActiveCallSession {
   callId: string;
   room: string;
