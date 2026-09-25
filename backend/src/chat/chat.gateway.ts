@@ -66,8 +66,10 @@ interface WatchPartyState {
   videoSource: {
     url: string;
     title: string;
-    type?: 'direct' | 'youtube';
+    type?: 'direct' | 'youtube' | 'embed';
     duration?: number;
+    provider?: string;
+    originalUrl?: string;
   } | null;
   currentTime: number;
   isPlaying: boolean;
@@ -76,6 +78,7 @@ interface WatchPartyState {
   lastActorNickname: string;
   isBuffering: boolean;
   bufferingUsers: string[];
+  hostNickname?: string;
 }
 
 export interface ActiveCallSession {
@@ -230,6 +233,7 @@ export class ChatGateway
   private socketMessageTimes = new Map<string, number[]>();
 
   private watchPartyRooms = new Map<string, WatchPartyState>();
+  private watchPartyCleanupTimers = new Map<string, NodeJS.Timeout>();
 
   private roomWallpapers = new Map<
     string,
@@ -291,11 +295,12 @@ export class ChatGateway
     const calculated = state.currentTime + elapsedSec;
     if (
       state.videoSource?.duration &&
+      state.videoSource.duration > 0 &&
       calculated > state.videoSource.duration
     ) {
       return state.videoSource.duration;
     }
-    return Math.max(0, calculated);
+    return Math.max(0, isNaN(calculated) ? 0 : calculated);
   }
 
   private checkRateLimit(
@@ -489,12 +494,48 @@ export class ChatGateway
       nickname: userInfo.nickname,
     });
 
-    // Clean up in-memory Watch Party state if no users remain in this room
+    // Prevent buffer lock deadlock if disconnecting user was buffering in Watch Party
+    const wpState = this.watchPartyRooms.get(userInfo.passcode);
+    if (wpState && wpState.bufferingUsers?.includes(userInfo.nickname)) {
+      wpState.bufferingUsers = wpState.bufferingUsers.filter(
+        (u) => u !== userInfo.nickname,
+      );
+      if (wpState.bufferingUsers.length === 0) {
+        wpState.isBuffering = false;
+        wpState.lastUpdatedTimestamp = Date.now();
+      }
+      this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
+        action: 'ready',
+        videoSource: wpState.videoSource,
+        currentTime: wpState.currentTime,
+        isPlaying: wpState.isPlaying,
+        playbackRate: wpState.playbackRate,
+        isBuffering: wpState.isBuffering,
+        bufferingUsers: wpState.bufferingUsers,
+        lastUpdatedTimestamp: wpState.lastUpdatedTimestamp,
+        lastActorNickname: userInfo.nickname,
+        hostNickname: wpState.hostNickname,
+        serverTime: Date.now(),
+      });
+    }
+
+    // Clean up in-memory Watch Party state with a 60-second grace period if no users remain
     const anyUserInRoom = Array.from(this.users.values()).some(
       (info) => info.passcode === userInfo.passcode,
     );
     if (!anyUserInRoom) {
-      this.watchPartyRooms.delete(userInfo.passcode);
+      const existingTimer = this.watchPartyCleanupTimers.get(userInfo.passcode);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        this.watchPartyCleanupTimers.delete(userInfo.passcode);
+        const stillAny = Array.from(this.users.values()).some(
+          (info) => info.passcode === userInfo.passcode,
+        );
+        if (!stillAny) {
+          this.watchPartyRooms.delete(userInfo.passcode);
+        }
+      }, 60000);
+      this.watchPartyCleanupTimers.set(userInfo.passcode, timer);
     }
   }
 
@@ -633,6 +674,13 @@ export class ChatGateway
           });
         }
       }
+    }
+
+    // Cancel any pending Watch Party room cleanup timer on user reconnect
+    const wpCleanup = this.watchPartyCleanupTimers.get(roomPasscode);
+    if (wpCleanup) {
+      clearTimeout(wpCleanup);
+      this.watchPartyCleanupTimers.delete(roomPasscode);
     }
 
     const messages = await this.messageRepo.find({
@@ -1933,6 +1981,12 @@ export class ChatGateway
         state.isBuffering = false;
         state.bufferingUsers = [];
         state.isActive = true;
+        // Notify other participant(s) so they receive the new movie invitation
+        client.to(targetPasscode).emit('watchPartyInvite', {
+          from: session.nickname,
+          videoSource: state.videoSource,
+          timestamp: now,
+        });
         break;
 
       case 'buffering':
@@ -1974,6 +2028,7 @@ export class ChatGateway
       bufferingUsers: state.bufferingUsers,
       lastUpdatedTimestamp: state.lastUpdatedTimestamp,
       lastActorNickname: session.nickname,
+      hostNickname: state.hostNickname,
       serverTime: now,
     };
 
@@ -2010,6 +2065,7 @@ export class ChatGateway
       bufferingUsers: state.bufferingUsers,
       lastUpdatedTimestamp: state.lastUpdatedTimestamp,
       lastActorNickname: state.lastActorNickname,
+      hostNickname: state.hostNickname,
       serverTime: Date.now(),
     };
 

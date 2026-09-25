@@ -132,6 +132,7 @@ export default function WatchPartyModal({
     danmakuComments: hookDanmakuComments,
     videoElementRef,
     ytPlayerRef,
+    isLocalActionRef,
     togglePlay,
     seek,
     changeRate,
@@ -169,6 +170,8 @@ export default function WatchPartyModal({
   const [syncNotice, setSyncNotice] = useState(null);
   const [showStreamBar, setShowStreamBar] = useState(true);
   const streamBarTimeoutRef = useRef(null);
+
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
   // Memoize embed URL so it doesn't reload the iframe on every 1-second timer tick
   const embedSrc = useMemo(() => {
@@ -239,6 +242,92 @@ export default function WatchPartyModal({
 
     return () => clearInterval(interval);
   }, [isPlaying, isBuffering, playbackRate, duration, videoSource?.type, setCurrentTime]);
+
+  // Real YouTube IFrame API Integration for zero-lag bidirectional synchronization
+  useEffect(() => {
+    if (!youtubeVideoId) return;
+
+    let player = null;
+    let isCancelled = false;
+
+    const setupPlayer = () => {
+      if (isCancelled || !window.YT || !window.YT.Player) return;
+      const el = document.getElementById('yt-watch-party-player-element');
+      if (!el) return;
+
+      try {
+        player = new window.YT.Player('yt-watch-party-player-element', {
+          videoId: youtubeVideoId,
+          playerVars: {
+            autoplay: isPlaying ? 1 : 0,
+            enablejsapi: 1,
+            rel: 0,
+            modestbranding: 1,
+            playsinline: 1,
+            start: Math.floor(currentTime || 0),
+          },
+          events: {
+            onReady: (event) => {
+              ytPlayerRef.current = event.target;
+              if (currentTime > 0) {
+                event.target.seekTo(currentTime, true);
+              }
+              if (isPlaying) {
+                event.target.playVideo();
+              } else {
+                event.target.pauseVideo();
+              }
+              const dur = event.target.getDuration();
+              if (dur && dur > 0) setDuration(dur);
+            },
+            onStateChange: (event) => {
+              if (isLocalActionRef?.current) return;
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                const time = event.target.getCurrentTime();
+                if (typeof time === 'number') setCurrentTime(time);
+                if (!isPlaying) togglePlay();
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
+                const time = event.target.getCurrentTime();
+                if (typeof time === 'number') setCurrentTime(time);
+                if (isPlaying) togglePlay();
+              } else if (event.data === window.YT.PlayerState.BUFFERING) {
+                notifyBuffering(true);
+              }
+            },
+          },
+        });
+        ytPlayerRef.current = player;
+      } catch (err) {
+        console.warn('[WatchParty] YouTube Player initialization warning:', err);
+      }
+    };
+
+    if (!window.YT || !window.YT.Player) {
+      if (!document.getElementById('youtube-iframe-api-script')) {
+        const tag = document.createElement('script');
+        tag.id = 'youtube-iframe-api-script';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.body.appendChild(tag);
+      }
+      const prevReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (prevReady) prevReady();
+        setupPlayer();
+      };
+    } else {
+      setupPlayer();
+    }
+
+    return () => {
+      isCancelled = true;
+      if (player && typeof player.destroy === 'function') {
+        try {
+          player.destroy();
+        } catch (_) {}
+      }
+      ytPlayerRef.current = null;
+    };
+  }, [youtubeVideoId]);
 
   // PostMessage bridge for player embeds
   const sendIframeCommand = useCallback((cmd) => {
@@ -1072,24 +1161,37 @@ export default function WatchPartyModal({
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onWaiting={() => notifyBuffering(true)}
-              onPlaying={() => notifyBuffering(false)}
+              onPlaying={() => {
+                notifyBuffering(false);
+                if (!isPlaying && !isLocalActionRef?.current) {
+                  togglePlay();
+                }
+              }}
+              onPause={() => {
+                if (isPlaying && !isLocalActionRef?.current) {
+                  togglePlay();
+                }
+              }}
+              onSeeked={(e) => {
+                const time = e.currentTarget.currentTime;
+                if (Math.abs(time - currentTime) > 0.8 && !isLocalActionRef?.current) {
+                  seek(time);
+                }
+              }}
               onClick={togglePlay}
               controls
               playsInline
             />
           ) : youtubeVideoId ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&enablejsapi=1`}
+            <div
+              id="yt-watch-party-player-element"
               className="watch-party-yt-iframe"
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen
-              title="YouTube Watch Party"
               style={{ pointerEvents: isDraggingPip ? 'none' : 'auto' }}
             />
           ) : videoSource?.type === 'embed' || videoSource?.url ? (
             <iframe
               ref={embedIframeRef}
-              key={`${videoSource.url}-sync-${syncKey}`}
+              key={videoSource.originalUrl || videoSource.url}
               src={embedSrc}
               className="watch-party-yt-iframe"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share *"
@@ -1153,6 +1255,155 @@ export default function WatchPartyModal({
                 </div>
               ))}
             </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Synchronized Playback Controls Bar */}
+        <div className="watch-party-controls-bar">
+          {/* Timeline Scrubber Row */}
+          <div className="watch-party-timeline-row">
+            <span
+              className="watch-party-time-text clickable-time"
+              onClick={handleJumpToTimePrompt}
+              title="Click to jump to specific scene timestamp"
+            >
+              {formatTime(currentTime)}
+            </span>
+
+            <div
+              ref={scrubberRef}
+              className="watch-party-scrubber"
+              onClick={handleScrubberClick}
+              title="Click or drag to seek in sync"
+            >
+              <div
+                className="watch-party-progress-fill"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <div
+                className="watch-party-scrubber-handle"
+                style={{ left: `${progressPercent}%` }}
+              />
+            </div>
+
+            <span className="watch-party-time-text">
+              {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Buttons Row */}
+          <div className="watch-party-buttons-row">
+            <div className="watch-party-left-controls">
+              {/* Play / Pause Button */}
+              <button
+                type="button"
+                className="watch-party-play-btn"
+                onClick={togglePlay}
+                title={isPlaying ? 'Pause Video for Both' : 'Play Video for Both'}
+              >
+                <Icon
+                  icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'}
+                  width="20"
+                />
+              </button>
+
+              {/* 10s Rewind */}
+              <button
+                type="button"
+                className="watch-party-btn-icon"
+                style={{ width: '34px', height: '34px' }}
+                onClick={() => seek(Math.max(0, currentTime - 10))}
+                title="Rewind 10 Seconds Together"
+              >
+                <Icon icon="solar:rewind-10-seconds-bold" width="18" />
+              </button>
+
+              {/* 10s Forward */}
+              <button
+                type="button"
+                className="watch-party-btn-icon"
+                style={{ width: '34px', height: '34px' }}
+                onClick={() => seek(Math.min(duration || 99999, currentTime + 10))}
+                title="Forward 10 Seconds Together"
+              >
+                <Icon icon="solar:forward-10-seconds-bold" width="18" />
+              </button>
+
+              {/* Volume & Mute */}
+              <div className="watch-party-volume-box">
+                <button
+                  type="button"
+                  className="watch-party-btn-icon"
+                  style={{ width: '32px', height: '32px' }}
+                  onClick={toggleMute}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  <Icon
+                    icon={
+                      isMuted || volume === 0
+                        ? 'solar:volume-cross-bold'
+                        : volume < 0.5
+                        ? 'solar:volume-small-bold'
+                        : 'solar:volume-loud-bold'
+                    }
+                    width="18"
+                  />
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="watch-party-volume-slider"
+                  title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+                />
+              </div>
+            </div>
+
+            <div className="watch-party-right-controls">
+              {/* Resync Scene Button */}
+              <button
+                type="button"
+                className="watch-party-btn-icon resync-btn"
+                onClick={() => handleResyncScene()}
+                title="Force Re-synchronize Scene Timestamp with Partner"
+              >
+                <Icon icon="solar:restart-bold" width="15" />
+                <span className="resync-label">Resync</span>
+              </button>
+
+              {/* Playback Rate Selector */}
+              <select
+                className="watch-party-rate-select"
+                value={playbackRate}
+                onChange={(e) => changeRate(Number(e.target.value))}
+                title="Playback Speed (Synchronized)"
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={0.75}>0.75x</option>
+                <option value={1}>1.0x (Normal)</option>
+                <option value={1.25}>1.25x</option>
+                <option value={1.5}>1.5x</option>
+                <option value={2}>2.0x</option>
+              </select>
+
+              {/* Partner Sync Status Pill */}
+              <div
+                className={`partner-sync-indicator ${partnerSyncStatus}`}
+                title={`Sync Status: ${partnerSyncStatus}`}
+              >
+                <span className="sync-status-dot" />
+                <span className="sync-status-text">
+                  {partnerSyncStatus === 'synced'
+                    ? 'In Sync'
+                    : partnerSyncStatus === 'buffering'
+                    ? 'Buffering...'
+                    : 'Realigning...'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1280,13 +1531,7 @@ export default function WatchPartyModal({
                       {/* Receiver (Partner) Cam */}
                       <div className="face-cam-card receiver">
                         <video
-                          ref={(el) => {
-                            partyRemoteVideoRef.current = el;
-                            if (el && webRTC?.remoteStream && el.srcObject !== webRTC.remoteStream) {
-                              el.srcObject = webRTC.remoteStream;
-                              el.play().catch(() => {});
-                            }
-                          }}
+                          ref={partyRemoteVideoRef}
                           autoPlay
                           playsInline
                           className="face-cam-video"
@@ -1306,13 +1551,7 @@ export default function WatchPartyModal({
                       {/* Sender (You) Cam */}
                       <div className="face-cam-card sender">
                         <video
-                          ref={(el) => {
-                            partyLocalVideoRef.current = el;
-                            if (el && webRTC?.localStream && el.srcObject !== webRTC.localStream) {
-                              el.srcObject = webRTC.localStream;
-                              el.play().catch(() => {});
-                            }
-                          }}
+                          ref={partyLocalVideoRef}
                           autoPlay
                           playsInline
                           muted

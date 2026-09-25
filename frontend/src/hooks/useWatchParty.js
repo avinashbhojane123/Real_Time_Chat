@@ -377,6 +377,11 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
         currentTime: 0,
         isPlaying: false,
       });
+      emitAction('invite', {
+        videoSource: source,
+        currentTime: 0,
+        isPlaying: false,
+      });
     },
     [emitAction]
   );
@@ -437,6 +442,7 @@ export function useWatchParty({ socketRef, passcode, nickname, showToast }) {
     incomingInvite,
     videoElementRef,
     ytPlayerRef,
+    isLocalActionRef,
     startWatchParty,
     acceptWatchPartyInvite,
     declineWatchPartyInvite,

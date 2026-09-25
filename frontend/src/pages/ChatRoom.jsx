@@ -702,6 +702,9 @@ export default function ChatRoom() {
         onOpenWatchParty={() => {
           watchParty.setIsOpen(true);
           watchParty.setIsMinimized(false);
+          if (watchParty.videoSource) {
+            watchParty.startWatchParty(watchParty.videoSource);
+          }
         }}
         isWatchPartyActive={watchParty.isActive}
       />
@@ -755,6 +758,9 @@ export default function ChatRoom() {
           onOpenWatchParty={() => {
             watchParty.setIsOpen(true);
             watchParty.setIsMinimized(false);
+            if (watchParty.videoSource) {
+              watchParty.startWatchParty(watchParty.videoSource);
+            }
           }}
           isWatchPartyActive={watchParty.isActive}
         />
