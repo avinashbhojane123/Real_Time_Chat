@@ -964,6 +964,7 @@ export default function ChatRoom() {
           acceptCall={webRTC.acceptCall}
           declineCall={webRTC.declineCall}
           endCall={webRTC.endCall}
+          isVoiceOnlyCall={webRTC.isVoiceOnlyCall}
         />
       )}
 

@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  startIncomingRingtone,
+  startOutgoingDialTone,
+  playCallEndedTone,
+  playCallDeclinedTone,
+} from '../utils/audioAlert';
 
 export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast }) {
   const [callState, setCallState] = useState('idle'); // idle | calling | incoming | active
@@ -14,6 +20,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
+  const [isVoiceOnlyCall, setIsVoiceOnlyCall] = useState(false);
 
   // Unified PiP State: 'none' | 'in-app' | 'desktop-os'
   const [pipMode, setPipMode] = useState('none');
@@ -27,10 +34,21 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const localVideoRef = useRef(null);
   const screenStreamRef = useRef(null);
 
+  // Dedicated HTMLAudioElement for pristine, uninterrupted remote audio
+  const remoteAudioElRef = useRef(null);
+
+  // Audio tone cleanup handlers
+  const ringtoneCleanupRef = useRef(null);
+  const dialToneCleanupRef = useRef(null);
+
+  // Peer targeting socket ID ref
+  const targetSocketIdRef = useRef(null);
+
   const isScreenSharingRef = useRef(false);
   const facingModeRef = useRef('user');
   const cameraOffRef = useRef(false);
   const micMutedRef = useRef(false);
+  const isVoiceOnlyRef = useRef(false);
 
   // Screen sharing capability check
   const isScreenShareSupported =
@@ -54,6 +72,10 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     isScreenSharingRef.current = isScreenSharing;
   }, [isScreenSharing]);
 
+  useEffect(() => {
+    isVoiceOnlyRef.current = isVoiceOnlyCall;
+  }, [isVoiceOnlyCall]);
+
   const callStateRef = useRef('idle');
   const pendingIceCandidatesRef = useRef([]);
   const callTimerRef = useRef(null);
@@ -67,6 +89,63 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setCallState(state);
     callStateRef.current = state;
   };
+
+  // Stop all active ringtones/dialtones
+  const stopAllAudioAlerts = useCallback(() => {
+    if (ringtoneCleanupRef.current) {
+      try {
+        ringtoneCleanupRef.current();
+      } catch (_) {}
+      ringtoneCleanupRef.current = null;
+    }
+    if (dialToneCleanupRef.current) {
+      try {
+        dialToneCleanupRef.current();
+      } catch (_) {}
+      dialToneCleanupRef.current = null;
+    }
+  }, []);
+
+  // Manage call state sound effects (outgoing ringing / incoming ringing)
+  useEffect(() => {
+    if (callState === 'calling') {
+      stopAllAudioAlerts();
+      dialToneCleanupRef.current = startOutgoingDialTone();
+    } else if (callState === 'incoming') {
+      stopAllAudioAlerts();
+      ringtoneCleanupRef.current = startIncomingRingtone();
+    } else {
+      stopAllAudioAlerts();
+    }
+    return () => {
+      stopAllAudioAlerts();
+    };
+  }, [callState, stopAllAudioAlerts]);
+
+  // Maintain dedicated remote audio playback element
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const audioEl = new Audio();
+      audioEl.autoplay = true;
+      audioEl.playsInline = true;
+      remoteAudioElRef.current = audioEl;
+      return () => {
+        audioEl.srcObject = null;
+        remoteAudioElRef.current = null;
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (remoteAudioElRef.current && remoteStream) {
+      if (remoteAudioElRef.current.srcObject !== remoteStream) {
+        remoteAudioElRef.current.srcObject = remoteStream;
+      }
+      remoteAudioElRef.current.play().catch((err) => {
+        console.warn('[WebRTC] Remote audio autoplay blocked:', err);
+      });
+    }
+  }, [remoteStream]);
 
   // Close any active OS PiP window / exit video PiP
   const closeAllPipWindows = useCallback(() => {
@@ -83,6 +162,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   }, []);
 
   const cleanUpCall = useCallback(() => {
+    stopAllAudioAlerts();
+    targetSocketIdRef.current = null;
+
     if (callTimerRef.current) {
       clearInterval(callTimerRef.current);
       callTimerRef.current = null;
@@ -119,6 +201,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       remoteStreamRef.current.getTracks().forEach((t) => t.stop());
       remoteStreamRef.current = null;
     }
+    if (remoteAudioElRef.current) {
+      remoteAudioElRef.current.srcObject = null;
+    }
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
@@ -133,8 +218,9 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setMicMuted(false);
     setCameraOff(false);
     setShowVideoPanel(false);
+    setIsVoiceOnlyCall(false);
     setPipMode('none');
-  }, [closeAllPipWindows]);
+  }, [closeAllPipWindows, stopAllAudioAlerts]);
 
   // Clean up all media tracks, timers, and connections on unmount
   useEffect(() => {
@@ -149,7 +235,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     pc.createOffer({ iceRestart: true })
       .then((offer) => pc.setLocalDescription(offer))
       .then(() => {
-        socketRef.current?.emit('webrtcOffer', { passcode, offer: pc.localDescription });
+        socketRef.current?.emit('webrtcOffer', {
+          passcode,
+          offer: pc.localDescription,
+          targetSocketId: targetSocketIdRef.current,
+        });
       })
       .catch((err) => console.warn('[WebRTC] ICE restart offer failed:', err));
   }, [passcode, socketRef]);
@@ -177,6 +267,40 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     }
   }, []);
 
+  /**
+   * Safe media acquisition helper:
+   * - Applies full AEC, ANS, AGC constraints
+   * - If camera fails (missing webcam, desktop PC), automatically falls back to audio-only
+   */
+  const acquireMediaStream = useCallback(async ({ isVoice = false } = {}) => {
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+
+    if (!isVoice) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingModeRef.current || 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: audioConstraints,
+        });
+        setIsVoiceOnlyCall(false);
+        return stream;
+      } catch (err) {
+        console.warn('[WebRTC] Camera unavailable or permission denied, falling back to audio only:', err);
+        if (showToast) showToast('Camera unavailable — continuing with audio only');
+      }
+    }
+
+    const audioStream = await navigator.mediaDevices.getUserMedia({
+      video: false,
+      audio: audioConstraints,
+    });
+    setIsVoiceOnlyCall(true);
+    return audioStream;
+  }, [showToast]);
+
   const createPeerConnection = useCallback(() => {
     if (peerConnectionRef.current) {
       try {
@@ -188,9 +312,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' },
         { urls: 'stun:global.stun.twilio.com:3478' },
         {
           urls: [
@@ -207,7 +328,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
-        socketRef.current?.emit('webrtcCandidate', { passcode, candidate: e.candidate });
+        socketRef.current?.emit('webrtcCandidate', {
+          passcode,
+          candidate: e.candidate,
+          targetSocketId: targetSocketIdRef.current,
+        });
       }
     };
 
@@ -245,6 +370,12 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       const updatedStream = new MediaStream(remoteStreamRef.current.getTracks());
       remoteStreamRef.current = updatedStream;
       setRemoteStream(updatedStream);
+
+      // Play through dedicated audio element
+      if (remoteAudioElRef.current) {
+        remoteAudioElRef.current.srcObject = updatedStream;
+        remoteAudioElRef.current.play().catch(() => {});
+      }
 
       // 3. Immediately assign to active remote video node with autoplay fallback
       const targetVideo = isStreamSwapped ? localVideoRef.current : remoteVideoRef.current;
@@ -369,8 +500,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     const socket = socketRef.current;
     if (!socket) return;
 
-    const handleCallUser = ({ callerName: cName, from }) => {
+    const handleCallUser = ({ callerName: cName, from, callerSocketId, isVoiceOnly }) => {
       if (Date.now() - lastCallEndedAtRef.current < 2500) return;
+      if (callerSocketId) targetSocketIdRef.current = callerSocketId;
+      if (isVoiceOnly !== undefined) setIsVoiceOnlyCall(Boolean(isVoiceOnly));
+
       const peerName = cName || from || 'Participant';
       setCallerName(peerName);
       setRemoteUserName(peerName);
@@ -378,15 +512,18 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       setShowVideoPanel(true);
     };
 
-    const handleCallAccepted = ({ receiverName: rName, from } = {}) => {
+    const handleCallAccepted = ({ receiverName: rName, from, receiverSocketId } = {}) => {
+      if (receiverSocketId) targetSocketIdRef.current = receiverSocketId;
       if (rName || from) {
         setRemoteUserName(rName || from);
       }
       updateCallState('active');
     };
 
-    const handleWebrtcOffer = async ({ offer, callerName: cName, from }) => {
+    const handleWebrtcOffer = async ({ offer, callerName: cName, from, callerSocketId, isVoiceOnly }) => {
       if (Date.now() - lastCallEndedAtRef.current < 2500) return;
+      if (callerSocketId) targetSocketIdRef.current = callerSocketId;
+      if (isVoiceOnly !== undefined) setIsVoiceOnlyCall(Boolean(isVoiceOnly));
       latestOfferRef.current = offer;
 
       if (callStateRef.current === 'idle') {
@@ -407,7 +544,12 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
               processPendingIceCandidates();
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
-              socketRef.current?.emit('webrtcAnswer', { passcode, answer, receiverName: nickname });
+              socketRef.current?.emit('webrtcAnswer', {
+                passcode,
+                answer,
+                receiverName: nickname,
+                targetSocketId: targetSocketIdRef.current,
+              });
             }
           } catch (err) {
             console.warn('[WebRTC] Handling offer error:', err);
@@ -416,7 +558,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       }
     };
 
-    const handleWebrtcAnswer = async ({ answer, receiverName: rName, from }) => {
+    const handleWebrtcAnswer = async ({ answer, receiverName: rName, from, receiverSocketId }) => {
+      if (receiverSocketId) targetSocketIdRef.current = receiverSocketId;
       if (rName || from) {
         setRemoteUserName(rName || from);
       }
@@ -446,55 +589,101 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       }
     };
 
-    const handleCallEnd = () => {
-      if (showToast) showToast('Call ended');
+    const handleCallBusy = ({ nickname: busyUser, reason }) => {
+      playCallDeclinedTone();
+      if (showToast) showToast(`${busyUser || 'Participant'} is busy on another call`);
       cleanUpCall();
     };
 
-    const handleCallDeclined = () => {
-      if (showToast) showToast('Call was declined');
+    const handleCallTimeout = ({ reason }) => {
+      playCallDeclinedTone();
+      if (showToast) showToast(reason || 'Call timed out (no answer)');
+      cleanUpCall();
+    };
+
+    const handleCallMissed = ({ callerName: cName }) => {
+      if (showToast) showToast(`Missed call from ${cName || 'Contact'}`);
+      cleanUpCall();
+    };
+
+    const handleCallError = ({ message }) => {
+      if (showToast) showToast(message || 'Unable to connect call');
+      cleanUpCall();
+    };
+
+    const handleCallEnd = ({ reason } = {}) => {
+      playCallEndedTone();
+      if (showToast) showToast(reason || 'Call ended');
+      cleanUpCall();
+    };
+
+    const handleCallDeclined = ({ reason } = {}) => {
+      playCallDeclinedTone();
+      if (showToast) showToast(reason || 'Call was declined');
       cleanUpCall();
     };
 
     socket.on('callUser', handleCallUser);
     socket.on('acceptCall', handleCallAccepted);
+    socket.on('callAccepted', handleCallAccepted);
     socket.on('webrtcOffer', handleWebrtcOffer);
     socket.on('webrtcAnswer', handleWebrtcAnswer);
     socket.on('webrtcCandidate', handleWebrtcCandidate);
     socket.on('screenShareStatus', handleScreenShareStatus);
+    socket.on('callBusy', handleCallBusy);
+    socket.on('callTimeout', handleCallTimeout);
+    socket.on('callMissed', handleCallMissed);
+    socket.on('callError', handleCallError);
     socket.on('callEnded', handleCallEnd);
+    socket.on('endCall', handleCallEnd);
     socket.on('callDeclined', handleCallDeclined);
+    socket.on('declineCall', handleCallDeclined);
 
     return () => {
       socket.off('callUser', handleCallUser);
       socket.off('acceptCall', handleCallAccepted);
+      socket.off('callAccepted', handleCallAccepted);
       socket.off('webrtcOffer', handleWebrtcOffer);
       socket.off('webrtcAnswer', handleWebrtcAnswer);
       socket.off('webrtcCandidate', handleWebrtcCandidate);
       socket.off('screenShareStatus', handleScreenShareStatus);
+      socket.off('callBusy', handleCallBusy);
+      socket.off('callTimeout', handleCallTimeout);
+      socket.off('callMissed', handleCallMissed);
+      socket.off('callError', handleCallError);
       socket.off('callEnded', handleCallEnd);
+      socket.off('endCall', handleCallEnd);
       socket.off('callDeclined', handleCallDeclined);
+      socket.off('declineCall', handleCallDeclined);
     };
-  }, [socketRef, passcode, nickname, createPeerConnection, processPendingIceCandidates, addIceCandidateSafely, cleanUpCall, showToast]);
+  }, [
+    socketRef,
+    passcode,
+    nickname,
+    createPeerConnection,
+    processPendingIceCandidates,
+    addIceCandidateSafely,
+    cleanUpCall,
+    showToast,
+  ]);
 
-  const startCall = async () => {
+  const startCall = async (options = {}) => {
+    const isVoice = Boolean(options?.isVoiceOnly);
     updateCallState('calling');
     setShowVideoPanel(true);
     setPipMode('none');
+    setIsVoiceOnlyCall(isVoice);
     setRemoteUserName(recipientUser ? recipientUser.nickname : 'Participant');
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
-      });
+      const stream = await acquireMediaStream({ isVoice });
       stream.getTracks().forEach((track) => {
         track.enabled = true;
       });
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      if (localVideoRef.current) {
+      if (localVideoRef.current && !isVoice) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(() => {});
       }
@@ -503,62 +692,86 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      socketRef.current?.emit('callUser', { passcode, callerName: nickname });
-      socketRef.current?.emit('webrtcOffer', { passcode, offer: pc.localDescription, callerName: nickname });
+      socketRef.current?.emit('callUser', {
+        passcode,
+        callerName: nickname,
+        targetNickname: recipientUser ? recipientUser.nickname : undefined,
+        isVoiceOnly: isVoice,
+      });
+
+      socketRef.current?.emit('webrtcOffer', {
+        passcode,
+        offer: pc.localDescription,
+        callerName: nickname,
+        targetNickname: recipientUser ? recipientUser.nickname : undefined,
+        isVoiceOnly: isVoice,
+      });
     } catch (err) {
-      alert('Could not access camera/microphone: ' + err.message);
+      if (showToast) showToast('Microphone/camera access denied: ' + err.message);
+      else alert('Could not access microphone/camera: ' + err.message);
       cleanUpCall();
     }
   };
 
   const acceptCall = async () => {
     try {
-      // 1. Acquire camera and microphone FIRST before transitioning state or creating peer connection
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
-      });
+      const stream = await acquireMediaStream({ isVoice: isVoiceOnlyRef.current });
       stream.getTracks().forEach((track) => {
         track.enabled = true;
       });
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      // 2. Now transition to active call state
       updateCallState('active');
-      socketRef.current?.emit('acceptCall', { passcode, receiverName: nickname });
+      socketRef.current?.emit('acceptCall', {
+        passcode,
+        receiverName: nickname,
+        targetSocketId: targetSocketIdRef.current,
+      });
 
-      // 3. Create peer connection with local tracks already attached
       const pc = createPeerConnection();
 
-      // 4. Attach local camera feed preview
-      if (localVideoRef.current) {
+      if (localVideoRef.current && !isVoiceOnlyRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(() => {});
       }
 
-      // 5. If caller offer is ready, set remote description and emit answer
       if (latestOfferRef.current) {
         await pc.setRemoteDescription(new RTCSessionDescription(latestOfferRef.current));
         processPendingIceCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        socketRef.current?.emit('webrtcAnswer', { passcode, answer, receiverName: nickname });
+        socketRef.current?.emit('webrtcAnswer', {
+          passcode,
+          answer,
+          receiverName: nickname,
+          targetSocketId: targetSocketIdRef.current,
+        });
       }
     } catch (err) {
-      alert('Could not access camera/microphone to accept call: ' + err.message);
+      if (showToast) showToast('Microphone/camera access denied: ' + err.message);
+      else alert('Could not access camera/microphone to accept call: ' + err.message);
       cleanUpCall();
     }
   };
 
   const declineCall = () => {
-    socketRef.current?.emit('declineCall', { passcode, receiverName: nickname });
+    playCallDeclinedTone();
+    socketRef.current?.emit('declineCall', {
+      passcode,
+      receiverName: nickname,
+      targetSocketId: targetSocketIdRef.current,
+    });
     cleanUpCall();
   };
 
   const endCall = useCallback(() => {
-    socketRef.current?.emit('endCall', { passcode });
+    playCallEndedTone();
+    socketRef.current?.emit('endCall', {
+      passcode,
+      targetSocketId: targetSocketIdRef.current,
+    });
     cleanUpCall();
   }, [passcode, socketRef, cleanUpCall]);
 
@@ -583,6 +796,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   }, []);
 
   const flipCamera = async () => {
+    if (isVoiceOnlyRef.current) return;
     const nextMode = facingModeRef.current === 'user' ? 'environment' : 'user';
     setFacingMode(nextMode);
     facingModeRef.current = nextMode;
@@ -593,19 +807,25 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: nextMode },
-        audio: !micMutedRef.current,
+        video: { facingMode: nextMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
       });
-      localStreamRef.current = newStream;
-      setLocalStream(newStream);
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (newVideoTrack) {
+        newVideoTrack.enabled = !cameraOffRef.current;
 
-      const pc = peerConnectionRef.current;
-      if (pc) {
-        const videoSender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
-        const newVideoTrack = newStream.getVideoTracks()[0];
-        if (videoSender && newVideoTrack) {
-          await videoSender.replaceTrack(newVideoTrack);
+        const pc = peerConnectionRef.current;
+        if (pc) {
+          const videoSender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+          if (videoSender) {
+            await videoSender.replaceTrack(newVideoTrack);
+          }
         }
+
+        const existingAudioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
+        const combined = new MediaStream([newVideoTrack, ...existingAudioTracks]);
+        localStreamRef.current = combined;
+        setLocalStream(combined);
       }
     } catch (err) {
       console.warn('Error flipping camera:', err);
@@ -613,7 +833,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   };
 
   // =========================================================================
-  // SCREEN SHARING CONTROLLER (Mobile / Desktop Compatible)
+  // SCREEN SHARING CONTROLLER (Mobile / Desktop Compatible with Audio)
   // =========================================================================
 
   const stopScreenShare = useCallback(async () => {
@@ -622,7 +842,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setIsScreenSharing(false);
 
     try {
-      // 1. First get user camera stream with the current facing mode
+      // 1. Get user camera stream with the current facing mode
       const camStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: facingModeRef.current || 'user',
@@ -662,7 +882,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       setLocalStream(combinedStream);
 
       // 5. Notify peer that screen share stopped
-      socketRef.current?.emit('screenShareStatus', { passcode, isSharing: false });
+      socketRef.current?.emit('screenShareStatus', {
+        passcode,
+        isSharing: false,
+        targetSocketId: targetSocketIdRef.current,
+      });
     } catch (err) {
       console.warn('[WebRTC] Error reverting from screen share to camera:', err);
     }
@@ -675,7 +899,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     }
 
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      }).catch(() => navigator.mediaDevices.getDisplayMedia({ video: true }));
+
       const screenTrack = screenStream.getVideoTracks()[0];
       if (!screenTrack) return;
 
@@ -698,11 +926,17 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       };
 
       const existingAudioTracks = localStreamRef.current ? localStreamRef.current.getAudioTracks() : [];
-      const combinedStream = new MediaStream([screenTrack, ...existingAudioTracks]);
+      const screenAudioTracks = screenStream.getAudioTracks();
+      const combinedAudio = screenAudioTracks.length > 0 ? [...screenAudioTracks, ...existingAudioTracks] : existingAudioTracks;
+      const combinedStream = new MediaStream([screenTrack, ...combinedAudio]);
       localStreamRef.current = combinedStream;
       setLocalStream(combinedStream);
 
-      socketRef.current?.emit('screenShareStatus', { passcode, isSharing: true });
+      socketRef.current?.emit('screenShareStatus', {
+        passcode,
+        isSharing: true,
+        targetSocketId: targetSocketIdRef.current,
+      });
     } catch (err) {
       console.warn('[WebRTC] Screen share error/cancel:', err);
       isScreenSharingRef.current = false;
@@ -816,7 +1050,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         };
         targetVideo.addEventListener('leavepictureinpicture', onLeavePip);
       } else {
-        // Fallback to In-App PiP if Desktop PiP is unsupported
         setPipMode('in-app');
         if (showToast) showToast('Desktop PiP not supported on this browser. Switched to In-App PiP.');
       }
@@ -833,7 +1066,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     setPipMode('none');
   }, [closeAllPipWindows]);
 
-  // Master PiP Toggle: Switches between Fullscreen and preferred PiP mode
+  // Master PiP Toggle
   const togglePip = useCallback(
     (mode = null) => {
       if (pipMode !== 'none') {
@@ -860,7 +1093,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     if (callState === 'active' && 'mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = new window.MediaMetadata({
-          title: `WhatsApp Video Call • ${remoteUserName || callerName || 'Contact'}`,
+          title: `WhatsApp ${isVoiceOnlyCall ? 'Voice' : 'Video'} Call • ${remoteUserName || callerName || 'Contact'}`,
           artist: 'Real-Time WebRTC Call',
           album: 'End-to-End Encrypted',
         });
@@ -875,7 +1108,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         navigator.mediaSession.setActionHandler('togglecamera', null);
       } catch (e) {}
     }
-  }, [callState, remoteUserName, callerName, endCall, toggleMic, toggleCamera]);
+  }, [callState, remoteUserName, callerName, endCall, toggleMic, toggleCamera, isVoiceOnlyCall]);
 
   return {
     callState,
@@ -895,6 +1128,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     callDuration,
     showVideoPanel,
     setShowVideoPanel,
+    isVoiceOnlyCall,
     // Unified PiP System
     pipMode,
     setPipMode,

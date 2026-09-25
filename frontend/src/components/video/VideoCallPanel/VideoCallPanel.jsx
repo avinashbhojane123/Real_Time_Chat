@@ -45,6 +45,7 @@ export default function VideoCallPanel({
   acceptCall,
   declineCall,
   endCall,
+  isVoiceOnlyCall = false,
 }) {
   const [showPipMenu, setShowPipMenu] = useState(false);
   const [pipSize, setPipSize] = useState('standard'); // 'compact' | 'standard' | 'expanded'
@@ -135,7 +136,7 @@ export default function VideoCallPanel({
         {/* Hidden video anchor for standard HTML5 requestPictureInPicture fallback */}
         {!pipWindow && (
           <div style={{ position: 'fixed', bottom: 10, right: 10, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}>
-            <video ref={remoteVideoRef} autoPlay playsInline muted />
+            <video ref={remoteVideoRef} autoPlay playsInline />
             <video ref={localVideoRef} autoPlay playsInline muted />
           </div>
         )}
@@ -926,7 +927,7 @@ export default function VideoCallPanel({
                   {initialLetter}
                 </div>
                 <div style={{ color: '#e9edef', fontSize: '1rem', fontWeight: 600 }}>
-                  Connecting video with {displayName}...
+                  {isVoiceOnlyCall ? `Voice call with ${displayName}` : `Connecting video with ${displayName}...`}
                 </div>
                 <div className="wa-sound-waves">
                   <span className="wa-sound-bar" />

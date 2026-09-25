@@ -292,7 +292,7 @@ const ChatHeader = memo(function ChatHeader({
                 alert('Cannot start call: Recipient is offline. Voice calls can only be made when the person is online.');
                 return;
               }
-              startCall();
+              startCall({ isVoiceOnly: true });
             }}
             style={{
               color: isRecipientOnline ? '#00a884' : '#8696a0',

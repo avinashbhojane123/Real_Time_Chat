@@ -14,6 +14,18 @@ export class CallUserDto {
   @IsOptional()
   @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
+  targetNickname?: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isVoiceOnly?: boolean;
 }
 
 export class AcceptCallDto {
@@ -29,6 +41,14 @@ export class AcceptCallDto {
   @IsOptional()
   @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
+
+  @IsOptional()
+  @IsString()
+  callId?: string;
 }
 
 export class DeclineCallDto {
@@ -44,6 +64,14 @@ export class DeclineCallDto {
   @IsOptional()
   @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 export class WebrtcOfferDto {
@@ -62,6 +90,14 @@ export class WebrtcOfferDto {
   @IsOptional()
   @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
+
+  @IsOptional()
+  @IsString()
+  targetNickname?: string;
 }
 
 export class WebrtcAnswerDto {
@@ -80,6 +116,10 @@ export class WebrtcAnswerDto {
   @IsOptional()
   @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
 }
 
 export class WebrtcCandidateDto {
@@ -94,6 +134,10 @@ export class WebrtcCandidateDto {
   @IsOptional()
   @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
 }
 
 export class EndCallDto {
@@ -101,6 +145,14 @@ export class EndCallDto {
   @IsNotEmpty()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   passcode!: string;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 export class TogglePipDto {
@@ -121,4 +173,8 @@ export class ScreenShareStatusDto {
 
   @IsBoolean()
   isSharing!: boolean;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
 }

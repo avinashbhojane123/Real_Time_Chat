@@ -76,6 +76,17 @@ interface WatchPartyState {
   lastActorNickname: string;
   isBuffering: boolean;
   bufferingUsers: string[];
+export interface ActiveCallSession {
+  callId: string;
+  room: string;
+  callerSocketId: string;
+  callerNickname: string;
+  calleeSocketId?: string;
+  calleeNickname?: string;
+  isVoiceOnly?: boolean;
+  state: 'calling' | 'active' | 'ended';
+  startedAt: number;
+  ringTimer?: any;
 }
 
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
@@ -226,6 +237,39 @@ export class ChatGateway
     }
   >();
 
+  private activeCallSessions = new Map<string, ActiveCallSession>();
+
+  private findCallBySocketId(socketId: string): ActiveCallSession | undefined {
+    for (const session of this.activeCallSessions.values()) {
+      if (
+        session.callerSocketId === socketId ||
+        session.calleeSocketId === socketId
+      ) {
+        return session;
+      }
+    }
+    return undefined;
+  }
+
+  private findSocketInRoom(
+    passcode: string,
+    nickname?: string,
+    excludeSocketId?: string,
+  ): { socketId: string; nickname: string } | undefined {
+    const cleanPass = passcode.trim();
+    for (const [id, user] of this.users.entries()) {
+      if (user.passcode.trim() === cleanPass && id !== excludeSocketId) {
+        if (
+          !nickname ||
+          user.nickname.trim().toLowerCase() === nickname.trim().toLowerCase()
+        ) {
+          return { socketId: id, nickname: user.nickname };
+        }
+      }
+    }
+    return undefined;
+  }
+
   private getCalculatedWatchPartyPosition(state: WatchPartyState): number {
     if (!state.isPlaying || state.isBuffering) {
       return state.currentTime;
@@ -272,6 +316,35 @@ export class ChatGateway
     const userInfo = this.users.get(client.id);
 
     if (!userInfo) return;
+
+    // Clean up any active or pending call for this socket immediately
+    const existingCall = this.findCallBySocketId(client.id);
+    if (existingCall) {
+      if (existingCall.ringTimer) {
+        clearTimeout(existingCall.ringTimer);
+      }
+      this.activeCallSessions.delete(existingCall.callId);
+
+      const peerSocketId =
+        existingCall.callerSocketId === client.id
+          ? existingCall.calleeSocketId
+          : existingCall.callerSocketId;
+
+      if (peerSocketId) {
+        this.server.to(peerSocketId).emit('callEnded', {
+          reason: 'Participant disconnected abruptly',
+          from: userInfo.nickname,
+          callId: existingCall.callId,
+        });
+      }
+      if (existingCall.room) {
+        this.server.to(existingCall.room).emit('callEnded', {
+          reason: 'Participant disconnected abruptly',
+          from: userInfo.nickname,
+          callId: existingCall.callId,
+        });
+      }
+    }
 
     this.users.delete(client.id);
 
@@ -872,15 +945,92 @@ export class ChatGateway
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
     const room = session.passcode.trim();
-    console.log(
-      `[CallUser] ${session.nickname} is calling in room: ${room}`,
-    );
+
+    // Clean up any stale call sessions previously initiated by this socket
+    const prevCall = this.findCallBySocketId(client.id);
+    if (prevCall) {
+      if (prevCall.ringTimer) clearTimeout(prevCall.ringTimer);
+      this.activeCallSessions.delete(prevCall.callId);
+    }
+
+    // Resolve target socket (explicit socket ID, targeted nickname, or other participant in 2-person room)
+    const target = data.targetSocketId
+      ? { socketId: data.targetSocketId, nickname: data.targetNickname || 'Participant' }
+      : this.findSocketInRoom(room, data.targetNickname, client.id);
+
+    // If target nickname was specified but no matching online user was found
+    if (data.targetNickname && !target) {
+      client.emit('callError', {
+        message: `${data.targetNickname} is currently offline.`,
+      });
+      return;
+    }
+
+    // Check if target is already in an active call
+    if (target) {
+      const targetActiveCall = this.findCallBySocketId(target.socketId);
+      if (targetActiveCall && targetActiveCall.state === 'active') {
+        client.emit('callBusy', {
+          nickname: target.nickname,
+          reason: 'User is currently on another call.',
+        });
+        return;
+      }
+    }
+
+    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newCallSession: ActiveCallSession = {
+      callId,
+      room,
+      callerSocketId: client.id,
+      callerNickname: session.nickname,
+      calleeSocketId: target?.socketId,
+      calleeNickname: target?.nickname,
+      isVoiceOnly: Boolean(data.isVoiceOnly),
+      state: 'calling',
+      startedAt: Date.now(),
+    };
+
+    // Auto-timeout ring timer (35 seconds)
+    newCallSession.ringTimer = setTimeout(() => {
+      const active = this.activeCallSessions.get(callId);
+      if (active && active.state === 'calling') {
+        this.activeCallSessions.delete(callId);
+        this.server.to(active.callerSocketId).emit('callTimeout', {
+          reason: 'No answer. Call timed out.',
+          callId,
+        });
+        if (active.calleeSocketId) {
+          this.server.to(active.calleeSocketId).emit('callMissed', {
+            callerName: active.callerNickname,
+            callId,
+          });
+        }
+      }
+    }, 35000);
+
+    this.activeCallSessions.set(callId, newCallSession);
+
     const callPayload = {
       callerName: data.callerName || session.nickname,
       from: session.nickname,
+      callerSocketId: client.id,
+      targetSocketId: target?.socketId,
+      isVoiceOnly: Boolean(data.isVoiceOnly),
+      callId,
     };
-    client.to(room).emit('userCalling', callPayload);
-    client.to(room).emit('callUser', callPayload);
+
+    console.log(
+      `[CallUser] ${session.nickname} calling ${target ? target.nickname : 'room'} (callId: ${callId}) in room: ${room}`,
+    );
+
+    if (target?.socketId) {
+      this.server.to(target.socketId).emit('userCalling', callPayload);
+      this.server.to(target.socketId).emit('callUser', callPayload);
+    } else {
+      client.to(room).emit('userCalling', callPayload);
+      client.to(room).emit('callUser', callPayload);
+    }
   }
 
   @SubscribeMessage('acceptCall')
@@ -892,13 +1042,43 @@ export class ChatGateway
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
     const room = session.passcode.trim();
+
+    // Find call session
+    const callSession =
+      (data.callId && this.activeCallSessions.get(data.callId)) ||
+      this.findCallBySocketId(client.id) ||
+      Array.from(this.activeCallSessions.values()).find(
+        (c) => c.room === room && c.state === 'calling',
+      );
+
+    if (callSession) {
+      if (callSession.ringTimer) {
+        clearTimeout(callSession.ringTimer);
+        callSession.ringTimer = undefined;
+      }
+      callSession.state = 'active';
+      callSession.calleeSocketId = client.id;
+      callSession.calleeNickname = session.nickname;
+    }
+
     console.log(
-      `[AcceptCall] ${session.nickname} accepted the call in room: ${room}`,
+      `[AcceptCall] ${session.nickname} accepted call in room: ${room}`,
     );
+
     const acceptPayload = {
       receiverName: data.receiverName || session.nickname,
       from: session.nickname,
+      receiverSocketId: client.id,
+      callId: callSession?.callId,
     };
+
+    if (callSession?.callerSocketId) {
+      this.server.to(callSession.callerSocketId).emit('callAccepted', acceptPayload);
+      this.server.to(callSession.callerSocketId).emit('acceptCall', acceptPayload);
+    } else if (data.targetSocketId) {
+      this.server.to(data.targetSocketId).emit('callAccepted', acceptPayload);
+      this.server.to(data.targetSocketId).emit('acceptCall', acceptPayload);
+    }
     client.to(room).emit('callAccepted', acceptPayload);
     client.to(room).emit('acceptCall', acceptPayload);
   }
@@ -915,10 +1095,27 @@ export class ChatGateway
     console.log(
       `[DeclineCall] ${session.nickname} declined the call in room: ${room}`,
     );
+
+    const callSession = this.findCallBySocketId(client.id);
+    if (callSession) {
+      if (callSession.ringTimer) clearTimeout(callSession.ringTimer);
+      this.activeCallSessions.delete(callSession.callId);
+    }
+
     const declinePayload = {
       receiverName: data.receiverName || session.nickname,
       from: session.nickname,
+      reason: data.reason || 'Call declined',
+      callId: callSession?.callId,
     };
+
+    if (callSession?.callerSocketId) {
+      this.server.to(callSession.callerSocketId).emit('callDeclined', declinePayload);
+      this.server.to(callSession.callerSocketId).emit('declineCall', declinePayload);
+    } else if (data.targetSocketId) {
+      this.server.to(data.targetSocketId).emit('callDeclined', declinePayload);
+      this.server.to(data.targetSocketId).emit('declineCall', declinePayload);
+    }
     client.to(room).emit('callDeclined', declinePayload);
     client.to(room).emit('declineCall', declinePayload);
   }
@@ -935,13 +1132,28 @@ export class ChatGateway
     console.log(
       `[WebRTCOffer] Relaying WebRTC offer from ${session.nickname} in room: ${room}`,
     );
+
+    const callSession = this.findCallBySocketId(client.id);
+
     const offerPayload = {
       offer: data.offer,
       from: session.nickname,
       callerName: data.callerName || session.nickname,
+      callerSocketId: client.id,
+      callId: callSession?.callId,
     };
-    client.to(room).emit('webrtcOfferRelay', offerPayload);
-    client.to(room).emit('webrtcOffer', offerPayload);
+
+    const targetSocketId =
+      data.targetSocketId ||
+      (callSession && callSession.callerSocketId === client.id ? callSession.calleeSocketId : undefined);
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('webrtcOfferRelay', offerPayload);
+      this.server.to(targetSocketId).emit('webrtcOffer', offerPayload);
+    } else {
+      client.to(room).emit('webrtcOfferRelay', offerPayload);
+      client.to(room).emit('webrtcOffer', offerPayload);
+    }
   }
 
   @SubscribeMessage('webrtcAnswer')
@@ -956,18 +1168,36 @@ export class ChatGateway
     console.log(
       `[WebRTCAnswer] Relaying WebRTC answer from ${session.nickname} in room: ${room}`,
     );
+
+    const callSession = this.findCallBySocketId(client.id);
+
     const answerPayload = {
       answer: data.answer,
       from: session.nickname,
       receiverName: data.receiverName || session.nickname,
+      receiverSocketId: client.id,
+      callId: callSession?.callId,
     };
-    client.to(room).emit('webrtcAnswerRelay', answerPayload);
-    client.to(room).emit('webrtcAnswer', answerPayload);
-    // Also broadcast callAccepted as an extra guarantee that caller transitions to active state
-    client.to(room).emit('callAccepted', {
-      receiverName: data.receiverName || session.nickname,
-      from: session.nickname,
-    });
+
+    const targetSocketId =
+      data.targetSocketId ||
+      (callSession && callSession.calleeSocketId === client.id ? callSession.callerSocketId : undefined);
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('webrtcAnswerRelay', answerPayload);
+      this.server.to(targetSocketId).emit('webrtcAnswer', answerPayload);
+      this.server.to(targetSocketId).emit('callAccepted', {
+        receiverName: data.receiverName || session.nickname,
+        from: session.nickname,
+      });
+    } else {
+      client.to(room).emit('webrtcAnswerRelay', answerPayload);
+      client.to(room).emit('webrtcAnswer', answerPayload);
+      client.to(room).emit('callAccepted', {
+        receiverName: data.receiverName || session.nickname,
+        from: session.nickname,
+      });
+    }
   }
 
   @SubscribeMessage('webrtcCandidate')
@@ -979,12 +1209,27 @@ export class ChatGateway
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
     const room = session.passcode.trim();
-    console.log(
-      `[WebRTCCandidate] Relaying WebRTC ICE candidate in room: ${room}`,
-    );
-    const candidatePayload = { candidate: data.candidate };
-    client.to(room).emit('webrtcCandidateRelay', candidatePayload);
-    client.to(room).emit('webrtcCandidate', candidatePayload);
+    const candidatePayload = {
+      candidate: data.candidate,
+      fromSocketId: client.id,
+    };
+
+    const callSession = this.findCallBySocketId(client.id);
+    const targetSocketId =
+      data.targetSocketId ||
+      (callSession
+        ? callSession.callerSocketId === client.id
+          ? callSession.calleeSocketId
+          : callSession.callerSocketId
+        : undefined);
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('webrtcCandidateRelay', candidatePayload);
+      this.server.to(targetSocketId).emit('webrtcCandidate', candidatePayload);
+    } else {
+      client.to(room).emit('webrtcCandidateRelay', candidatePayload);
+      client.to(room).emit('webrtcCandidate', candidatePayload);
+    }
   }
 
   @SubscribeMessage('endCall')
@@ -994,8 +1239,39 @@ export class ChatGateway
 
     const room = session.passcode.trim();
     console.log(`[EndCall] Relaying endCall in room: ${room}`);
-    client.to(room).emit('callEnded');
-    client.to(room).emit('endCall');
+
+    const callSession = this.findCallBySocketId(client.id);
+    if (callSession) {
+      if (callSession.ringTimer) clearTimeout(callSession.ringTimer);
+      this.activeCallSessions.delete(callSession.callId);
+
+      const peerSocketId =
+        callSession.callerSocketId === client.id
+          ? callSession.calleeSocketId
+          : callSession.callerSocketId;
+
+      if (peerSocketId) {
+        this.server.to(peerSocketId).emit('callEnded', {
+          reason: data.reason || 'Call ended by participant',
+          from: session.nickname,
+          callId: callSession.callId,
+        });
+        this.server.to(peerSocketId).emit('endCall', {
+          reason: data.reason || 'Call ended by participant',
+          from: session.nickname,
+          callId: callSession.callId,
+        });
+      }
+    }
+
+    client.to(room).emit('callEnded', {
+      reason: data.reason || 'Call ended',
+      from: session.nickname,
+    });
+    client.to(room).emit('endCall', {
+      reason: data.reason || 'Call ended',
+      from: session.nickname,
+    });
   }
 
   @SubscribeMessage('togglePip')
