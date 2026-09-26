@@ -55,6 +55,7 @@ import {
 } from './dto/status.dto';
 import {
   WatchPartyActionDto,
+  WatchPartyClockPingDto,
   GetWatchPartyDto,
   WatchPartyReactionDto,
   WatchPartyCommentDto,
@@ -75,6 +76,8 @@ interface WatchPartyState {
   isPlaying: boolean;
   playbackRate: number;
   lastUpdatedTimestamp: number;
+  scheduledStartServerTime?: number;
+  version: number;
   lastActorNickname: string;
   isBuffering: boolean;
   bufferingUsers: string[];
@@ -299,8 +302,14 @@ export class ChatGateway
     if (!state.isPlaying || state.isBuffering) {
       return state.currentTime;
     }
+    const now = Date.now();
+    // If playback is scheduled to start in the future, it has not advanced yet
+    if (state.scheduledStartServerTime && state.scheduledStartServerTime > now) {
+      return state.currentTime;
+    }
+    const anchorTime = state.scheduledStartServerTime || state.lastUpdatedTimestamp;
     const elapsedSec =
-      ((Date.now() - state.lastUpdatedTimestamp) / 1000) *
+      Math.max(0, (now - anchorTime) / 1000) *
       (state.playbackRate || 1);
     const calculated = state.currentTime + elapsedSec;
     if (
@@ -513,8 +522,10 @@ export class ChatGateway
       if (wpState.bufferingUsers.length === 0) {
         wpState.isBuffering = false;
         wpState.lastUpdatedTimestamp = Date.now();
+        wpState.scheduledStartServerTime = undefined;
         this.clearWatchPartyBufferTimer(userInfo.passcode);
       }
+      wpState.version = (wpState.version || 0) + 1;
       this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
         action: 'ready',
         videoSource: wpState.videoSource,
@@ -524,6 +535,8 @@ export class ChatGateway
         isBuffering: wpState.isBuffering,
         bufferingUsers: wpState.bufferingUsers,
         lastUpdatedTimestamp: wpState.lastUpdatedTimestamp,
+        scheduledStartServerTime: undefined,
+        version: wpState.version,
         lastActorNickname: userInfo.nickname,
         hostNickname: wpState.hostNickname,
         serverTime: Date.now(),
@@ -535,6 +548,8 @@ export class ChatGateway
       wpState.isPlaying = false;
       wpState.currentTime = this.getCalculatedWatchPartyPosition(wpState);
       wpState.lastUpdatedTimestamp = Date.now();
+      wpState.scheduledStartServerTime = undefined;
+      wpState.version = (wpState.version || 0) + 1;
       this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
         action: 'partner_disconnected',
         videoSource: wpState.videoSource,
@@ -544,6 +559,8 @@ export class ChatGateway
         isBuffering: false,
         bufferingUsers: wpState.bufferingUsers || [],
         lastUpdatedTimestamp: wpState.lastUpdatedTimestamp,
+        scheduledStartServerTime: undefined,
+        version: wpState.version,
         lastActorNickname: userInfo.nickname,
         hostNickname: wpState.hostNickname,
         isHostOnly: wpState.isHostOnly,
@@ -1910,6 +1927,12 @@ export class ChatGateway
     let state = this.watchPartyRooms.get(targetPasscode);
     const now = Date.now();
 
+    // Cancel pending eviction timer if users are actively interacting
+    if (this.watchPartyCleanupTimers.has(targetPasscode)) {
+      clearTimeout(this.watchPartyCleanupTimers.get(targetPasscode)!);
+      this.watchPartyCleanupTimers.delete(targetPasscode);
+    }
+
     if (!state) {
       state = {
         isActive: true,
@@ -1918,6 +1941,8 @@ export class ChatGateway
         isPlaying: Boolean(data.isPlaying),
         playbackRate: data.playbackRate || 1,
         lastUpdatedTimestamp: now,
+        scheduledStartServerTime: undefined,
+        version: 1,
         lastActorNickname: session.nickname,
         hostNickname: session.nickname,
         isHostOnly: false,
@@ -1950,6 +1975,7 @@ export class ChatGateway
           state.currentTime = data.currentTime;
         state.lastActorNickname = session.nickname;
         state.lastUpdatedTimestamp = now;
+        state.version = (state.version || 0) + 1;
         // Notify other participant(s) in the room with an invitation popup
         client.to(targetPasscode).emit('watchPartyInvite', {
           from: session.nickname,
@@ -1961,17 +1987,25 @@ export class ChatGateway
       case 'accept':
         state.isActive = true;
         state.isPlaying = true;
+        // Preserve running movie timestamp if already playing; don't reset to 0:00!
         state.currentTime =
-          data.currentTime !== undefined
-            ? data.currentTime
-            : state.currentTime || 0;
-        state.lastUpdatedTimestamp = now;
+          currentPos > 0
+            ? currentPos
+            : data.currentTime !== undefined
+              ? data.currentTime
+              : state.currentTime || 0;
+        const acceptScheduledStart = now + 350;
+        state.lastUpdatedTimestamp = acceptScheduledStart;
+        state.scheduledStartServerTime = acceptScheduledStart;
         state.lastActorNickname = session.nickname;
         state.isBuffering = false;
         state.bufferingUsers = [];
+        state.version = (state.version || 0) + 1;
         this.server.to(targetPasscode).emit('watchPartyAccepted', {
           acceptedBy: session.nickname,
           videoSource: state.videoSource,
+          scheduledStartServerTime: acceptScheduledStart,
+          currentTime: state.currentTime,
         });
         break;
 
@@ -1982,21 +2016,43 @@ export class ChatGateway
         return { success: true };
 
       case 'play':
+        // Idempotency: if already playing within 500ms, don't restart scheduled timer
+        if (
+          state.isPlaying &&
+          state.scheduledStartServerTime &&
+          Math.abs(now - state.scheduledStartServerTime) < 500
+        ) {
+          return { success: true };
+        }
+        // Scheduled future playback to eliminate asymmetric network latency lag
+        const playScheduledStart = now + 300;
         state.isPlaying = true;
         state.currentTime =
           data.currentTime !== undefined ? data.currentTime : currentPos;
-        state.lastUpdatedTimestamp = now;
+        state.lastUpdatedTimestamp = playScheduledStart;
+        state.scheduledStartServerTime = playScheduledStart;
         state.lastActorNickname = session.nickname;
         state.isBuffering = false;
         state.bufferingUsers = [];
+        state.version = (state.version || 0) + 1;
         break;
 
       case 'pause':
+        // Idempotency: if already paused and position hasn't drifted significantly, avoid jitter
+        if (
+          !state.isPlaying &&
+          (data.currentTime === undefined ||
+            Math.abs(data.currentTime - state.currentTime) < 0.5)
+        ) {
+          return { success: true };
+        }
         state.isPlaying = false;
         state.currentTime =
           data.currentTime !== undefined ? data.currentTime : currentPos;
         state.lastUpdatedTimestamp = now;
+        state.scheduledStartServerTime = undefined;
         state.lastActorNickname = session.nickname;
+        state.version = (state.version || 0) + 1;
         break;
 
       case 'seek':
@@ -2005,8 +2061,16 @@ export class ChatGateway
         if (data.isPlaying !== undefined) {
           state.isPlaying = data.isPlaying;
         }
-        state.lastUpdatedTimestamp = now;
+        if (state.isPlaying) {
+          const seekScheduledStart = now + 300;
+          state.lastUpdatedTimestamp = seekScheduledStart;
+          state.scheduledStartServerTime = seekScheduledStart;
+        } else {
+          state.lastUpdatedTimestamp = now;
+          state.scheduledStartServerTime = undefined;
+        }
         state.lastActorNickname = session.nickname;
+        state.version = (state.version || 0) + 1;
         break;
 
       case 'rate':
@@ -2014,7 +2078,9 @@ export class ChatGateway
           data.currentTime !== undefined ? data.currentTime : currentPos;
         state.playbackRate = data.playbackRate || 1;
         state.lastUpdatedTimestamp = now;
+        state.scheduledStartServerTime = undefined;
         state.lastActorNickname = session.nickname;
+        state.version = (state.version || 0) + 1;
         break;
 
       case 'change_video':
@@ -2023,10 +2089,12 @@ export class ChatGateway
         state.isPlaying = false;
         state.playbackRate = 1;
         state.lastUpdatedTimestamp = now;
+        state.scheduledStartServerTime = undefined;
         state.lastActorNickname = session.nickname;
         state.isBuffering = false;
         state.bufferingUsers = [];
         state.isActive = true;
+        state.version = (state.version || 0) + 1;
         this.clearWatchPartyBufferTimer(targetPasscode);
         break;
 
@@ -2037,6 +2105,8 @@ export class ChatGateway
         state.isBuffering = true;
         state.currentTime = currentPos;
         state.lastUpdatedTimestamp = now;
+        state.scheduledStartServerTime = undefined;
+        state.version = (state.version || 0) + 1;
 
         // Auto-release watchdog: after 10s of buffering without ready, auto-unblock room
         this.clearWatchPartyBufferTimer(targetPasscode);
@@ -2047,6 +2117,8 @@ export class ChatGateway
             st.isBuffering = false;
             st.bufferingUsers = [];
             st.lastUpdatedTimestamp = Date.now();
+            st.scheduledStartServerTime = undefined;
+            st.version = (st.version || 0) + 1;
             this.server.to(targetPasscode).emit('watchPartyUpdate', {
               action: 'ready',
               videoSource: st.videoSource,
@@ -2056,6 +2128,8 @@ export class ChatGateway
               isBuffering: false,
               bufferingUsers: [],
               lastUpdatedTimestamp: st.lastUpdatedTimestamp,
+              scheduledStartServerTime: undefined,
+              version: st.version,
               lastActorNickname: 'Auto-Watchdog',
               hostNickname: st.hostNickname,
               serverTime: Date.now(),
@@ -2071,8 +2145,24 @@ export class ChatGateway
         );
         if (state.bufferingUsers.length === 0) {
           state.isBuffering = false;
-          state.lastUpdatedTimestamp = now;
+          if (state.isPlaying) {
+            const readyScheduledStart = now + 300;
+            state.lastUpdatedTimestamp = readyScheduledStart;
+            state.scheduledStartServerTime = readyScheduledStart;
+          } else {
+            state.lastUpdatedTimestamp = now;
+            state.scheduledStartServerTime = undefined;
+          }
           this.clearWatchPartyBufferTimer(targetPasscode);
+        }
+        state.version = (state.version || 0) + 1;
+        break;
+
+      case 'sync_tick':
+      case 'heartbeat':
+        if (state.isPlaying && !state.isBuffering) {
+          state.currentTime = currentPos;
+          state.lastUpdatedTimestamp = now;
         }
         break;
 
@@ -2090,6 +2180,7 @@ export class ChatGateway
         if (session.nickname === state.hostNickname) {
           state.isHostOnly = !state.isHostOnly;
           state.lastUpdatedTimestamp = now;
+          state.version = (state.version || 0) + 1;
         }
         break;
     }
@@ -2103,6 +2194,8 @@ export class ChatGateway
       isBuffering: state.isBuffering,
       bufferingUsers: state.bufferingUsers,
       lastUpdatedTimestamp: state.lastUpdatedTimestamp,
+      scheduledStartServerTime: state.scheduledStartServerTime,
+      version: state.version || 1,
       lastActorNickname: session.nickname,
       hostNickname: state.hostNickname,
       isHostOnly: Boolean(state.isHostOnly),
@@ -2112,6 +2205,18 @@ export class ChatGateway
     // Broadcast synchronized state to everyone in the room
     this.server.to(targetPasscode).emit('watchPartyUpdate', payload);
     return { success: true, state: payload };
+  }
+
+  @SubscribeMessage('watchPartyClockPing')
+  handleWatchPartyClockPing(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WatchPartyClockPingDto,
+  ) {
+    const serverTime = Date.now();
+    return {
+      clientSendTime: data?.clientSendTime || 0,
+      serverTime,
+    };
   }
 
   @SubscribeMessage('getWatchPartyState')
@@ -2125,6 +2230,11 @@ export class ChatGateway
       return { success: false, message: 'Unauthorized session' };
     }
 
+    if (this.watchPartyCleanupTimers.has(targetPasscode)) {
+      clearTimeout(this.watchPartyCleanupTimers.get(targetPasscode)!);
+      this.watchPartyCleanupTimers.delete(targetPasscode);
+    }
+
     const state = this.watchPartyRooms.get(targetPasscode);
     if (!state || !state.isActive) {
       client.emit('watchPartyState', null);
@@ -2132,6 +2242,7 @@ export class ChatGateway
     }
 
     const calculatedTime = this.getCalculatedWatchPartyPosition(state);
+    const now = Date.now();
     const payload = {
       action: 'sync',
       videoSource: state.videoSource,
@@ -2141,10 +2252,12 @@ export class ChatGateway
       isBuffering: state.isBuffering,
       bufferingUsers: state.bufferingUsers,
       lastUpdatedTimestamp: state.lastUpdatedTimestamp,
+      scheduledStartServerTime: state.scheduledStartServerTime,
+      version: state.version || 1,
       lastActorNickname: state.lastActorNickname,
       hostNickname: state.hostNickname,
       isHostOnly: Boolean(state.isHostOnly),
-      serverTime: Date.now(),
+      serverTime: now,
     };
 
     client.emit('watchPartyState', payload);

@@ -311,6 +311,54 @@ const ChatHeader = memo(function ChatHeader({
           </motion.button>
 
 
+          {/* Watch Party Cinema Button with Live Active Glow */}
+          {onOpenWatchParty && (
+            <motion.button
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
+              type="button"
+              className="m3-action-btn"
+              onClick={onOpenWatchParty}
+              style={{
+                position: 'relative',
+                backgroundColor: isWatchPartyActive ? 'rgba(0, 168, 132, 0.18)' : 'transparent',
+                border: isWatchPartyActive ? '1px solid rgba(0, 168, 132, 0.4)' : '1px solid transparent',
+                color: isWatchPartyActive ? '#00a884' : '#8696a0',
+                width: '38px',
+                height: '38px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title={
+                isWatchPartyActive
+                  ? 'Watch Party Active (Click to Open Cinema)'
+                  : 'Start Watch Party (Watch Movies Together in Perfect Sync)'
+              }
+            >
+              {isWatchPartyActive && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '6px',
+                    right: '6px',
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    backgroundColor: '#00a884',
+                    boxShadow: '0 0 6px #00a884',
+                  }}
+                />
+              )}
+              <Icon
+                icon={isWatchPartyActive ? 'solar:clapperboard-play-bold-duotone' : 'solar:clapperboard-play-linear'}
+                width="20"
+                height="20"
+              />
+            </motion.button>
+          )}
+
           {/* Search Icon Button with M3 State Layer & Tactile Motion Feedback */}
           <motion.button
             whileHover={{ scale: 1.12 }}

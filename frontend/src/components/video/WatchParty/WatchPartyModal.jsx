@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import Hls from 'hls.js';
+import { getTrendingMovies, searchMovies, getStreamSources, getProxiedStreamUrl } from '../../../services/movieService';
 import './WatchPartyModal.css';
 
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
@@ -142,6 +143,11 @@ export default function WatchPartyModal({
     sendReaction,
     sendComment,
     closeWatchParty,
+    performClockSync,
+    serverClockSkew,
+    wakeLockActive,
+    audioDelayOffset: hookAudioDelayOffset,
+    setAudioDelayOffset: hookSetAudioDelayOffset,
   } = watchParty;
 
   // YouTube Video ID extractor (declared early to prevent TDZ in effects)
@@ -180,7 +186,149 @@ export default function WatchPartyModal({
   const [showStreamBar, setShowStreamBar] = useState(true);
   const streamBarTimeoutRef = useRef(null);
 
-  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+  // Smooth Scrubber Dragging States (Prevents 60Hz socket flooding during drag)
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubTargetTime, setScrubTargetTime] = useState(0);
+
+  // HLS Multi-Quality & Subtitle States
+  const [hlsLevels, setHlsLevels] = useState([]);
+  const [selectedHlsLevel, setSelectedHlsLevel] = useState(-1);
+  const hlsRef = useRef(null);
+  const [isSubtitlesOn, setIsSubtitlesOn] = useState(true);
+
+  // Intelligent WebRTC Voice Call Audio Ducking
+  const [isAudioDuckingEnabled, setIsAudioDuckingEnabled] = useState(true);
+  const isCallActive = Boolean(webRTC && (webRTC.callState === 'active' || webRTC.callState === 'calling'));
+
+  // Bluetooth Audio Delay Offset Calibration (-300ms to +300ms)
+  const [localAudioDelayOffset, setLocalAudioDelayOffset] = useState(() => {
+    try {
+      const saved = localStorage.getItem('watchPartyAudioDelayOffset');
+      return saved !== null ? parseInt(saved, 10) : 0;
+    } catch (_) {
+      return 0;
+    }
+  });
+  const audioDelayOffset = hookAudioDelayOffset !== undefined ? hookAudioDelayOffset : localAudioDelayOffset;
+  const [showAudioDelayModal, setShowAudioDelayModal] = useState(false);
+  const [isNativePip, setIsNativePip] = useState(false);
+
+  const handleAudioDelayChange = (offsetMs) => {
+    if (hookSetAudioDelayOffset) {
+      hookSetAudioDelayOffset(offsetMs);
+    } else {
+      setLocalAudioDelayOffset(offsetMs);
+      try {
+        localStorage.setItem('watchPartyAudioDelayOffset', String(offsetMs));
+      } catch (_) {}
+    }
+    if (offsetMs !== 0) {
+      setSyncNotice(`🎧 Audio sync calibrated: ${offsetMs > 0 ? `+${offsetMs}` : offsetMs}ms for wireless headphones`);
+      setTimeout(() => setSyncNotice(null), 3000);
+    }
+  };
+
+  const toggleNativePip = async () => {
+    const video = videoElementRef.current;
+    if (!video) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setIsNativePip(false);
+      } else if (document.pictureInPictureEnabled && video.requestPictureInPicture) {
+        await video.requestPictureInPicture();
+        setIsNativePip(true);
+      }
+    } catch (err) {
+      console.warn('[WatchParty] Native PiP error:', err);
+    }
+  };
+
+  // TMDB & Consumet API Movie Explorer States
+  const [drawerTab, setDrawerTab] = useState('browse'); // 'browse' | 'custom'
+  const [movieSearchQuery, setMovieSearchQuery] = useState('');
+  const [trendingMovies, setTrendingMovies] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isLoadingMovies, setIsLoadingMovies] = useState(false);
+  const [isExtractingStream, setIsExtractingStream] = useState(false);
+
+  // Fetch trending movies from TMDB on component mount
+  useEffect(() => {
+    getTrendingMovies(1).then((items) => {
+      if (items && items.length > 0) setTrendingMovies(items);
+    });
+  }, []);
+
+  // Search TMDB movies with debounce
+  useEffect(() => {
+    if (!movieSearchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setIsLoadingMovies(true);
+      searchMovies(movieSearchQuery)
+        .then((items) => setSearchResults(items || []))
+        .finally(() => setIsLoadingMovies(false));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [movieSearchQuery]);
+
+  const handleSelectMovie = async (movie) => {
+    if (isControlLocked) {
+      setSyncNotice(`🔒 Only the party host (${watchParty?.hostNickname || 'Host'}) can change the movie`);
+      setTimeout(() => setSyncNotice(null), 3500);
+      return;
+    }
+
+    setIsExtractingStream(true);
+    setSyncNotice(`🍿 Resolving streams for "${movie.title}" via Consumet API...`);
+    try {
+      const data = await getStreamSources(movie.title, movie.tmdbId, movie.mediaType);
+      const directSource = data?.sources?.find((s) => s.isM3U8) || data?.sources?.[0];
+      const subtitlesUrl = data?.subtitles?.[0]?.url;
+
+      let sourceToUse;
+      if (directSource?.url) {
+        sourceToUse = {
+          url: directSource.url,
+          title: movie.title,
+          type: 'direct',
+          provider: data.provider || 'Consumet HLS',
+          subtitlesUrl,
+          tmdbId: movie.tmdbId,
+        };
+      } else {
+        sourceToUse = {
+          url: data?.embedFallbackUrl || `https://cinemaos.live/watch/movie/${movie.tmdbId}`,
+          title: movie.title,
+          type: 'embed',
+          provider: 'CinemaOS / Multi-Mirror',
+          tmdbId: movie.tmdbId,
+        };
+      }
+
+      changeVideo(sourceToUse);
+      setShowDrawer(false);
+      setSyncNotice(`🎬 Now playing "${movie.title}" in perfect sync!`);
+      setTimeout(() => setSyncNotice(null), 4000);
+    } catch (err) {
+      console.warn('Fallback to embed mirror:', err);
+      changeVideo({
+        url: `https://cinemaos.live/watch/movie/${movie.tmdbId}`,
+        title: movie.title,
+        type: 'embed',
+        provider: 'CinemaOS',
+        tmdbId: movie.tmdbId,
+      });
+      setShowDrawer(false);
+    } finally {
+      setIsExtractingStream(false);
+    }
+  };
+
+  const displayedTime = isScrubbing ? scrubTargetTime : currentTime;
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (displayedTime / duration) * 100)) : 0;
 
   // Memoize embed URL so it doesn't reload the iframe on every 1-second timer tick
   const embedSrc = useMemo(() => {
@@ -263,18 +411,31 @@ export default function WatchPartyModal({
     const video = videoElementRef.current;
     if (!video || !videoSource?.url) return;
 
-    const isHls = /\.m3u8(\?.*)?$/i.test(videoSource.url) || videoSource.provider === 'HLS Stream';
+    const isHls =
+      /\.m3u8(\?.*)?$/i.test(videoSource.url) ||
+      videoSource.provider === 'HLS Stream' ||
+      videoSource.provider === 'Consumet (FlixHQ)' ||
+      videoSource.provider === 'Consumet HLS';
     let hls = null;
 
     if (isHls) {
+      const streamToLoad = getProxiedStreamUrl(videoSource.url);
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
+          maxSeekHole: 0.1,
+          accurateSeeking: true,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
         });
-        hls.loadSource(videoSource.url);
+        hlsRef.current = hls;
+        hls.loadSource(streamToLoad);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+          if (data?.levels && data.levels.length > 0) {
+            setHlsLevels(data.levels);
+          }
           if (currentTime > 0) {
             video.currentTime = currentTime;
           }
@@ -282,8 +443,48 @@ export default function WatchPartyModal({
             video.play().catch(() => {});
           }
         });
+
+        // Automatic CDN Token Expiry & Network 403 Recovery
+        hls.on(Hls.Events.ERROR, async (_event, data) => {
+          if (data.fatal) {
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              const status = data.response?.code;
+              if (status === 403 || status === 404) {
+                if (videoSource?.tmdbId && videoSource?.title) {
+                  setSyncNotice('🔄 Stream token expired. Auto-refreshing stream in sync...');
+                  try {
+                    const refreshed = await getStreamSources(
+                      videoSource.title,
+                      videoSource.tmdbId,
+                      videoSource.mediaType || 'movie',
+                      videoSource.season || 1,
+                      videoSource.episode || 1,
+                    );
+                    const freshDirect =
+                      refreshed?.sources?.find((s) => s.isM3U8) ||
+                      refreshed?.sources?.[0];
+                    if (freshDirect?.url) {
+                      hls.loadSource(getProxiedStreamUrl(freshDirect.url));
+                      hls.startLoad();
+                      setSyncNotice('✅ Stream restored in sync!');
+                      setTimeout(() => setSyncNotice(null), 3000);
+                      return;
+                    }
+                  } catch (e) {
+                    console.warn('[WatchParty] Failed to refresh stream token', e);
+                  }
+                }
+              }
+              hls.startLoad();
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError();
+            } else {
+              hls.destroy();
+            }
+          }
+        });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = videoSource.url;
+        video.src = streamToLoad;
       }
     }
 
@@ -291,8 +492,45 @@ export default function WatchPartyModal({
       if (hls) {
         hls.destroy();
       }
+      hlsRef.current = null;
+      setHlsLevels([]);
     };
   }, [videoSource?.url, isPlaying]);
+
+  // Intelligent Voice Call Audio Ducking Engine
+  // Automatically balances movie volume by 65% when friends are on a live WebRTC call
+  useEffect(() => {
+    const duckFactor = isCallActive && isAudioDuckingEnabled ? 0.35 : 1.0;
+    const targetVol = isMuted ? 0 : volume * duckFactor;
+
+    if (videoElementRef.current) {
+      videoElementRef.current.volume = Math.max(0, Math.min(1, targetVol));
+    }
+    if (ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === 'function') {
+      ytPlayerRef.current.setVolume(Math.round(targetVol * 100));
+    }
+  }, [volume, isMuted, isCallActive, isAudioDuckingEnabled, videoElementRef, ytPlayerRef]);
+
+  // HLS stream resolution switcher
+  const handleHlsLevelChange = (e) => {
+    const level = parseInt(e.target.value, 10);
+    setSelectedHlsLevel(level);
+    if (hlsRef.current) {
+      hlsRef.current.currentLevel = level;
+    }
+  };
+
+  // Closed Captions / Subtitle switcher
+  const toggleSubtitles = useCallback(() => {
+    const next = !isSubtitlesOn;
+    setIsSubtitlesOn(next);
+    const video = videoElementRef.current;
+    if (video && video.textTracks && video.textTracks.length > 0) {
+      for (let i = 0; i < video.textTracks.length; i++) {
+        video.textTracks[i].mode = next ? 'showing' : 'hidden';
+      }
+    }
+  }, [isSubtitlesOn, videoElementRef]);
 
   // Real YouTube IFrame API Integration for zero-lag bidirectional synchronization
   useEffect(() => {
@@ -337,11 +575,11 @@ export default function WatchPartyModal({
               if (event.data === window.YT.PlayerState.PLAYING) {
                 const time = event.target.getCurrentTime();
                 if (typeof time === 'number') setCurrentTime(time);
-                if (!isPlaying) togglePlay();
+                if (!isPlaying) togglePlay(true, time);
               } else if (event.data === window.YT.PlayerState.PAUSED) {
                 const time = event.target.getCurrentTime();
                 if (typeof time === 'number') setCurrentTime(time);
-                if (isPlaying) togglePlay();
+                if (isPlaying) togglePlay(false, time);
               } else if (event.data === window.YT.PlayerState.BUFFERING) {
                 notifyBuffering(true);
               }
@@ -404,6 +642,7 @@ export default function WatchPartyModal({
   const executeSyncScene = useCallback(
     (targetSeconds) => {
       const cleanSec = Math.max(0, Math.floor(targetSeconds || 0));
+      performClockSync?.();
       seek(cleanSec);
       setSyncKey((k) => k + 1);
 
@@ -421,7 +660,7 @@ export default function WatchPartyModal({
       setTimeout(() => setSyncNotice(null), 4000);
       setShowSyncModal(false);
     },
-    [seek, sendIframeCommand, recipientUser?.nickname, videoElementRef, ytPlayerRef]
+    [seek, sendIframeCommand, recipientUser?.nickname, videoElementRef, ytPlayerRef, performClockSync]
   );
 
   // Partner scene sync update listener
@@ -539,6 +778,12 @@ export default function WatchPartyModal({
 
   const handleLoadedMetadata = (e) => {
     setDuration(e.currentTarget.duration || 0);
+    const v = e.currentTarget;
+    if (v) {
+      v.preservesPitch = true;
+      v.mozPreservesPitch = true;
+      v.webkitPreservesPitch = true;
+    }
     if (currentTime > 0) {
       e.currentTarget.currentTime = currentTime;
     }
@@ -564,6 +809,41 @@ export default function WatchPartyModal({
     seek(target);
   };
 
+  const getScrubberPositionTime = useCallback((clientX) => {
+    if (!scrubberRef.current || !duration) return 0;
+    const rect = scrubberRef.current.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return pos * duration;
+  }, [duration]);
+
+  const handleScrubberPointerDown = (e) => {
+    if (isControlLocked) {
+      setSyncNotice(`🔒 Only the party host (${watchParty?.hostNickname || 'Host'}) can seek the movie`);
+      setTimeout(() => setSyncNotice(null), 3500);
+      return;
+    }
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setIsScrubbing(true);
+    const target = getScrubberPositionTime(e.clientX);
+    setScrubTargetTime(target);
+  };
+
+  const handleScrubberPointerMove = (e) => {
+    if (!isScrubbing) return;
+    const target = getScrubberPositionTime(e.clientX);
+    setScrubTargetTime(target);
+  };
+
+  const handleScrubberPointerUp = (e) => {
+    if (!isScrubbing) return;
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch (_) {}
+    setIsScrubbing(false);
+    const target = getScrubberPositionTime(e.clientX);
+    seek(target);
+  };
+
   const handleScrubberClick = (e) => {
     if (isControlLocked) {
       setSyncNotice(`🔒 Only the party host (${watchParty?.hostNickname || 'Host'}) can seek the movie`);
@@ -571,9 +851,7 @@ export default function WatchPartyModal({
       return;
     }
     if (!scrubberRef.current || !duration) return;
-    const rect = scrubberRef.current.getBoundingClientRect();
-    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const target = pos * duration;
+    const target = getScrubberPositionTime(e.clientX);
     seek(target);
   };
 
@@ -581,12 +859,14 @@ export default function WatchPartyModal({
     const val = parseFloat(e.target.value);
     setVolume(val);
     setIsMuted(val === 0);
+    const duckFactor = isCallActive && isAudioDuckingEnabled ? 0.35 : 1.0;
+    const targetVol = val * duckFactor;
     if (videoElementRef.current) {
-      videoElementRef.current.volume = val;
+      videoElementRef.current.volume = targetVol;
       videoElementRef.current.muted = val === 0;
     }
     if (ytPlayerRef.current && typeof ytPlayerRef.current.setVolume === 'function') {
-      ytPlayerRef.current.setVolume(Math.round(val * 100));
+      ytPlayerRef.current.setVolume(Math.round(targetVol * 100));
       if (val === 0) {
         ytPlayerRef.current.mute?.();
       } else {
@@ -598,11 +878,12 @@ export default function WatchPartyModal({
   const toggleMute = () => {
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
+    const duckFactor = isCallActive && isAudioDuckingEnabled ? 0.35 : 1.0;
     if (videoElementRef.current) {
       videoElementRef.current.muted = nextMuted;
       if (!nextMuted && volume === 0) {
         setVolume(0.5);
-        videoElementRef.current.volume = 0.5;
+        videoElementRef.current.volume = 0.5 * duckFactor;
       }
     }
     if (ytPlayerRef.current) {
@@ -611,7 +892,7 @@ export default function WatchPartyModal({
       } else {
         ytPlayerRef.current.unMute?.();
         if (volume === 0) {
-          ytPlayerRef.current.setVolume?.(50);
+          ytPlayerRef.current.setVolume?.(Math.round(50 * duckFactor));
           setVolume(0.5);
         }
       }
@@ -1102,6 +1383,18 @@ export default function WatchPartyModal({
               />
             </button>
 
+            {/* Native OS Picture-in-Picture Button */}
+            {typeof document !== 'undefined' && document.pictureInPictureEnabled && (
+              <button
+                type="button"
+                className={`watch-party-btn-icon ${isNativePip ? 'active' : ''}`}
+                onClick={toggleNativePip}
+                title={isNativePip ? 'Exit Native PiP' : 'Native Floating Picture-in-Picture (OS level)'}
+              >
+                <Icon icon="solar:pip-bold-duotone" width="20" />
+              </button>
+            )}
+
             <button
               type="button"
               className="watch-party-btn-icon"
@@ -1280,18 +1573,21 @@ export default function WatchPartyModal({
               onWaiting={() => notifyBuffering(true)}
               onPlaying={() => {
                 notifyBuffering(false);
-                if (!isPlaying && !isLocalActionRef?.current) {
+                if (watchParty?.isRemoteSyncRef?.current || isLocalActionRef?.current) return;
+                if (!isPlaying) {
                   handleTogglePlay();
                 }
               }}
               onPause={() => {
-                if (isPlaying && !isLocalActionRef?.current) {
+                if (watchParty?.isRemoteSyncRef?.current || isLocalActionRef?.current) return;
+                if (isPlaying) {
                   handleTogglePlay();
                 }
               }}
               onSeeked={(e) => {
+                if (watchParty?.isRemoteSyncRef?.current || isLocalActionRef?.current) return;
                 const time = e.currentTarget.currentTime;
-                if (Math.abs(time - currentTime) > 0.8 && !isLocalActionRef?.current) {
+                if (Math.abs(time - currentTime) > 0.8) {
                   handleSeekSafe(time);
                 }
               }}
@@ -1420,13 +1716,17 @@ export default function WatchPartyModal({
               onClick={handleJumpToTimePrompt}
               title="Click to jump to specific scene timestamp"
             >
-              {formatTime(currentTime)}
+              {formatTime(displayedTime)}
             </span>
 
             <div
               ref={scrubberRef}
-              className="watch-party-scrubber"
+              className={`watch-party-scrubber ${isScrubbing ? 'is-scrubbing' : ''}`}
               onClick={handleScrubberClick}
+              onPointerDown={handleScrubberPointerDown}
+              onPointerMove={handleScrubberPointerMove}
+              onPointerUp={handleScrubberPointerUp}
+              onPointerCancel={handleScrubberPointerUp}
               title="Click or drag to seek in sync"
             >
               <div
@@ -1512,10 +1812,69 @@ export default function WatchPartyModal({
                   className="watch-party-volume-slider"
                   title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
                 />
+
+                {/* Bluetooth Audio Delay Calibration Button */}
+                <button
+                  type="button"
+                  className={`watch-party-btn-icon ${audioDelayOffset !== 0 ? 'active' : ''}`}
+                  style={{ width: '28px', height: '28px', marginLeft: '2px' }}
+                  onClick={() => setShowAudioDelayModal(true)}
+                  title={`Bluetooth Headphone Audio Sync: ${audioDelayOffset > 0 ? `+${audioDelayOffset}` : audioDelayOffset}ms`}
+                >
+                  <Icon icon="solar:headphones-round-sound-bold-duotone" width="16" />
+                </button>
               </div>
+
+              {/* Audio Ducking Indicator / Toggle (when in live call) */}
+              {isCallActive && (
+                <button
+                  type="button"
+                  className={`audio-ducking-pill ${isAudioDuckingEnabled ? 'active' : 'off'}`}
+                  onClick={() => setIsAudioDuckingEnabled(!isAudioDuckingEnabled)}
+                  title={
+                    isAudioDuckingEnabled
+                      ? 'Voice Call Audio Ducking is active: movie volume is balanced at 35% so voices stay crystal clear. Click to set to full volume.'
+                      : 'Audio Ducking is off: movie is at 100% volume. Click to enable ducking.'
+                  }
+                >
+                  <Icon icon={isAudioDuckingEnabled ? 'solar:headphones-round-sound-bold-duotone' : 'solar:headphones-round-bold-duotone'} width="14" />
+                  <span className="ducking-text">{isAudioDuckingEnabled ? 'Ducked 35%' : 'Full Vol'}</span>
+                </button>
+              )}
             </div>
 
             <div className="watch-party-right-controls">
+              {/* Subtitles (CC) Toggle Button (when subtitles are available) */}
+              {(videoSource?.subtitlesUrl || customSubtitleUrl) && (
+                <button
+                  type="button"
+                  className={`watch-party-btn-icon cc-btn ${isSubtitlesOn ? 'active' : ''}`}
+                  onClick={toggleSubtitles}
+                  title={isSubtitlesOn ? 'Turn Subtitles OFF' : 'Turn Subtitles ON'}
+                >
+                  <Icon icon={isSubtitlesOn ? 'solar:subtitles-bold' : 'solar:subtitles-linear'} width="16" />
+                  <span className="cc-label">CC</span>
+                </button>
+              )}
+
+              {/* HLS Stream Quality Level Selector */}
+              {hlsLevels.length > 0 && (
+                <select
+                  className="watch-party-rate-select watch-party-quality-select"
+                  value={selectedHlsLevel}
+                  onChange={handleHlsLevelChange}
+                  title="Stream Resolution & Quality (HLS)"
+                >
+                  <option value={-1}>Auto (Adaptive)</option>
+                  {hlsLevels.map((lvl, idx) => (
+                    <option key={idx} value={idx}>
+                      {lvl.height ? `${lvl.height}p` : `Stream ${idx + 1}`}
+                      {lvl.bitrate ? ` (${Math.round(lvl.bitrate / 1000)}k)` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+
               {/* Resync Scene Button */}
               <button
                 type="button"
@@ -1542,20 +1901,31 @@ export default function WatchPartyModal({
                 <option value={2}>2.0x</option>
               </select>
 
-              {/* Partner Sync Status Pill */}
+              {/* Partner Sync Status Pill with Sub-50ms Accuracy Badge */}
               <div
                 className={`partner-sync-indicator ${partnerSyncStatus}`}
-                title={`Sync Status: ${partnerSyncStatus}`}
+                title={`Sync Status: ${partnerSyncStatus} • Clock Offset: ${Math.round(serverClockSkew || 0)}ms`}
               >
                 <span className="sync-status-dot" />
                 <span className="sync-status-text">
                   {partnerSyncStatus === 'synced'
-                    ? 'In Sync'
+                    ? 'In Perfect Sync'
                     : partnerSyncStatus === 'buffering'
                     ? 'Buffering...'
                     : 'Realigning...'}
                 </span>
               </div>
+
+              {/* Screen Wake Lock Pill */}
+              {wakeLockActive && (
+                <div
+                  className="watch-party-wakelock-pill"
+                  title="Screen Wake Lock is active: Your device screen will not dim or sleep during movie playback"
+                >
+                  <Icon icon="solar:sun-2-bold" width="13" />
+                  <span>Awake</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1813,7 +2183,7 @@ export default function WatchPartyModal({
             </form>
           </div>
 
-          {/* Source Selection Drawer (Platform Shortcuts & URL Input) */}
+          {/* Source Selection Drawer (TMDB & Consumet Explorer + Direct URL Input) */}
           <AnimatePresence>
             {showDrawer && (
               <motion.div
@@ -1823,35 +2193,141 @@ export default function WatchPartyModal({
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 350, damping: 25 }}
               >
-                <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
-                  <input
-                    type="text"
-                    className="custom-url-input"
-                    placeholder="Paste movie link from CinemaOS, CineHD, Cineby, Cinevice, MX Player, PRMovies, or YouTube..."
-                    value={customInputUrl}
-                    onChange={(e) => setCustomInputUrl(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                  <input
-                    type="text"
-                    className="custom-url-input custom-url-title-input"
-                    placeholder="Movie Title (Optional - auto-detected)"
-                    value={customInputTitle}
-                    onChange={(e) => setCustomInputTitle(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    className="custom-url-input custom-url-title-input"
-                    placeholder="Subtitle WebVTT URL (.vtt) (Optional)"
-                    value={customSubtitleUrl}
-                    onChange={(e) => setCustomSubtitleUrl(e.target.value)}
-                  />
-                  <button type="submit" className="custom-url-btn">
-                    <Icon icon="solar:play-bold" width="18" />
-                    <span>Watch Together</span>
+                {/* Drawer Tab Switcher */}
+                <div className="watch-party-drawer-tabs">
+                  <button
+                    type="button"
+                    className={`drawer-tab-btn ${drawerTab === 'browse' ? 'active' : ''}`}
+                    onClick={() => setDrawerTab('browse')}
+                  >
+                    <Icon icon="solar:clapperboard-play-bold-duotone" width="16" />
+                    <span>Browse & Search Movies (TMDB & Consumet)</span>
                   </button>
-                </form>
+                  <button
+                    type="button"
+                    className={`drawer-tab-btn ${drawerTab === 'custom' ? 'active' : ''}`}
+                    onClick={() => setDrawerTab('custom')}
+                  >
+                    <Icon icon="solar:link-bold-duotone" width="16" />
+                    <span>Paste Link / Direct URL</span>
+                  </button>
+                </div>
+
+                {/* Tab 1: TMDB & Consumet Movie Explorer */}
+                {drawerTab === 'browse' ? (
+                  <div className="tmdb-explorer-container">
+                    <div className="tmdb-search-bar">
+                      <Icon icon="solar:magnifer-bold-duotone" width="18" style={{ color: '#00a884' }} />
+                      <input
+                        type="text"
+                        className="tmdb-search-input"
+                        placeholder="Search movies & shows (e.g. Inception, Moana, Stranger Things, Dune)..."
+                        value={movieSearchQuery}
+                        onChange={(e) => setMovieSearchQuery(e.target.value)}
+                        autoFocus
+                      />
+                      {isLoadingMovies && (
+                        <Icon icon="line-md:loading-twotone-loop" width="18" style={{ color: '#00a884' }} />
+                      )}
+                      {movieSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setMovieSearchQuery('')}
+                          style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer' }}
+                        >
+                          <Icon icon="line-md:close" width="16" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {movieSearchQuery ? `Search Results for "${movieSearchQuery}"` : '🔥 Trending Movies & Series This Week'}
+                      </span>
+                      {isExtractingStream && (
+                        <span style={{ fontSize: '0.72rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Icon icon="line-md:loading-twotone-loop" width="14" />
+                          <span>Extracting stream via Consumet...</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="tmdb-movies-grid">
+                      {((movieSearchQuery.trim() ? searchResults : trendingMovies) || []).map((movie) => (
+                        <motion.div
+                          key={movie.id}
+                          className="tmdb-movie-card"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => handleSelectMovie(movie)}
+                          title={`Watch "${movie.title}" together in perfect sync`}
+                        >
+                          <div className="tmdb-poster-wrap">
+                            {movie.posterPath ? (
+                              <img src={movie.posterPath} alt={movie.title} className="tmdb-poster-img" loading="lazy" />
+                            ) : (
+                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#182229' }}>
+                                <Icon icon="solar:clapperboard-play-bold-duotone" width="32" style={{ color: '#8696a0' }} />
+                              </div>
+                            )}
+                            {movie.rating > 0 && (
+                              <span className="tmdb-rating-pill">
+                                <Icon icon="solar:star-bold" width="10" />
+                                <span>{movie.rating}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="tmdb-movie-details">
+                            <span className="tmdb-movie-title">{movie.title}</span>
+                            <div className="tmdb-movie-meta">
+                              <span>{movie.releaseDate ? movie.releaseDate.slice(0, 4) : 'Movie'}</span>
+                              <span style={{ textTransform: 'uppercase', fontSize: '0.65rem', color: '#00a884' }}>
+                                {movie.mediaType || 'HD'}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+
+                      {movieSearchQuery && !isLoadingMovies && searchResults.length === 0 && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '24px', color: '#8696a0', fontSize: '0.84rem' }}>
+                          No movies found for "{movieSearchQuery}". Try another title or switch to "Paste Link".
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Tab 2: Custom URL Form */
+                  <form className="custom-url-form" onSubmit={handleCustomUrlSubmit}>
+                    <input
+                      type="text"
+                      className="custom-url-input"
+                      placeholder="Paste movie link from CinemaOS, CineHD, Cineby, Cinevice, MX Player, PRMovies, or YouTube..."
+                      value={customInputUrl}
+                      onChange={(e) => setCustomInputUrl(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      className="custom-url-input custom-url-title-input"
+                      placeholder="Movie Title (Optional - auto-detected)"
+                      value={customInputTitle}
+                      onChange={(e) => setCustomInputTitle(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      className="custom-url-input custom-url-title-input"
+                      placeholder="Subtitle WebVTT URL (.vtt) (Optional)"
+                      value={customSubtitleUrl}
+                      onChange={(e) => setCustomSubtitleUrl(e.target.value)}
+                    />
+                    <button type="submit" className="custom-url-btn">
+                      <Icon icon="solar:play-bold" width="18" />
+                      <span>Watch Together</span>
+                    </button>
+                  </form>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1977,6 +2453,97 @@ export default function WatchPartyModal({
                     <span>Sync</span>
                   </button>
                 </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Bluetooth Headphone Audio Delay Offset Dialog Modal */}
+        <AnimatePresence>
+          {showAudioDelayModal && (
+            <motion.div
+              className="watch-party-sync-modal-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setShowAudioDelayModal(false);
+              }}
+            >
+              <motion.div
+                className="watch-party-sync-modal"
+                initial={{ scale: 0.9, opacity: 0, y: 15 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 15 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              >
+                <div className="sync-modal-title-row">
+                  <div className="sync-modal-title">
+                    <Icon icon="solar:headphones-round-sound-bold-duotone" width="22" style={{ color: '#00a884' }} />
+                    <span>Bluetooth Headphone Audio Sync</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="watch-party-btn-icon"
+                    style={{ width: '28px', height: '28px' }}
+                    onClick={() => setShowAudioDelayModal(false)}
+                    title="Close"
+                  >
+                    <Icon icon="line-md:close" width="16" />
+                  </button>
+                </div>
+
+                <p className="sync-modal-subtitle">
+                  Bluetooth headphones (AirPods, Galaxy Buds) introduce 150–250ms wireless delay. Calibrate below to lock lip-sync in exact alignment.
+                </p>
+
+                <div className="sync-presets-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  {[
+                    { label: '0ms (Wired)', val: 0 },
+                    { label: '+100ms', val: 100 },
+                    { label: '+150ms (AirPods)', val: 150 },
+                    { label: '+200ms (Buds)', val: 200 },
+                    { label: '+250ms (Sony)', val: 250 },
+                    { label: '-100ms (Lead)', val: -100 },
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      className={`sync-preset-btn ${audioDelayOffset === p.val ? 'active' : ''}`}
+                      onClick={() => {
+                        handleAudioDelayChange(p.val);
+                        setShowAudioDelayModal(false);
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#8696a0', minWidth: '70px' }}>Offset: {audioDelayOffset}ms</span>
+                  <input
+                    type="range"
+                    min="-300"
+                    max="400"
+                    step="25"
+                    value={audioDelayOffset}
+                    onChange={(e) => handleAudioDelayChange(parseInt(e.target.value, 10))}
+                    className="watch-party-volume-slider"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    className="sync-preset-btn"
+                    style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                    onClick={() => {
+                      handleAudioDelayChange(0);
+                      setShowAudioDelayModal(false);
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}

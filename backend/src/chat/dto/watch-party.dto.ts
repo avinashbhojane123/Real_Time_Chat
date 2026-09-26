@@ -30,6 +30,8 @@ export class WatchPartyActionDto {
     'ready',
     'close',
     'toggle_host_lock',
+    'sync_tick',
+    'heartbeat',
   ])
   action!: string;
 
@@ -45,12 +47,22 @@ export class WatchPartyActionDto {
   @IsOptional()
   playbackRate?: number;
 
+  @IsNumber()
+  @IsOptional()
+  scheduledStartServerTime?: number;
+
+  @IsNumber()
+  @IsOptional()
+  clientSendTime?: number;
+
   @IsOptional()
   videoSource?: {
     url: string;
     title: string;
-    type?: 'direct' | 'youtube';
+    type?: 'direct' | 'youtube' | 'embed';
     duration?: number;
+    provider?: string;
+    originalUrl?: string;
   };
 
   @IsBoolean()
@@ -64,6 +76,17 @@ export class WatchPartyActionDto {
   @IsString()
   @IsOptional()
   nickname?: string;
+}
+
+export class WatchPartyClockPingDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  clientSendTime!: number;
 }
 
 export class GetWatchPartyDto {
