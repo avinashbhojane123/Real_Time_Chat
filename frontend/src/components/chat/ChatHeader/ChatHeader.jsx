@@ -334,7 +334,7 @@ const ChatHeader = memo(function ChatHeader({
               title={
                 isWatchPartyActive
                   ? 'Watch Party Active (Click to Open Cinema)'
-                  : 'Start Watch Party (Watch Movies Together in Perfect Sync)'
+                  : 'Start Watch Party'
               }
             >
               {isWatchPartyActive && (

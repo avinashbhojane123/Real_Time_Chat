@@ -1225,19 +1225,6 @@ export default function WatchPartyModal({
               </div>
             ) : null}
 
-            {/* Sync Movie Scene Button */}
-            <button
-              type="button"
-              className="watch-party-sync-scene-btn"
-              onClick={() => {
-                setSyncInputTime(formatTime(currentTime));
-                setShowSyncModal(true);
-              }}
-              title="Sync Movie Timing & Scene with Partner"
-            >
-              <Icon icon="solar:restart-bold-duotone" width="18" />
-              <span className="sync-scene-btn-label">Sync Scene</span>
-            </button>
 
             {/* Live Face Cam (Video Call) Toggle Button */}
             {webRTC && (
@@ -1332,14 +1319,6 @@ export default function WatchPartyModal({
               </AnimatePresence>
             </div>
 
-            <button
-              type="button"
-              className={`watch-party-btn-icon ${showDrawer ? 'active' : ''}`}
-              onClick={() => setShowDrawer(!showDrawer)}
-              title="Change Video / Enter URL"
-            >
-              <Icon icon="solar:link-bold-duotone" width="20" />
-            </button>
 
             <button
               type="button"
@@ -1934,20 +1913,6 @@ export default function WatchPartyModal({
                   </select>
                 )}
 
-                {/* Partner Sync Status Pill with Sub-50ms Accuracy Badge */}
-                <div
-                  className={`partner-sync-indicator ${partnerSyncStatus}`}
-                  title={`Sync Status: ${partnerSyncStatus} • Clock Offset: ${Math.round(serverClockSkew || 0)}ms`}
-                >
-                  <span className="sync-status-dot" />
-                  <span className="sync-status-text">
-                    {partnerSyncStatus === 'synced'
-                      ? 'In Perfect Sync'
-                      : partnerSyncStatus === 'buffering'
-                        ? 'Buffering...'
-                        : 'Realigning...'}
-                  </span>
-                </div>
 
                 {/* Screen Wake Lock Pill */}
                 {wakeLockActive && (

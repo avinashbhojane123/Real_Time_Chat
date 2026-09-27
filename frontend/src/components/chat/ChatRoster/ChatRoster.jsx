@@ -235,7 +235,7 @@ const ChatRoster = memo(function ChatRoster({
               position: 'relative',
             }}
             className="media-item-card"
-            title={isWatchPartyActive ? 'Watch Party Active — Click to Join' : 'Start Watch Party (Watch Movies in Perfect Sync)'}
+            title={isWatchPartyActive ? 'Watch Party Active — Click to Join' : 'Start Watch Party'}
           >
             <Icon icon="solar:clapperboard-play-bold-duotone" width="22" height="22" style={{ color: isWatchPartyActive ? '#00a884' : '#ff007f' }} />
             {isWatchPartyActive && (
