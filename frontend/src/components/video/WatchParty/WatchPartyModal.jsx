@@ -1625,6 +1625,26 @@ export default function WatchPartyModal({
               title={videoSource.title || 'Movie Watch Party'}
               style={{ pointerEvents: isDraggingPip ? 'none' : 'auto' }}
             />
+          ) : !videoSource ? (
+            <div className="watch-party-empty-player">
+              <div className="empty-player-icon-pulse">
+                <Icon icon="solar:clapperboard-play-bold-duotone" width="48" style={{ color: '#00a884' }} />
+              </div>
+              <h3 className="empty-player-title">Cinema Together</h3>
+              <p className="empty-player-sub">
+                {recipientUser ? `Watch movies & series synchronized frame-for-frame with ${recipientUser.nickname}` : 'Select a movie below or paste any stream link to begin'}
+              </p>
+              {!showDrawer && (
+                <button
+                  type="button"
+                  className="empty-player-cta"
+                  onClick={() => setShowDrawer(true)}
+                >
+                  <Icon icon="solar:magnifer-bold-duotone" width="18" />
+                  <span>Browse Movies & Shows</span>
+                </button>
+              )}
+            </div>
           ) : null}
 
           {/* Autoplay Unmute Notification Banner */}
@@ -1768,7 +1788,7 @@ export default function WatchPartyModal({
                 onClick={() => handleSeekSafe(Math.max(0, currentTime - 10))}
                 title="Rewind 10 Seconds Together"
               >
-                <Icon icon="solar:rewind-10-seconds-bold" width="18" />
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>replay_10</span>
               </button>
 
               {/* 10s Forward */}
@@ -1779,7 +1799,7 @@ export default function WatchPartyModal({
                 onClick={() => handleSeekSafe(Math.min(duration || 99999, currentTime + 10))}
                 title="Forward 10 Seconds Together"
               >
-                <Icon icon="solar:forward-10-seconds-bold" width="18" />
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>forward_10</span>
               </button>
 
               {/* Volume & Mute */}
@@ -2178,7 +2198,7 @@ export default function WatchPartyModal({
                 style={{ width: '34px', height: '34px' }}
                 title="Send Comment to Screen & Chat"
               >
-                <Icon icon="solar:plain-bold" width="18" />
+                <span className="material-symbols-outlined" style={{ fontSize: '18px', lineHeight: 1, transform: 'rotate(-30deg)' }}>send</span>
               </button>
             </form>
           </div>
