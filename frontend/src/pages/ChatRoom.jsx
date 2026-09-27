@@ -978,44 +978,64 @@ export default function ChatRoom() {
         </AnimatePresence>
 
         {/* Bottom Input Control Bar */}
-        <ChatInputBar
-          users={users}
-          replyingTo={replyingTo}
-          setReplyingTo={setReplyingTo}
-          editingMsg={editingMsg}
-          cancelEditing={cancelEditing}
-          showEmojiPicker={showEmojiPicker}
-          setShowEmojiPicker={setShowEmojiPicker}
-          EMOJI_LIST={EMOJI_LIST}
-          showActionMenu={showActionMenu}
-          setShowActionMenu={setShowActionMenu}
-          isUploadingFile={isUploadingFile}
-          handleFileUpload={(e) => socketFileUpload(e, disappearingTimer)}
-          setShowPollModal={setShowPollModal}
-          handleShareLocation={() => socketShareLocation(disappearingTimer)}
-          showDisappearingMenu={showDisappearingMenu}
-          setShowDisappearingMenu={setShowDisappearingMenu}
-          disappearingTimer={disappearingTimer}
-          setShowThemeModal={setShowThemeModal}
-          setShowClearConfirm={setShowClearConfirm}
-          setShowLogoutConfirm={setShowLogoutConfirm}
-          inputText={inputText}
-          setInputText={setInputText}
-          handleInputChange={handleInputChange}
-          handleSendMessage={handleSendMessage}
-          isRecordingAudio={isRecordingAudio}
-          recDuration={recDuration}
-          startRecording={startRecording}
-          stopRecording={stopRecording}
-          cancelRecording={cancelRecording}
-          isRecordingVideo={isRecordingVideo}
-          videoWithoutSound={videoWithoutSound}
-          startVideoRecording={startVideoRecording}
-          closeVideoRecording={closeVideoRecording}
-          handleSendVideoNote={handleSendVideoNote}
-          formatTimer={formatTimer}
-          showToast={showToast}
-        />
+        {isCurrentUserBanned ? (
+          <div
+            style={{
+              padding: '16px 20px',
+              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+              borderTop: '1px solid rgba(239, 68, 68, 0.35)',
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              fontWeight: 700,
+              fontSize: '0.86rem',
+            }}
+          >
+            <span>⛔ You have been permanently banned from this room. Messaging, calls, and status posting are disabled.</span>
+          </div>
+        ) : (
+          <ChatInputBar
+            users={users}
+            isCurrentUserMuted={isCurrentUserMuted}
+            replyingTo={replyingTo}
+            setReplyingTo={setReplyingTo}
+            editingMsg={editingMsg}
+            cancelEditing={cancelEditing}
+            showEmojiPicker={showEmojiPicker}
+            setShowEmojiPicker={setShowEmojiPicker}
+            EMOJI_LIST={EMOJI_LIST}
+            showActionMenu={showActionMenu}
+            setShowActionMenu={setShowActionMenu}
+            isUploadingFile={isUploadingFile}
+            handleFileUpload={(e) => socketFileUpload(e, disappearingTimer)}
+            setShowPollModal={setShowPollModal}
+            handleShareLocation={() => socketShareLocation(disappearingTimer)}
+            showDisappearingMenu={showDisappearingMenu}
+            setShowDisappearingMenu={setShowDisappearingMenu}
+            disappearingTimer={disappearingTimer}
+            setShowThemeModal={setShowThemeModal}
+            setShowClearConfirm={setShowClearConfirm}
+            setShowLogoutConfirm={setShowLogoutConfirm}
+            inputText={inputText}
+            setInputText={setInputText}
+            handleInputChange={handleInputChange}
+            handleSendMessage={handleSendMessage}
+            isRecordingAudio={isRecordingAudio}
+            recDuration={recDuration}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            cancelRecording={cancelRecording}
+            isRecordingVideo={isRecordingVideo}
+            videoWithoutSound={videoWithoutSound}
+            startVideoRecording={startVideoRecording}
+            closeVideoRecording={closeVideoRecording}
+            handleSendVideoNote={handleSendVideoNote}
+            formatTimer={formatTimer}
+            showToast={showToast}
+          />
+        )}
       </main>
 
       {/* WebRTC Video Call Panel Overlay (hidden when WatchParty cinema has its own live face cams) */}

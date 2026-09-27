@@ -358,45 +358,57 @@ const ChatHeader = memo(function ChatHeader({
           </div>
 
           {/* WhatsApp Video Call Button with M3 State Layer & Tactile Motion Feedback */}
-          <motion.button
-            whileHover={{ scale: 1.12 }}
-            whileTap={{ scale: 0.88 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
-            type="button"
-            className="m3-action-btn"
-            disabled={!isRecipientOnline && callState === 'idle'}
-            onClick={() => {
-              if (!isRecipientOnline && callState === 'idle') {
-                alert('Cannot start video call: Recipient is offline. Video calls can only be made when the person is online.');
-                return;
-              }
-              if (callState === 'idle') startCall();
-              else setShowVideoPanel(!showVideoPanel);
-            }}
-            style={{
-              backgroundColor: callState === 'active' ? '#25d366' : 'transparent',
-              color: callState === 'active' ? '#000000' : isRecipientOnline ? '#00a884' : '#8696a0',
-              fontWeight: 700,
-              fontSize: '0.82rem',
-              cursor: isRecipientOnline || callState !== 'idle' ? 'pointer' : 'not-allowed',
-              opacity: !isRecipientOnline && callState === 'idle' ? 0.5 : 1,
-              width: '38px',
-              height: '38px',
-            }}
-            title={
-              callState === 'active'
-                ? 'Toggle Video Panel'
-                : isRecipientOnline
-                  ? 'Start Video Call'
-                  : 'User is offline - Video call unavailable'
-            }
-          >
+          {(() => {
+            const canCall = callState !== 'idle' || (isGroupRoom ? onlineCount > 1 : isRecipientOnline);
+            return (
+              <motion.button
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.88 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 17, ease: [0.2, 0, 0, 1] }}
+                type="button"
+                className="m3-action-btn"
+                disabled={!canCall}
+                onClick={() => {
+                  if (callState === 'active' || callState === 'calling') {
+                    setShowVideoPanel(!showVideoPanel);
+                    return;
+                  }
+                  if (!canCall) {
+                    alert(isGroupRoom ? 'No other participants are currently online to call.' : 'Cannot start video call: Recipient is offline.');
+                    return;
+                  }
+                  if (isGroupRoom) {
+                    setShowRosterPanel(true);
+                  } else {
+                    startCall();
+                  }
+                }}
+                style={{
+                  backgroundColor: callState === 'active' ? '#25d366' : 'transparent',
+                  color: callState === 'active' ? '#000000' : canCall ? '#00a884' : '#8696a0',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: canCall ? 'pointer' : 'not-allowed',
+                  opacity: !canCall ? 0.5 : 1,
+                  width: '38px',
+                  height: '38px',
+                }}
+                title={
+                  callState === 'active'
+                    ? 'Toggle Video Panel'
+                    : canCall
+                      ? (isGroupRoom ? 'Call Participant (Open Participants List)' : 'Start Video Call')
+                      : 'Participant is offline - Video call unavailable'
+                }
+              >
             <Icon
               icon={callState === 'active' ? 'line-md:video-twotone' : 'solar:videocamera-record-bold-duotone'}
               width="20"
               height="20"
             />
           </motion.button>
+            );
+          })()}
 
 
           {/* Search Icon Button with M3 State Layer & Tactile Motion Feedback */}

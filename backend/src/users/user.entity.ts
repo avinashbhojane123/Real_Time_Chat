@@ -7,10 +7,12 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  Unique,
 } from 'typeorm';
 
 import { Room } from '../rooms/room.entity';
 
+@Unique(['roomId', 'nickname'])
 @Index(['roomId', 'nickname'])
 @Entity('users')
 export class User {
@@ -126,4 +128,11 @@ export class User {
     nullable: true,
   })
   bannedAt!: Date | null;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  sessionToken!: string | null;
 }

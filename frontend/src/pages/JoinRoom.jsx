@@ -119,7 +119,7 @@ export default function JoinRoom() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          'Could not verify room passcode. Please check passcode or network connection.'
+        'Could not verify room passcode. Please check passcode or network connection.'
       );
     } finally {
       setJoining(false);

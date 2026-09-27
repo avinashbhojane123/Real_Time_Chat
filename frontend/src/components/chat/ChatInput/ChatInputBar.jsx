@@ -4,6 +4,7 @@ import VideoNoteRecorder from './VideoNoteRecorder';
 import './ChatInputBar.css';
 
 const ChatInputBar = memo(function ChatInputBar({
+  isCurrentUserMuted = false,
   replyingTo,
   setReplyingTo,
   editingMsg,
@@ -597,7 +598,14 @@ const ChatInputBar = memo(function ChatInputBar({
             <input
               ref={inputRef}
               type="text"
-              placeholder={editingMsg ? 'Edit message...' : 'Type a message'}
+              disabled={isCurrentUserMuted}
+              placeholder={
+                isCurrentUserMuted
+                  ? '🔇 You were muted by the room host'
+                  : editingMsg
+                    ? 'Edit message...'
+                    : 'Type a message'
+              }
               value={inputText}
               onChange={handleTextChange}
               onKeyDown={handleInputKeyDown}
@@ -605,12 +613,13 @@ const ChatInputBar = memo(function ChatInputBar({
                 flex: 1,
                 height: '42px',
                 borderRadius: '8px',
-                backgroundColor: '#2a3942',
-                border: 'none',
-                color: '#e9edef',
+                backgroundColor: isCurrentUserMuted ? '#182229' : '#2a3942',
+                border: isCurrentUserMuted ? '1px solid rgba(239, 68, 68, 0.3)' : 'none',
+                color: isCurrentUserMuted ? '#ef4444' : '#e9edef',
                 padding: '0 16px',
                 fontSize: '0.9rem',
                 outline: 'none',
+                cursor: isCurrentUserMuted ? 'not-allowed' : 'text',
               }}
             />
 

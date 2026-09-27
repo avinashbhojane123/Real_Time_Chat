@@ -100,6 +100,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       socket.emit('joinRoom', {
         nickname,
         passcode,
+        sessionToken: sessionStorage.getItem('sessionAuthToken') || undefined,
         deviceType: clientDevice.deviceType,
         deviceModel: clientDevice.deviceModel,
         browser: clientDevice.browser,
@@ -272,22 +273,44 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     socket.on('userKicked', ({ targetNickname, kickedBy }) => {
       showToast(`⚠️ ${targetNickname} was removed from the room by ${kickedBy}`);
+      setUsers((prev) =>
+        prev.map((u) => (u.nickname === targetNickname ? { ...u, isOnline: false } : u))
+      );
     });
 
-    socket.on('userBanned', ({ targetNickname, bannedBy, reason }) => {
+    socket.on('userBanned', ({ targetNickname, bannedBy }) => {
       showToast(`⛔ ${targetNickname} was permanently banned by ${bannedBy}`);
+      setUsers((prev) =>
+        prev.map((u) => (u.nickname === targetNickname ? { ...u, isBanned: true, isOnline: false } : u))
+      );
     });
 
     socket.on('userUnbanned', ({ targetNickname, unbannedBy }) => {
       showToast(`✅ ${targetNickname} was unbanned by ${unbannedBy}`);
+      setUsers((prev) =>
+        prev.map((u) => (u.nickname === targetNickname ? { ...u, isBanned: false } : u))
+      );
     });
 
     socket.on('userPromoted', ({ targetNickname, role, promotedBy }) => {
       showToast(`⭐ ${targetNickname} is now ${role} (by ${promotedBy})`);
+      setUsers((prev) =>
+        prev.map((u) => (u.nickname === targetNickname ? { ...u, role } : u))
+      );
     });
 
-    socket.on('hostChanged', ({ newHost, previousHost }) => {
-      showToast(`👑 Room host transferred to @${newHost}`);
+    socket.on('hostChanged', ({ newHostNickname, newHost, previousHostNickname, previousHost }) => {
+      const nextHost = newHostNickname || newHost;
+      const prevHost = previousHostNickname || previousHost;
+      if (nextHost) {
+        showToast(`👑 Room host transferred to @${nextHost}`);
+        setUsers((prev) =>
+          prev.map((u) => ({
+            ...u,
+            role: u.nickname === nextHost ? 'host' : u.nickname === prevHost ? 'member' : u.role,
+          }))
+        );
+      }
     });
 
     socket.on('userMuteToggled', ({ targetNickname, isMuted, mutedBy }) => {
@@ -304,6 +327,14 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('kickedFromRoom', ({ reason, kickedBy }) => {
       setKickedInfo({ reason: reason || 'Removed by host', kickedBy: kickedBy || 'Host' });
       showToast('⚠️ You have been removed from the room.');
+    });
+
+    socket.on('sessionReplaced', ({ message }) => {
+      showToast(message || 'Your session has been resumed in another tab');
+      setKickedInfo({
+        reason: message || 'Your session has been resumed in another connection.',
+        kickedBy: 'System',
+      });
     });
 
     socket.on('directMessage', (dm) => {
@@ -985,7 +1016,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       if (res && !res.success) {
         showToast(res.message || 'Failed to clear inactive users');
       } else if (res && res.success) {
-        showToast(`🧹 Removed ${res.removedCount} inactive participant(s)`);
+        showToast(`🧹 Removed ${res.removedCount ?? 0} inactive participant(s)`);
       }
     });
   };

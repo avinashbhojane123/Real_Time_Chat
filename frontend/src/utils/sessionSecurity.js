@@ -132,7 +132,7 @@ export function terminateSession() {
  * Installs window lifecycle listeners to detect tab close vs page reload.
  */
 export function setupSessionLifecycleWatchers() {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
 
   const handleBeforeUnload = () => {
     // When unloading, mark that a potential reload is occurring

@@ -5,22 +5,24 @@ export async function getBatteryInfo() {
   if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
     try {
       const battery = await navigator.getBattery();
-      const level = Math.round(battery.level * 100);
-      const isCharging = battery.charging;
-      const label = `${isCharging ? '⚡' : '🔋'} ${level}%`;
-      return { level, isCharging, label };
+      if (battery && typeof battery.level === 'number') {
+        const level = Math.round(battery.level * 100);
+        const isCharging = Boolean(battery.charging);
+        const label = `${isCharging ? '⚡' : '🔋'} ${level}%`;
+        return { level, isCharging, label };
+      }
     } catch (e) {
       // Fallback if Battery API throws
     }
   }
-  return { level: 100, isCharging: false, label: '🔋 100%' };
+  return { level: null, isCharging: false, label: null };
 }
 
 /**
  * Synchronous fallback battery helper
  */
 export function detectBatteryInfoSync() {
-  return { level: 100, isCharging: false, label: '🔋 100%' };
+  return { level: null, isCharging: false, label: null };
 }
 
 /**

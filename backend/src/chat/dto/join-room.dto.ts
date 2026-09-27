@@ -55,4 +55,9 @@ export class JoinRoomDto {
   @IsOptional()
   @IsNumber()
   batteryLevel?: number;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  sessionToken?: string;
 }

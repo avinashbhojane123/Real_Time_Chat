@@ -265,9 +265,6 @@ const ChatRoster = memo(function ChatRoster({
     );
   };
 
-  // Collapsed Rail View (60px)
-  if (!showRosterPanel && !showRailSidebar) return null;
-
   return (
     <>
       {showRailSidebar && (
@@ -501,9 +498,11 @@ const ChatRoster = memo(function ChatRoster({
       </aside>
       )}
 
-      {showRosterPanel && (
-        <motion.aside
-          initial={{ opacity: 0, x: isMobileDevice ? '100%' : -10 }}
+      <AnimatePresence>
+        {showRosterPanel && (
+          <motion.aside
+            key="chat-roster-panel"
+            initial={{ opacity: 0, x: isMobileDevice ? '100%' : -10 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: isMobileDevice ? '100%' : -10 }}
           transition={{ duration: 0.2 }}
@@ -1202,8 +1201,9 @@ const ChatRoster = memo(function ChatRoster({
         </motion.div>
         <span>E2E Encrypted Session • Zero Trace</span>
       </div>
-    </motion.aside>
-    )}
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
     {/* Participant Profile & Action Popover / Modal */}
     <AnimatePresence>
