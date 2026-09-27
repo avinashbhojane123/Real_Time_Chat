@@ -117,8 +117,8 @@ export default function ChatRoom() {
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User & Presence Calculation
-  const otherUsers = useMemo(() => users.filter((u) => u.nickname !== nickname), [users, nickname]);
-  const otherOnlineUsers = useMemo(() => otherUsers.filter((u) => u.isOnline), [otherUsers]);
+  const otherUsers = (users || []).filter((u) => u.nickname !== nickname);
+  const otherOnlineUsers = otherUsers.filter((u) => u.isOnline);
   const recipientUser = otherUsers.length === 1 ? otherUsers[0] : (otherOnlineUsers.length > 0 ? otherOnlineUsers[0] : null);
   const isRecipientOnline = Boolean(recipientUser && recipientUser.isOnline);
   const isGroupRoom = true; // All passcode sessions represent collaborative rooms

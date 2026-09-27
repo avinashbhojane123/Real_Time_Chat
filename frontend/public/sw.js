@@ -1,5 +1,5 @@
 // Service Worker for Nexus Space PWA
-const CACHE_NAME = 'nexus-space-v1';
+const CACHE_NAME = 'nexus-space-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
