@@ -116,11 +116,12 @@ export default function ChatRoom() {
     isCurrentUserBanned,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
-  // Recipient User Calculation
-  const otherUsers = users.filter((u) => u.nickname !== nickname);
-  const isGroupRoom = otherUsers.length > 1;
-  const recipientUser = otherUsers.length > 0 ? otherUsers[0] : null;
-  const isRecipientOnline = otherUsers.some((u) => u.isOnline);
+  // Recipient User & Presence Calculation
+  const otherUsers = useMemo(() => users.filter((u) => u.nickname !== nickname), [users, nickname]);
+  const otherOnlineUsers = useMemo(() => otherUsers.filter((u) => u.isOnline), [otherUsers]);
+  const recipientUser = otherUsers.length === 1 ? otherUsers[0] : (otherOnlineUsers.length > 0 ? otherOnlineUsers[0] : null);
+  const isRecipientOnline = Boolean(recipientUser && recipientUser.isOnline);
+  const isGroupRoom = true; // All passcode sessions represent collaborative rooms
 
   // WebRTC Video/Voice Call Hook
   const webRTC = useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast });
@@ -999,6 +1000,7 @@ export default function ChatRoom() {
           </div>
         ) : (
           <ChatInputBar
+            nickname={nickname}
             users={users}
             isCurrentUserMuted={isCurrentUserMuted}
             replyingTo={replyingTo}

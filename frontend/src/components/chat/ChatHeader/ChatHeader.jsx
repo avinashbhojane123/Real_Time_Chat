@@ -245,7 +245,9 @@ const ChatHeader = memo(function ChatHeader({
                   <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
                     <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" style={{ flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-                      {onlineCount} online • {usersCount} members
+                      {usersCount === 2 && recipientUser
+                        ? `with @${recipientUser.nickname} • ${isRecipientOnline ? 'Online' : 'Offline'}`
+                        : `${onlineCount} online • ${usersCount} members`}
                     </span>
                   </div>
                 )}
@@ -374,11 +376,13 @@ const ChatHeader = memo(function ChatHeader({
                     return;
                   }
                   if (!canCall) {
-                    alert(isGroupRoom ? 'No other participants are currently online to call.' : 'Cannot start video call: Recipient is offline.');
+                    alert('No other participants are currently online to call.');
                     return;
                   }
-                  if (isGroupRoom) {
+                  if (onlineCount > 2) {
                     setShowRosterPanel(true);
+                  } else if (recipientUser && isRecipientOnline) {
+                    startCall({ isVoiceOnly: false, targetNickname: recipientUser.nickname });
                   } else {
                     startCall();
                   }

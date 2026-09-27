@@ -229,7 +229,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('userOnline', ({ nickname: onlineUser }) => {
       if (onlineUser) {
         setUsers((prev) =>
-          prev.map((u) => (u.nickname === onlineUser ? { ...u, isOnline: true, lastSeen: null } : u))
+          prev.map((u) => (u.nickname && u.nickname.toLowerCase() === onlineUser.toLowerCase() ? { ...u, isOnline: true, lastSeen: null } : u))
         );
       }
     });
@@ -238,7 +238,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       if (offlineUser) {
         setUsers((prev) =>
           prev.map((u) =>
-            u.nickname === offlineUser
+            u.nickname && u.nickname.toLowerCase() === offlineUser.toLowerCase()
               ? { ...u, isOnline: false, lastSeen: offlineTime || new Date() }
               : u
           )
@@ -250,7 +250,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       if (updatedNick) {
         setUsers((prev) =>
           prev.map((u) =>
-            u.nickname === updatedNick
+            u.nickname && u.nickname.toLowerCase() === updatedNick.toLowerCase()
               ? {
                   ...u,
                   ...(batteryLabel !== undefined ? { batteryLabel } : {}),

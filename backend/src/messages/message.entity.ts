@@ -145,4 +145,20 @@ export class Message {
     default: null,
   })
   readBy!: string[] | null;
+
+  @Index()
+  @Column({
+    type: 'boolean',
+    default: false,
+  })
+  isDirect!: boolean;
+
+  @Index()
+  @Column({
+    type: 'text',
+    nullable: true,
+    default: null,
+  })
+  targetNickname!: string | null;
 }
+

@@ -4,6 +4,7 @@ import VideoNoteRecorder from './VideoNoteRecorder';
 import './ChatInputBar.css';
 
 const ChatInputBar = memo(function ChatInputBar({
+  nickname = '',
   isCurrentUserMuted = false,
   replyingTo,
   setReplyingTo,
@@ -78,10 +79,17 @@ const ChatInputBar = memo(function ChatInputBar({
 
   const mentionMatches = useMemo(() => {
     if (mentionQuery === null) return [];
+    const myNick = (nickname || '').trim().toLowerCase();
     return (users || [])
-      .filter((u) => u.nickname && u.nickname.toLowerCase().includes(mentionQuery))
+      .filter(
+        (u) =>
+          u.nickname &&
+          u.nickname.trim().toLowerCase() !== myNick &&
+          !u.isBanned &&
+          u.nickname.toLowerCase().includes(mentionQuery)
+      )
       .slice(0, 6);
-  }, [users, mentionQuery]);
+  }, [users, mentionQuery, nickname]);
 
   const insertMention = (targetNick) => {
     const pos = inputRef.current ? inputRef.current.selectionStart : inputText.length;

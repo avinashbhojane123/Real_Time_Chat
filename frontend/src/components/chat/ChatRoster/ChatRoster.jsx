@@ -919,43 +919,49 @@ const ChatRoster = memo(function ChatRoster({
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                                         <button
                                           type="button"
+                                          disabled={isCurrentUserMuted || u.isMuted}
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (isCurrentUserMuted || u.isMuted) return;
                                             onStartCall({ isVoiceOnly: true, targetNickname: u.nickname });
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: '#00a884',
-                                            cursor: 'pointer',
+                                            color: (isCurrentUserMuted || u.isMuted) ? '#8696a0' : '#00a884',
+                                            cursor: (isCurrentUserMuted || u.isMuted) ? 'not-allowed' : 'pointer',
+                                            opacity: (isCurrentUserMuted || u.isMuted) ? 0.45 : 1,
                                             padding: '3px',
                                             borderRadius: '50%',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                           }}
-                                          title={`Voice call ${u.nickname}`}
+                                          title={isCurrentUserMuted ? 'You are muted and cannot place calls' : u.isMuted ? `${u.nickname} is muted and cannot join calls` : `Voice call ${u.nickname}`}
                                         >
                                           <Icon icon="solar:phone-bold-duotone" width="16" height="16" />
                                         </button>
                                         <button
                                           type="button"
+                                          disabled={isCurrentUserMuted || u.isMuted}
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (isCurrentUserMuted || u.isMuted) return;
                                             onStartCall({ isVoiceOnly: false, targetNickname: u.nickname });
                                           }}
                                           style={{
                                             background: 'none',
                                             border: 'none',
-                                            color: '#00a884',
-                                            cursor: 'pointer',
+                                            color: (isCurrentUserMuted || u.isMuted) ? '#8696a0' : '#00a884',
+                                            cursor: (isCurrentUserMuted || u.isMuted) ? 'not-allowed' : 'pointer',
+                                            opacity: (isCurrentUserMuted || u.isMuted) ? 0.45 : 1,
                                             padding: '3px',
                                             borderRadius: '50%',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                           }}
-                                          title={`Video call ${u.nickname}`}
+                                          title={isCurrentUserMuted ? 'You are muted and cannot place calls' : u.isMuted ? `${u.nickname} is muted and cannot join calls` : `Video call ${u.nickname}`}
                                         >
                                           <Icon icon="solar:videocamera-bold-duotone" width="16" height="16" />
                                         </button>
@@ -1413,64 +1419,98 @@ const ChatRoster = memo(function ChatRoster({
                 <span>{copiedHandle ? 'Copied!' : 'Copy @'}</span>
               </button>
 
-              {inspectingUser.nickname !== nickname && inspectingUser.isOnline && onStartCall && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onStartCall({ isVoiceOnly: true, targetNickname: inspectingUser.nickname });
-                      setInspectingUser(null);
-                    }}
-                    style={{
-                      backgroundColor: 'rgba(0, 168, 132, 0.2)',
-                      color: '#00a884',
-                      border: '1px solid rgba(0, 168, 132, 0.4)',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Icon icon="solar:phone-calling-rounded-bold-duotone" width="16" height="16" />
-                    <span>Voice Call</span>
-                  </button>
+              {inspectingUser.nickname !== nickname && inspectingUser.isOnline && onStartCall && (() => {
+                const canCall = !isCurrentUserMuted && !inspectingUser.isMuted;
+                const callDisabledReason = isCurrentUserMuted
+                  ? 'You are muted by the host and cannot place calls'
+                  : inspectingUser.isMuted
+                    ? 'Participant is muted and cannot join calls'
+                    : '';
+                return (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!canCall}
+                      onClick={() => {
+                        if (!canCall) return;
+                        onStartCall({ isVoiceOnly: true, targetNickname: inspectingUser.nickname });
+                        setInspectingUser(null);
+                      }}
+                      style={{
+                        backgroundColor: canCall ? 'rgba(0, 168, 132, 0.2)' : 'rgba(134, 150, 160, 0.1)',
+                        color: canCall ? '#00a884' : '#8696a0',
+                        border: `1px solid ${canCall ? 'rgba(0, 168, 132, 0.4)' : 'rgba(134, 150, 160, 0.2)'}`,
+                        borderRadius: '10px',
+                        padding: '8px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: canCall ? 'pointer' : 'not-allowed',
+                        opacity: canCall ? 1 : 0.6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                      title={callDisabledReason || `Voice call @${inspectingUser.nickname}`}
+                    >
+                      <Icon icon="solar:phone-calling-rounded-bold-duotone" width="16" height="16" />
+                      <span>Voice Call</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onStartCall({ isVoiceOnly: false, targetNickname: inspectingUser.nickname });
-                      setInspectingUser(null);
-                    }}
-                    style={{
-                      backgroundColor: 'rgba(0, 112, 243, 0.2)',
-                      color: '#0070f3',
-                      border: '1px solid rgba(0, 112, 243, 0.4)',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Icon icon="solar:videocamera-record-bold-duotone" width="16" height="16" />
-                    <span>Video Call</span>
-                  </button>
-                </>
-              )}
+                    <button
+                      type="button"
+                      disabled={!canCall}
+                      onClick={() => {
+                        if (!canCall) return;
+                        onStartCall({ isVoiceOnly: false, targetNickname: inspectingUser.nickname });
+                        setInspectingUser(null);
+                      }}
+                      style={{
+                        backgroundColor: canCall ? 'rgba(0, 112, 243, 0.2)' : 'rgba(134, 150, 160, 0.1)',
+                        color: canCall ? '#0070f3' : '#8696a0',
+                        border: `1px solid ${canCall ? 'rgba(0, 112, 243, 0.4)' : 'rgba(134, 150, 160, 0.2)'}`,
+                        borderRadius: '10px',
+                        padding: '8px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: canCall ? 'pointer' : 'not-allowed',
+                        opacity: canCall ? 1 : 0.6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                      title={callDisabledReason || `Video call @${inspectingUser.nickname}`}
+                    >
+                      <Icon icon="solar:videocamera-record-bold-duotone" width="16" height="16" />
+                      <span>Video Call</span>
+                    </button>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Direct Whisper / Message Input */}
             {inspectingUser.nickname !== nickname && onSendDirectMessage && (
-              inspectingUser.isOnline ? (
+              isCurrentUserMuted ? (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    fontSize: '0.74rem',
+                    color: '#f87171',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginTop: '2px',
+                  }}
+                >
+                  <Icon icon="solar:muted-bold-duotone" width="14" height="14" style={{ flexShrink: 0 }} />
+                  <span>You have been muted by the host and cannot send direct whispers.</span>
+                </div>
+              ) : inspectingUser.isOnline ? (
                 <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
                   <input
                     type="text"
@@ -1540,22 +1580,25 @@ const ChatRoster = memo(function ChatRoster({
               )
             )}
 
-            {/* Host Administration Controls */}
-            {(currentUserRole === 'host' || currentUserRole === 'admin') && inspectingUser.nickname !== nickname && (
+            {/* Host / Admin Moderation Controls */}
+            {inspectingUser.nickname !== nickname && (
+              (currentUserRole === 'host' && inspectingUser.role !== 'host') ||
+              (currentUserRole === 'admin' && inspectingUser.role !== 'host' && inspectingUser.role !== 'admin')
+            ) && (
               <div
                 style={{
                   marginTop: '4px',
                   padding: '12px',
-                  backgroundColor: 'rgba(255, 193, 7, 0.07)',
+                  backgroundColor: currentUserRole === 'host' ? 'rgba(255, 193, 7, 0.07)' : 'rgba(59, 130, 246, 0.07)',
                   borderRadius: '12px',
-                  border: '1px solid rgba(255, 193, 7, 0.25)',
+                  border: `1px solid ${currentUserRole === 'host' ? 'rgba(255, 193, 7, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
                 }}
               >
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffc107', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span>👑 HOST CONTROLS</span>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: currentUserRole === 'host' ? '#ffc107' : '#60a5fa', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>{currentUserRole === 'host' ? '👑 HOST CONTROLS' : '🛡️ ADMIN MODERATION'}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                   <button
