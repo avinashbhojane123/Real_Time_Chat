@@ -2423,6 +2423,53 @@
   color: #8696a0;
 }
 
+/* Search Empty Prompt State */
+.tmdb-search-empty-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(134, 150, 160, 0.2);
+  border-radius: 14px;
+  gap: 10px;
+  text-align: center;
+  margin: 4px 0 10px;
+}
+
+.search-prompt-text {
+  font-size: 0.82rem;
+  color: #8696a0;
+  font-weight: 500;
+}
+
+.search-suggestions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.search-suggestion-chip {
+  background: rgba(0, 168, 132, 0.1);
+  border: 1px solid rgba(0, 168, 132, 0.25);
+  color: #00a884;
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-suggestion-chip:hover {
+  background: rgba(0, 168, 132, 0.25);
+  border-color: #00a884;
+  transform: translateY(-1px);
+}
+
 .tmdb-movies-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));

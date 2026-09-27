@@ -247,17 +247,9 @@ export default function WatchPartyModal({
   // TMDB & Consumet API Movie Explorer States
   const [drawerTab, setDrawerTab] = useState('browse'); // 'browse' | 'custom'
   const [movieSearchQuery, setMovieSearchQuery] = useState('');
-  const [trendingMovies, setTrendingMovies] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [isLoadingMovies, setIsLoadingMovies] = useState(false);
   const [isExtractingStream, setIsExtractingStream] = useState(false);
-
-  // Fetch trending movies from TMDB on component mount
-  useEffect(() => {
-    getTrendingMovies(1).then((items) => {
-      if (items && items.length > 0) setTrendingMovies(items);
-    });
-  }, []);
 
   // Search TMDB movies with debounce
   useEffect(() => {
@@ -2260,61 +2252,83 @@ export default function WatchPartyModal({
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        {movieSearchQuery ? `Search Results for "${movieSearchQuery}"` : '🔥 Trending Movies & Series This Week'}
-                      </span>
-                      {isExtractingStream && (
-                        <span style={{ fontSize: '0.72rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Icon icon="line-md:loading-twotone-loop" width="14" />
-                          <span>Extracting stream via Consumet...</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="tmdb-movies-grid">
-                      {((movieSearchQuery.trim() ? searchResults : trendingMovies) || []).map((movie) => (
-                        <motion.div
-                          key={movie.id}
-                          className="tmdb-movie-card"
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => handleSelectMovie(movie)}
-                          title={`Watch "${movie.title}" together in perfect sync`}
-                        >
-                          <div className="tmdb-poster-wrap">
-                            {movie.posterPath ? (
-                              <img src={movie.posterPath} alt={movie.title} className="tmdb-poster-img" loading="lazy" />
-                            ) : (
-                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#182229' }}>
-                                <Icon icon="solar:clapperboard-play-bold-duotone" width="32" style={{ color: '#8696a0' }} />
-                              </div>
-                            )}
-                            {movie.rating > 0 && (
-                              <span className="tmdb-rating-pill">
-                                <Icon icon="solar:star-bold" width="10" />
-                                <span>{movie.rating}</span>
-                              </span>
-                            )}
-                          </div>
-                          <div className="tmdb-movie-details">
-                            <span className="tmdb-movie-title">{movie.title}</span>
-                            <div className="tmdb-movie-meta">
-                              <span>{movie.releaseDate ? movie.releaseDate.slice(0, 4) : 'Movie'}</span>
-                              <span style={{ textTransform: 'uppercase', fontSize: '0.65rem', color: '#00a884' }}>
-                                {movie.mediaType || 'HD'}
-                              </span>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-
-                      {movieSearchQuery && !isLoadingMovies && searchResults.length === 0 && (
-                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '24px', color: '#8696a0', fontSize: '0.84rem' }}>
-                          No movies found for "{movieSearchQuery}". Try another title or switch to "Paste Link".
+                    {movieSearchQuery.trim() ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#00a884', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            {isLoadingMovies ? `Searching for "${movieSearchQuery}"...` : `Search Results for "${movieSearchQuery}" (${searchResults.length})`}
+                          </span>
+                          {isExtractingStream && (
+                            <span style={{ fontSize: '0.72rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Icon icon="line-md:loading-twotone-loop" width="14" />
+                              <span>Extracting stream via Consumet...</span>
+                            </span>
+                          )}
                         </div>
-                      )}
-                    </div>
+
+                        <div className="tmdb-movies-grid">
+                          {searchResults.map((movie) => (
+                            <motion.div
+                              key={movie.id}
+                              className="tmdb-movie-card"
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.96 }}
+                              onClick={() => handleSelectMovie(movie)}
+                              title={`Watch "${movie.title}" together in perfect sync`}
+                            >
+                              <div className="tmdb-poster-wrap">
+                                {movie.posterPath ? (
+                                  <img src={movie.posterPath} alt={movie.title} className="tmdb-poster-img" loading="lazy" />
+                                ) : (
+                                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#182229' }}>
+                                    <Icon icon="solar:clapperboard-play-bold-duotone" width="32" style={{ color: '#8696a0' }} />
+                                  </div>
+                                )}
+                                {movie.rating > 0 && (
+                                  <span className="tmdb-rating-pill">
+                                    <Icon icon="solar:star-bold" width="10" />
+                                    <span>{movie.rating}</span>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="tmdb-movie-details">
+                                <span className="tmdb-movie-title">{movie.title}</span>
+                                <div className="tmdb-movie-meta">
+                                  <span>{movie.releaseDate ? movie.releaseDate.slice(0, 4) : 'Movie'}</span>
+                                  <span style={{ textTransform: 'uppercase', fontSize: '0.65rem', color: '#00a884' }}>
+                                    {movie.mediaType || 'HD'}
+                                  </span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+
+                          {!isLoadingMovies && searchResults.length === 0 && (
+                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '24px', color: '#8696a0', fontSize: '0.84rem' }}>
+                              No movies found for "{movieSearchQuery}". Try another title or switch to "Paste Link".
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="tmdb-search-empty-prompt">
+                        <Icon icon="solar:magnifer-bold-duotone" width="30" style={{ color: '#00a884' }} />
+                        <span className="search-prompt-text">Type in the search bar above to search movies & series</span>
+                        <div className="search-suggestions-row">
+                          <span style={{ fontSize: '0.72rem', color: '#8696a0', marginRight: '4px' }}>Popular:</span>
+                          {['Inception', 'Dune', 'Stranger Things', 'Interstellar', 'Moana', 'Avatar'].map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              className="search-suggestion-chip"
+                              onClick={() => setMovieSearchQuery(tag)}
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* Tab 2: Custom URL Form */
