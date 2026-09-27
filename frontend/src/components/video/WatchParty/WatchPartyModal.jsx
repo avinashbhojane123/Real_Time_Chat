@@ -321,6 +321,7 @@ export default function WatchPartyModal({
 
   const displayedTime = isScrubbing ? scrubTargetTime : currentTime;
   const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (displayedTime / duration) * 100)) : 0;
+  const isEmbedMovie = Boolean(videoSource?.type === 'embed' && !youtubeVideoId);
 
   // Memoize embed URL so it doesn't reload the iframe on every 1-second timer tick
   const embedSrc = useMemo(() => {
@@ -1539,7 +1540,7 @@ export default function WatchPartyModal({
           )}
 
           {/* Synchronized Paused Overlay Banner */}
-          {!isPlaying && videoSource && (
+          {!isPlaying && videoSource && !isEmbedMovie && (
             <div className="watch-party-synced-pause-pill">
               <span className="synced-pause-indicator" />
               <span>Paused at {formatTime(currentTime)} • Synced with {recipientUser?.nickname || 'Partner'}</span>
@@ -1720,227 +1721,248 @@ export default function WatchPartyModal({
         </div>
 
         {/* Synchronized Playback Controls Bar */}
-        <div className="watch-party-controls-bar">
-          {/* Timeline Scrubber Row */}
-          <div className="watch-party-timeline-row">
-            <span
-              className="watch-party-time-text clickable-time"
-              onClick={handleJumpToTimePrompt}
-              title="Click to jump to specific scene timestamp"
-            >
-              {formatTime(displayedTime)}
-            </span>
-
-            <div
-              ref={scrubberRef}
-              className={`watch-party-scrubber ${isScrubbing ? 'is-scrubbing' : ''}`}
-              onClick={handleScrubberClick}
-              onPointerDown={handleScrubberPointerDown}
-              onPointerMove={handleScrubberPointerMove}
-              onPointerUp={handleScrubberPointerUp}
-              onPointerCancel={handleScrubberPointerUp}
-              title="Click or drag to seek in sync"
-            >
-              <div
-                className="watch-party-progress-fill"
-                style={{ width: `${progressPercent}%` }}
-              />
-              <div
-                className="watch-party-scrubber-handle"
-                style={{ left: `${progressPercent}%` }}
-              />
-            </div>
-
-            <span className="watch-party-time-text">
-              {formatTime(duration)}
-            </span>
-          </div>
-
-          {/* Buttons Row */}
-          <div className="watch-party-buttons-row">
-            <div className="watch-party-left-controls">
-              {/* Play / Pause Button */}
-              <button
-                type="button"
-                className="watch-party-play-btn"
-                onClick={handleTogglePlay}
-                title={isPlaying ? 'Pause Video for Both' : 'Play Video for Both'}
-              >
-                <Icon
-                  icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'}
-                  width="20"
-                />
-              </button>
-
-              {/* 10s Rewind */}
-              <button
-                type="button"
-                className="watch-party-btn-icon"
-                style={{ width: '34px', height: '34px' }}
-                onClick={() => handleSeekSafe(Math.max(0, currentTime - 10))}
-                title="Rewind 10 Seconds Together"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>replay_10</span>
-              </button>
-
-              {/* 10s Forward */}
-              <button
-                type="button"
-                className="watch-party-btn-icon"
-                style={{ width: '34px', height: '34px' }}
-                onClick={() => handleSeekSafe(Math.min(duration || 99999, currentTime + 10))}
-                title="Forward 10 Seconds Together"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>forward_10</span>
-              </button>
-
-              {/* Volume & Mute */}
-              <div className="watch-party-volume-box">
-                <button
-                  type="button"
-                  className="watch-party-btn-icon"
-                  style={{ width: '32px', height: '32px' }}
-                  onClick={toggleMute}
-                  title={isMuted ? 'Unmute' : 'Mute'}
+        {videoSource && (
+          <div className={`watch-party-controls-bar ${isEmbedMovie ? 'embed-compact' : ''}`}>
+            {/* Timeline Scrubber Row - ONLY for Direct Native & YouTube players */}
+            {!isEmbedMovie && (
+              <div className="watch-party-timeline-row">
+                <span
+                  className="watch-party-time-text clickable-time"
+                  onClick={handleJumpToTimePrompt}
+                  title="Click to jump to specific scene timestamp"
                 >
-                  <Icon
-                    icon={
-                      isMuted || volume === 0
-                        ? 'solar:volume-cross-bold'
-                        : volume < 0.5
-                          ? 'solar:volume-small-bold'
-                          : 'solar:volume-loud-bold'
-                    }
-                    width="18"
+                  {formatTime(displayedTime)}
+                </span>
+
+                <div
+                  ref={scrubberRef}
+                  className={`watch-party-scrubber ${isScrubbing ? 'is-scrubbing' : ''}`}
+                  onClick={handleScrubberClick}
+                  onPointerDown={handleScrubberPointerDown}
+                  onPointerMove={handleScrubberPointerMove}
+                  onPointerUp={handleScrubberPointerUp}
+                  onPointerCancel={handleScrubberPointerUp}
+                  title="Click or drag to seek in sync"
+                >
+                  <div
+                    className="watch-party-progress-fill"
+                    style={{ width: `${progressPercent}%` }}
                   />
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="watch-party-volume-slider"
-                  title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
-                />
+                  <div
+                    className="watch-party-scrubber-handle"
+                    style={{ left: `${progressPercent}%` }}
+                  />
+                </div>
 
-                {/* Bluetooth Audio Delay Calibration Button */}
-                <button
-                  type="button"
-                  className={`watch-party-btn-icon ${audioDelayOffset !== 0 ? 'active' : ''}`}
-                  style={{ width: '28px', height: '28px', marginLeft: '2px' }}
-                  onClick={() => setShowAudioDelayModal(true)}
-                  title={`Bluetooth Headphone Audio Sync: ${audioDelayOffset > 0 ? `+${audioDelayOffset}` : audioDelayOffset}ms`}
-                >
-                  <Icon icon="solar:headphones-round-sound-bold-duotone" width="16" />
-                </button>
-              </div>
-
-              {/* Audio Ducking Indicator / Toggle (when in live call) */}
-              {isCallActive && (
-                <button
-                  type="button"
-                  className={`audio-ducking-pill ${isAudioDuckingEnabled ? 'active' : 'off'}`}
-                  onClick={() => setIsAudioDuckingEnabled(!isAudioDuckingEnabled)}
-                  title={
-                    isAudioDuckingEnabled
-                      ? 'Voice Call Audio Ducking is active: movie volume is balanced at 35% so voices stay crystal clear. Click to set to full volume.'
-                      : 'Audio Ducking is off: movie is at 100% volume. Click to enable ducking.'
-                  }
-                >
-                  <Icon icon={isAudioDuckingEnabled ? 'solar:headphones-round-sound-bold-duotone' : 'solar:headphones-round-bold-duotone'} width="14" />
-                  <span className="ducking-text">{isAudioDuckingEnabled ? 'Ducked 35%' : 'Full Vol'}</span>
-                </button>
-              )}
-            </div>
-
-            <div className="watch-party-right-controls">
-              {/* Subtitles (CC) Toggle Button (when subtitles are available) */}
-              {(videoSource?.subtitlesUrl || customSubtitleUrl) && (
-                <button
-                  type="button"
-                  className={`watch-party-btn-icon cc-btn ${isSubtitlesOn ? 'active' : ''}`}
-                  onClick={toggleSubtitles}
-                  title={isSubtitlesOn ? 'Turn Subtitles OFF' : 'Turn Subtitles ON'}
-                >
-                  <Icon icon={isSubtitlesOn ? 'solar:subtitles-bold' : 'solar:subtitles-linear'} width="16" />
-                  <span className="cc-label">CC</span>
-                </button>
-              )}
-
-              {/* HLS Stream Quality Level Selector */}
-              {hlsLevels.length > 0 && (
-                <select
-                  className="watch-party-rate-select watch-party-quality-select"
-                  value={selectedHlsLevel}
-                  onChange={handleHlsLevelChange}
-                  title="Stream Resolution & Quality (HLS)"
-                >
-                  <option value={-1}>Auto (Adaptive)</option>
-                  {hlsLevels.map((lvl, idx) => (
-                    <option key={idx} value={idx}>
-                      {lvl.height ? `${lvl.height}p` : `Stream ${idx + 1}`}
-                      {lvl.bitrate ? ` (${Math.round(lvl.bitrate / 1000)}k)` : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {/* Resync Scene Button */}
-              <button
-                type="button"
-                className="watch-party-btn-icon resync-btn"
-                onClick={() => handleResyncScene()}
-                title="Force Re-synchronize Scene Timestamp with Partner"
-              >
-                <Icon icon="solar:restart-bold" width="15" />
-                <span className="resync-label">Resync</span>
-              </button>
-
-              {/* Playback Rate Selector */}
-              <select
-                className="watch-party-rate-select"
-                value={playbackRate}
-                onChange={(e) => changeRate(Number(e.target.value))}
-                title="Playback Speed (Synchronized)"
-              >
-                <option value={0.5}>0.5x</option>
-                <option value={0.75}>0.75x</option>
-                <option value={1}>1.0x (Normal)</option>
-                <option value={1.25}>1.25x</option>
-                <option value={1.5}>1.5x</option>
-                <option value={2}>2.0x</option>
-              </select>
-
-              {/* Partner Sync Status Pill with Sub-50ms Accuracy Badge */}
-              <div
-                className={`partner-sync-indicator ${partnerSyncStatus}`}
-                title={`Sync Status: ${partnerSyncStatus} • Clock Offset: ${Math.round(serverClockSkew || 0)}ms`}
-              >
-                <span className="sync-status-dot" />
-                <span className="sync-status-text">
-                  {partnerSyncStatus === 'synced'
-                    ? 'In Perfect Sync'
-                    : partnerSyncStatus === 'buffering'
-                      ? 'Buffering...'
-                      : 'Realigning...'}
+                <span className="watch-party-time-text">
+                  {formatTime(duration)}
                 </span>
               </div>
+            )}
 
-              {/* Screen Wake Lock Pill */}
-              {wakeLockActive && (
-                <div
-                  className="watch-party-wakelock-pill"
-                  title="Screen Wake Lock is active: Your device screen will not dim or sleep during movie playback"
+            {/* Buttons Row */}
+            <div className="watch-party-buttons-row">
+              <div className="watch-party-left-controls">
+                {/* Play / 10s Rewind / 10s Forward / Volume - ONLY for Direct Native & YouTube players */}
+                {!isEmbedMovie ? (
+                  <>
+                    <button
+                      type="button"
+                      className="watch-party-play-btn"
+                      onClick={handleTogglePlay}
+                      title={isPlaying ? 'Pause Video for Both' : 'Play Video for Both'}
+                    >
+                      <Icon
+                        icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'}
+                        width="20"
+                      />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="watch-party-btn-icon"
+                      style={{ width: '34px', height: '34px' }}
+                      onClick={() => handleSeekSafe(Math.max(0, currentTime - 10))}
+                      title="Rewind 10 Seconds Together"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>replay_10</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="watch-party-btn-icon"
+                      style={{ width: '34px', height: '34px' }}
+                      onClick={() => handleSeekSafe(Math.min(duration || 99999, currentTime + 10))}
+                      title="Forward 10 Seconds Together"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>forward_10</span>
+                    </button>
+
+                    <div className="watch-party-volume-box">
+                      <button
+                        type="button"
+                        className="watch-party-btn-icon"
+                        style={{ width: '32px', height: '32px' }}
+                        onClick={toggleMute}
+                        title={isMuted ? 'Unmute' : 'Mute'}
+                      >
+                        <Icon
+                          icon={
+                            isMuted || volume === 0
+                              ? 'solar:volume-cross-bold'
+                              : volume < 0.5
+                                ? 'solar:volume-small-bold'
+                                : 'solar:volume-loud-bold'
+                          }
+                          width="18"
+                        />
+                      </button>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        className="watch-party-volume-slider"
+                        title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+                      />
+
+                      <button
+                        type="button"
+                        className={`watch-party-btn-icon ${audioDelayOffset !== 0 ? 'active' : ''}`}
+                        style={{ width: '28px', height: '28px', marginLeft: '2px' }}
+                        onClick={() => setShowAudioDelayModal(true)}
+                        title={`Bluetooth Headphone Audio Sync: ${audioDelayOffset > 0 ? `+${audioDelayOffset}` : audioDelayOffset}ms`}
+                      >
+                        <Icon icon="solar:headphones-round-sound-bold-duotone" width="16" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* Embed mode: Clean stream & sync indicators (no duplicate controls) */
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className={`watch-party-btn-icon ${audioDelayOffset !== 0 ? 'active' : ''}`}
+                      style={{ width: '28px', height: '28px' }}
+                      onClick={() => setShowAudioDelayModal(true)}
+                      title={`Bluetooth Headphone Audio Sync: ${audioDelayOffset > 0 ? `+${audioDelayOffset}` : audioDelayOffset}ms`}
+                    >
+                      <Icon icon="solar:headphones-round-sound-bold-duotone" width="15" />
+                    </button>
+                    <span style={{ fontSize: '0.74rem', color: '#8696a0', fontWeight: 500 }}>
+                      Streamed via <strong style={{ color: '#00a884' }}>{videoSource.provider || 'CinemaOS'}</strong>
+                    </span>
+                  </div>
+                )}
+
+                {/* Audio Ducking Indicator / Toggle (when in live call) */}
+                {isCallActive && (
+                  <button
+                    type="button"
+                    className={`audio-ducking-pill ${isAudioDuckingEnabled ? 'active' : 'off'}`}
+                    onClick={() => setIsAudioDuckingEnabled(!isAudioDuckingEnabled)}
+                    title={
+                      isAudioDuckingEnabled
+                        ? 'Voice Call Audio Ducking is active: movie volume is balanced at 35% so voices stay crystal clear. Click to set to full volume.'
+                        : 'Audio Ducking is off: movie is at 100% volume. Click to enable ducking.'
+                    }
+                  >
+                    <Icon icon={isAudioDuckingEnabled ? 'solar:headphones-round-sound-bold-duotone' : 'solar:headphones-round-bold-duotone'} width="14" />
+                    <span className="ducking-text">{isAudioDuckingEnabled ? 'Ducked 35%' : 'Full Vol'}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="watch-party-right-controls">
+                {/* Subtitles & HLS quality - only for direct streams */}
+                {!isEmbedMovie && (videoSource?.subtitlesUrl || customSubtitleUrl) && (
+                  <button
+                    type="button"
+                    className={`watch-party-btn-icon cc-btn ${isSubtitlesOn ? 'active' : ''}`}
+                    onClick={toggleSubtitles}
+                    title={isSubtitlesOn ? 'Turn Subtitles OFF' : 'Turn Subtitles ON'}
+                  >
+                    <Icon icon={isSubtitlesOn ? 'solar:subtitles-bold' : 'solar:subtitles-linear'} width="16" />
+                    <span className="cc-label">CC</span>
+                  </button>
+                )}
+
+                {!isEmbedMovie && hlsLevels.length > 0 && (
+                  <select
+                    className="watch-party-rate-select watch-party-quality-select"
+                    value={selectedHlsLevel}
+                    onChange={handleHlsLevelChange}
+                    title="Stream Resolution & Quality (HLS)"
+                  >
+                    <option value={-1}>Auto (Adaptive)</option>
+                    {hlsLevels.map((lvl, idx) => (
+                      <option key={idx} value={idx}>
+                        {lvl.height ? `${lvl.height}p` : `Stream ${idx + 1}`}
+                        {lvl.bitrate ? ` (${Math.round(lvl.bitrate / 1000)}k)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Resync Scene Button */}
+                <button
+                  type="button"
+                  className="watch-party-btn-icon resync-btn"
+                  onClick={() => handleResyncScene()}
+                  title="Force Re-synchronize Scene Timestamp with Partner"
                 >
-                  <Icon icon="solar:sun-2-bold" width="13" />
-                  <span>Awake</span>
+                  <Icon icon="solar:restart-bold" width="15" />
+                  <span className="resync-label">Resync</span>
+                </button>
+
+                {/* Playback Rate Selector - only for direct streams */}
+                {!isEmbedMovie && (
+                  <select
+                    className="watch-party-rate-select"
+                    value={playbackRate}
+                    onChange={(e) => changeRate(Number(e.target.value))}
+                    title="Playback Speed (Synchronized)"
+                  >
+                    <option value={0.5}>0.5x</option>
+                    <option value={0.75}>0.75x</option>
+                    <option value={1}>1.0x (Normal)</option>
+                    <option value={1.25}>1.25x</option>
+                    <option value={1.5}>1.5x</option>
+                    <option value={2}>2.0x</option>
+                  </select>
+                )}
+
+                {/* Partner Sync Status Pill with Sub-50ms Accuracy Badge */}
+                <div
+                  className={`partner-sync-indicator ${partnerSyncStatus}`}
+                  title={`Sync Status: ${partnerSyncStatus} • Clock Offset: ${Math.round(serverClockSkew || 0)}ms`}
+                >
+                  <span className="sync-status-dot" />
+                  <span className="sync-status-text">
+                    {partnerSyncStatus === 'synced'
+                      ? 'In Perfect Sync'
+                      : partnerSyncStatus === 'buffering'
+                        ? 'Buffering...'
+                        : 'Realigning...'}
+                  </span>
                 </div>
-              )}
+
+                {/* Screen Wake Lock Pill */}
+                {wakeLockActive && (
+                  <div
+                    className="watch-party-wakelock-pill"
+                    title="Screen Wake Lock is active: Your device screen will not dim or sleep during movie playback"
+                  >
+                    <Icon icon="solar:sun-2-bold" width="13" />
+                    <span>Awake</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Live Floating or Docked Face Cams */}
         <AnimatePresence>

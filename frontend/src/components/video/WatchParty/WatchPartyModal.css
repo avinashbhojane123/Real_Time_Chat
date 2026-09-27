@@ -690,6 +690,12 @@
   z-index: 20;
 }
 
+.watch-party-controls-bar.embed-compact {
+  padding: 8px 16px;
+  gap: 0;
+  background: rgba(11, 20, 26, 0.95);
+}
+
 .watch-party-timeline-row {
   display: flex;
   align-items: center;
