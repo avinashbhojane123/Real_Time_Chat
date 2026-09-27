@@ -95,39 +95,50 @@ const ChatRoster = memo(function ChatRoster({
     }
   };
 
+  const normalizeText = (str) =>
+    (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
   // Filter Users in Real-Time by Name, Device, or Browser
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) return users;
-    const q = searchQuery.toLowerCase().trim();
+    const q = normalizeText(searchQuery);
     return users.filter((u) => {
       return (
-        (u.nickname && u.nickname.toLowerCase().includes(q)) ||
-        (u.deviceModel && u.deviceModel.toLowerCase().includes(q)) ||
-        (u.browser && u.browser.toLowerCase().includes(q)) ||
-        (u.os && u.os.toLowerCase().includes(q)) ||
-        (u.networkLabel && u.networkLabel.toLowerCase().includes(q))
+        normalizeText(u.nickname).includes(q) ||
+        normalizeText(u.deviceModel).includes(q) ||
+        normalizeText(u.browser).includes(q) ||
+        normalizeText(u.os).includes(q) ||
+        normalizeText(u.networkLabel).includes(q)
       );
     });
   }, [users, searchQuery]);
 
-  // Online users with "You" pinned at top, followed by alphabetical order
+  const rolePriority = { host: 1, admin: 2, member: 3 };
+
+  // Online users with "You" pinned at top, followed by role hierarchy (Host -> Admin -> Member) and alphabetical order
   const onlineUsers = useMemo(() => {
     const list = filteredUsers.filter((u) => u.isOnline);
     return list.sort((a, b) => {
       if (a.nickname === nickname) return -1;
       if (b.nickname === nickname) return 1;
-      return (a.nickname || '').localeCompare(b.nickname || '');
+      const prioA = rolePriority[a.role || 'member'] || 3;
+      const prioB = rolePriority[b.role || 'member'] || 3;
+      if (prioA !== prioB) return prioA - prioB;
+      return (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' });
     });
   }, [filteredUsers, nickname]);
 
-  // Offline users sorted by lastSeen DESC (most recently active first)
+  // Offline users sorted by role hierarchy, then lastSeen DESC (most recently active first)
   const offlineUsers = useMemo(() => {
     const list = filteredUsers.filter((u) => !u.isOnline);
     return list.sort((a, b) => {
+      const prioA = rolePriority[a.role || 'member'] || 3;
+      const prioB = rolePriority[b.role || 'member'] || 3;
+      if (prioA !== prioB) return prioA - prioB;
       const timeA = a.lastSeen ? new Date(a.lastSeen).getTime() : 0;
       const timeB = b.lastSeen ? new Date(b.lastSeen).getTime() : 0;
       if (timeA !== timeB) return timeB - timeA;
-      return (a.nickname || '').localeCompare(b.nickname || '');
+      return (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' });
     });
   }, [filteredUsers]);
 
@@ -140,7 +151,9 @@ const ChatRoster = memo(function ChatRoster({
     const now = Date.now();
     const windowMs = 30 * 60 * 1000;
     const buckets = Array(10).fill(0);
-    for (const m of messages) {
+    const sliceCount = Math.min(messages.length, 120);
+    const recent = messages.slice(-sliceCount);
+    for (const m of recent) {
       const t = m.createdAt ? new Date(m.createdAt).getTime() : now;
       const diff = now - t;
       if (diff >= 0 && diff < windowMs) {
