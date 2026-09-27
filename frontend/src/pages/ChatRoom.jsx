@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import './ChatRoom.css';
@@ -7,6 +7,12 @@ import './ChatRoom.css';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { formatTimer } from '../utils/chatUtils';
 import { saveWallpaperOffline, getWallpaperOffline, checkImageUrlValid } from '../utils/wallpaperStorage';
+import {
+  validateSession,
+  touchSessionActivity,
+  terminateSession,
+  setupSessionLifecycleWatchers,
+} from '../utils/sessionSecurity';
 
 // Hooks
 import { useChatSocket } from '../hooks/useChatSocket';
@@ -40,12 +46,29 @@ export default function ChatRoom() {
   const nickname = (sessionStorage.getItem('nickname') || '').trim();
   const passcode = (sessionStorage.getItem('passcode') || '').trim();
 
-  // Auth verification check on mount
+  // Auth verification check on mount (Security Guards A, B, C, D)
   useEffect(() => {
-    if (!nickname || !passcode) {
+    const cleanupWatchers = setupSessionLifecycleWatchers();
+    const authStatus = validateSession();
+
+    if (!authStatus.valid) {
+      console.warn('[SessionSecurity] Access denied:', authStatus.reason);
+      terminateSession();
       navigate('/', { replace: true });
+      return;
     }
-  }, [nickname, passcode, navigate]);
+
+    // Option C: History Masking (replace state so Chrome history does not log direct entry)
+    try {
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ protected: true }, document.title);
+      }
+    } catch (e) {}
+
+    return () => {
+      cleanupWatchers();
+    };
+  }, [navigate]);
 
   // Socket & Chat State Hook
   const {
@@ -109,6 +132,46 @@ export default function ChatRoom() {
   const [showRosterPanel, setShowRosterPanel] = useState(false);
   const [showRailSidebar, setShowRailSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const [isMobileDevice, setIsMobileDevice] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  const handleLogout = useCallback(() => {
+    try {
+      webRTC?.cleanUpCall?.();
+    } catch (e) {}
+    terminateSession();
+    sessionStorage.clear();
+    localStorage.removeItem('passcode');
+    localStorage.removeItem('nickname');
+    localStorage.removeItem('avatarUrl');
+    navigate('/', { replace: true });
+  }, [navigate, webRTC]);
+
+  // Option A: Active Inactivity TTL Watcher & User Activity Listeners
+  useEffect(() => {
+    const handleUserActivity = () => {
+      touchSessionActivity();
+    };
+
+    window.addEventListener('pointerdown', handleUserActivity, { passive: true });
+    window.addEventListener('keydown', handleUserActivity, { passive: true });
+    window.addEventListener('touchstart', handleUserActivity, { passive: true });
+    window.addEventListener('scroll', handleUserActivity, { passive: true });
+
+    const interval = setInterval(() => {
+      const check = validateSession();
+      if (!check.valid) {
+        if (showToast) showToast('Session expired due to inactivity. Returning to portal.');
+        handleLogout();
+      }
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('pointerdown', handleUserActivity);
+      window.removeEventListener('keydown', handleUserActivity);
+      window.removeEventListener('touchstart', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
+    };
+  }, [showToast, handleLogout]);
 
   useEffect(() => {
     const handleResize = () => setIsMobileDevice(window.innerWidth < 768);
@@ -580,14 +643,7 @@ export default function ChatRoom() {
 
 
 
-  const handleLogout = () => {
-    webRTC.cleanUpCall();
-    sessionStorage.clear();
-    localStorage.removeItem('passcode');
-    localStorage.removeItem('nickname');
-    localStorage.removeItem('avatarUrl');
-    navigate('/', { replace: true });
-  };
+
 
   // Pointer Drag-to-Reply Handlers
   const handlePointerDown = (e, msgId) => {

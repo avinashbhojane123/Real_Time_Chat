@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { uploadFileApi, joinRoomApi } from '../services/apiService';
+import { startSession } from '../utils/sessionSecurity';
 import SecretRoomModal from '../components/modals/SecretRoomModal/SecretRoomModal';
 import './JoinRoom.css';
 
@@ -81,11 +82,13 @@ export default function JoinRoom() {
       const data = await joinRoomApi(baseUrl, finalNickname, passcode);
 
       if (data && data.success) {
-        sessionStorage.setItem('baseUrl', baseUrl.trim());
-        sessionStorage.setItem('nickname', finalNickname);
-        sessionStorage.setItem('passcode', passcode.trim());
-        if (avatarUrl) sessionStorage.setItem('avatarUrl', avatarUrl);
         const cleanPass = passcode.trim();
+        startSession({
+          nickname: finalNickname,
+          passcode: cleanPass,
+          baseUrl: baseUrl.trim(),
+          avatarUrl,
+        });
         const existingLocalTheme = localStorage.getItem(`chat_theme_${cleanPass}`);
         const existingLocalWp = localStorage.getItem(`chat_custom_wallpaper_${cleanPass}`);
 
@@ -500,7 +503,7 @@ export default function JoinRoom() {
         joining={joining}
 
         handleSecretJoin={handleSecretJoin}
-        onNavigateChat={() => navigate('/chat')}
+        onNavigateChat={() => navigate('/chat', { replace: true, state: { authorizedEntry: true } })}
       />
 
       {/* Footer */}
