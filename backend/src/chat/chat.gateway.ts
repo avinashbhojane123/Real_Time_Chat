@@ -479,6 +479,13 @@ export class ChatGateway
         await this.userRepo.save(user);
       }
 
+      const activeNicknames = new Set(
+        Array.from(this.users.values())
+          .filter((s) => s.passcode === room.passcode)
+          .map((s) => s.nickname),
+      );
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const updatedUsers = await this.userRepo.find({
         where: {
           roomId: room.id,
@@ -488,12 +495,19 @@ export class ChatGateway
         },
       });
 
+      const relevantUpdatedUsers = updatedUsers.filter((u) => {
+        if (activeNicknames.has(u.nickname)) return true;
+        if (u.isOnline) return true;
+        if (!u.lastSeen) return true;
+        return new Date(u.lastSeen) > sevenDaysAgo;
+      });
+
       this.server.to(room.passcode).emit(
         'usersList',
-        updatedUsers.map((user) => ({
+        relevantUpdatedUsers.map((user) => ({
           id: user.id,
           nickname: user.nickname,
-          isOnline: user.isOnline,
+          isOnline: activeNicknames.has(user.nickname),
           lastSeen: user.lastSeen,
           deviceType: user.deviceType,
           deviceModel: user.deviceModel,
@@ -779,6 +793,13 @@ export class ChatGateway
       isDefault: isRoomDefault,
     });
 
+    const activeNicknames = new Set(
+      Array.from(this.users.values())
+        .filter((s) => s.passcode === roomPasscode)
+        .map((s) => s.nickname),
+    );
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const roomUsers = await this.userRepo.find({
       where: {
         roomId: room.id,
@@ -788,12 +809,19 @@ export class ChatGateway
       },
     });
 
+    const relevantRoomUsers = roomUsers.filter((u) => {
+      if (activeNicknames.has(u.nickname)) return true;
+      if (u.isOnline) return true;
+      if (!u.lastSeen) return true;
+      return new Date(u.lastSeen) > sevenDaysAgo;
+    });
+
     this.server.to(room.passcode).emit(
       'usersList',
-      roomUsers.map((user) => ({
+      relevantRoomUsers.map((user) => ({
         id: user.id,
         nickname: user.nickname,
-        isOnline: user.isOnline,
+        isOnline: activeNicknames.has(user.nickname) || user.isOnline,
         lastSeen: user.lastSeen,
         deviceType: user.deviceType,
         deviceModel: user.deviceModel,
@@ -1124,6 +1152,13 @@ export class ChatGateway
       return;
     }
 
+    const activeNicknames = new Set(
+      Array.from(this.users.values())
+        .filter((s) => s.passcode === data.passcode)
+        .map((s) => s.nickname),
+    );
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const users = await this.userRepo.find({
       where: {
         roomId: room.id,
@@ -1133,12 +1168,19 @@ export class ChatGateway
       },
     });
 
+    const relevantUsers = users.filter((u) => {
+      if (activeNicknames.has(u.nickname)) return true;
+      if (u.isOnline) return true;
+      if (!u.lastSeen) return true;
+      return new Date(u.lastSeen) > sevenDaysAgo;
+    });
+
     client.emit(
       'usersList',
-      users.map((user) => ({
+      relevantUsers.map((user) => ({
         id: user.id,
         nickname: user.nickname,
-        isOnline: user.isOnline,
+        isOnline: activeNicknames.has(user.nickname) || user.isOnline,
         lastSeen: user.lastSeen,
         deviceType: user.deviceType,
         deviceModel: user.deviceModel,

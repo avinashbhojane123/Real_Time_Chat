@@ -224,20 +224,32 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       setUsers(userList || []);
     });
 
-    socket.on('userOnline', () => {
-      socket.emit('getUsers', { passcode });
+    socket.on('userOnline', ({ nickname: onlineUser }) => {
+      if (onlineUser) {
+        setUsers((prev) =>
+          prev.map((u) => (u.nickname === onlineUser ? { ...u, isOnline: true, lastSeen: null } : u))
+        );
+      }
     });
 
-    socket.on('userOffline', () => {
-      socket.emit('getUsers', { passcode });
+    socket.on('userOffline', ({ nickname: offlineUser, lastSeen: offlineTime }) => {
+      if (offlineUser) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.nickname === offlineUser
+              ? { ...u, isOnline: false, lastSeen: offlineTime || new Date() }
+              : u
+          )
+        );
+      }
     });
 
     socket.on('userJoined', () => {
-      socket.emit('getUsers', { passcode });
+      // Backend automatically broadcasts updated 'usersList' to all room members upon join
     });
 
     socket.on('userLeft', () => {
-      socket.emit('getUsers', { passcode });
+      // Backend automatically broadcasts updated 'usersList' to all room members upon leave
     });
 
     // Typing Listeners

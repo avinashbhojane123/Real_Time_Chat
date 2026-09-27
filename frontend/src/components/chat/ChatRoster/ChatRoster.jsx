@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatUserPresence } from '../../../utils/chatUtils';
@@ -37,6 +37,7 @@ const ChatRoster = memo(function ChatRoster({
   messages = [],
   typingUsers = [],
   statusUserList = [],
+  socketLatency = null,
   renderStatusAvatar,
   setActiveStatusUser,
   setShowStatusCreator,
@@ -51,41 +52,180 @@ const ChatRoster = memo(function ChatRoster({
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [showStatusDrawer, setShowStatusDrawer] = useState(false); // Status Stories Modal Drawer
+  const [searchQuery, setSearchQuery] = useState('');
+  const [avatarErrors, setAvatarErrors] = useState({});
 
-  // Group Users into Online and Offline
-  const onlineUsers = users.filter((u) => u.isOnline);
-  const offlineUsers = users.filter((u) => !u.isOnline);
+  const handleAvatarError = (nick) => {
+    setAvatarErrors((prev) => ({ ...prev, [nick]: true }));
+  };
 
-  // Calculate uupm.cc Team Activity Meter Data (Feature #4)
-  // Generates 10 activity bars reflecting message counts in the room session
+  const handleUserClick = (u) => {
+    if (u.nickname === nickname) return;
+    if (setChatMessage) {
+      setChatMessage((prev) => {
+        const mention = `@${u.nickname} `;
+        if (prev && prev.includes(mention)) return prev;
+        return prev ? `${prev} ${mention}` : mention;
+      });
+      if (chatInputRef && chatInputRef.current) {
+        chatInputRef.current.focus();
+      }
+      if (isMobileDevice && setShowRosterPanel) {
+        setShowRosterPanel(false);
+      }
+    }
+  };
+
+  // Filter Users in Real-Time by Name, Device, or Browser
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return users;
+    const q = searchQuery.toLowerCase().trim();
+    return users.filter((u) => {
+      return (
+        (u.nickname && u.nickname.toLowerCase().includes(q)) ||
+        (u.deviceModel && u.deviceModel.toLowerCase().includes(q)) ||
+        (u.browser && u.browser.toLowerCase().includes(q)) ||
+        (u.os && u.os.toLowerCase().includes(q)) ||
+        (u.networkLabel && u.networkLabel.toLowerCase().includes(q))
+      );
+    });
+  }, [users, searchQuery]);
+
+  const onlineUsers = useMemo(() => filteredUsers.filter((u) => u.isOnline), [filteredUsers]);
+  const offlineUsers = useMemo(() => filteredUsers.filter((u) => !u.isOnline), [filteredUsers]);
+
+  // Real Team Activity Meter: Measures temporal message distribution in session
   const totalMsgs = messages.length;
-  const activityBars = Array.from({ length: 10 }, (_, i) => {
-    // Generate realistic bar heights based on room message volume
-    const baseVal = Math.max(15, Math.min(100, (totalMsgs * (i + 1) * 7) % 85 + 20));
-    return baseVal;
-  });
+  const activityBars = useMemo(() => {
+    if (!messages || messages.length === 0) {
+      return Array(10).fill(12);
+    }
+    const now = Date.now();
+    const windowMs = 30 * 60 * 1000;
+    const buckets = Array(10).fill(0);
+    for (const m of messages) {
+      const t = m.createdAt ? new Date(m.createdAt).getTime() : now;
+      const diff = now - t;
+      if (diff >= 0 && diff < windowMs) {
+        const bucketIdx = 9 - Math.min(9, Math.floor((diff / windowMs) * 10));
+        buckets[bucketIdx]++;
+      }
+    }
+    const maxVal = Math.max(1, ...buckets);
+    return buckets.map((count) => Math.max(12, Math.round((count / maxVal) * 100)));
+  }, [messages]);
 
-  // Helper to render platform & connection ping badge
+  // Render Real Platform, Battery & Connection Metadata Badge
   const renderRosterDeviceBadge = (u) => {
-    const isMobile = u.isMobile || (u.userAgent && /mobile|android|iphone|ipad/i.test(u.userAgent));
+    const isMe = u.nickname === nickname;
+    const isMobile = u.isMobile || (u.userAgent && /mobile|android|iphone|ipad/i.test(u.userAgent)) || u.deviceType === 'mobile';
+    const deviceName = u.deviceModel || (isMobile ? 'Mobile' : 'Desktop');
+    const hasBattery = Boolean(u.batteryLabel);
+    const isCharging = Boolean(u.batteryIsCharging);
+
     return (
-      <motion.div
-        whileHover={{ scale: 1.05, x: 2 }}
-        className="device-badge-glow"
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px',
+          flexWrap: 'wrap',
+          marginTop: '3px',
+        }}
       >
-        <motion.div whileHover={{ rotate: [0, 10, -10, 0] }} style={{ display: 'flex', alignItems: 'center' }}>
+        {/* Device Name Badge */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(134, 150, 160, 0.15)',
+            padding: '1px 6px',
+            borderRadius: '8px',
+            fontSize: '0.67rem',
+            color: '#aebac1',
+          }}
+          title={`${u.browser || ''} on ${u.os || ''} (${deviceName})`}
+        >
           <Icon
             icon={isMobile ? 'solar:smartphone-bold-duotone' : 'solar:laptop-minimalistic-bold-duotone'}
-            width="13"
-            height="13"
+            width="11"
+            height="11"
             style={{ color: '#00a884' }}
           />
-        </motion.div>
-        <span>{isMobile ? 'Mobile' : 'Desktop'}</span>
-        <span style={{ color: 'rgba(134, 150, 160, 0.4)' }}>•</span>
-        <Icon icon="solar:wifi-router-bold-duotone" width="12" height="12" style={{ color: '#00a884' }} />
-        <span style={{ color: '#00a884', fontWeight: 600 }}>18ms</span>
-      </motion.div>
+          <span style={{ maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {deviceName}
+          </span>
+        </div>
+
+        {/* Real Battery Badge (If available from device) */}
+        {hasBattery && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              backgroundColor: isCharging ? 'rgba(0, 168, 132, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${isCharging ? 'rgba(0, 168, 132, 0.3)' : 'rgba(134, 150, 160, 0.15)'}`,
+              padding: '1px 5px',
+              borderRadius: '8px',
+              fontSize: '0.67rem',
+              color: isCharging ? '#00a884' : '#8696a0',
+            }}
+            title={isCharging ? `Charging: ${u.batteryLabel}` : `Battery: ${u.batteryLabel}`}
+          >
+            <Icon
+              icon={isCharging ? 'solar:bolt-bold-duotone' : 'solar:battery-charge-minimalistic-bold-duotone'}
+              width="10"
+              height="10"
+              style={{ color: isCharging ? '#00a884' : '#8696a0' }}
+            />
+            <span>{u.batteryLabel}</span>
+          </div>
+        )}
+
+        {/* Real Connection Latency / Network Type */}
+        {isMe ? (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              backgroundColor: 'rgba(0, 168, 132, 0.12)',
+              border: '1px solid rgba(0, 168, 132, 0.3)',
+              padding: '1px 5px',
+              borderRadius: '8px',
+              fontSize: '0.67rem',
+              color: '#00a884',
+            }}
+            title={`Your Real-time Latency: ${socketLatency !== null ? `${socketLatency}ms` : 'Measuring...'}`}
+          >
+            <Icon icon="solar:wifi-router-bold-duotone" width="10" height="10" />
+            <span>{socketLatency !== null ? `${socketLatency}ms` : 'Ping'}</span>
+          </div>
+        ) : (
+          u.networkLabel && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(134, 150, 160, 0.15)',
+                padding: '1px 5px',
+                borderRadius: '8px',
+                fontSize: '0.67rem',
+                color: '#8696a0',
+              }}
+              title={`Network: ${u.networkLabel}`}
+            >
+              <Icon icon="solar:wifi-router-bold-duotone" width="10" height="10" />
+              <span>{u.networkLabel}</span>
+            </div>
+          )
+        )}
+      </div>
     );
   };
 
@@ -363,9 +503,14 @@ const ChatRoster = memo(function ChatRoster({
           <motion.div whileHover={{ scale: 1.15, rotate: 10 }}>
             <Icon icon="solar:users-group-two-rounded-bold-duotone" width="24" height="24" style={{ color: '#00a884' }} />
           </motion.div>
-          <span style={{ fontWeight: 700, fontSize: '0.96rem', color: '#e9edef' }}>
-            Participants ({users.length})
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef' }}>
+              Participants ({users.length})
+            </span>
+            <span style={{ fontSize: '0.7rem', color: '#00a884', fontWeight: 600 }}>
+              {onlineUsers.length} online
+            </span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -389,6 +534,47 @@ const ChatRoster = memo(function ChatRoster({
           >
             <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
           </motion.button>
+        </div>
+      </div>
+
+      {/* Real-time Search Filter Bar */}
+      <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(134, 150, 160, 0.12)' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#111b21',
+            borderRadius: '8px',
+            padding: '6px 10px',
+            border: '1px solid rgba(134, 150, 160, 0.15)',
+            gap: '8px',
+          }}
+        >
+          <Icon icon="solar:magnifer-linear" width="15" height="15" style={{ color: '#8696a0', flexShrink: 0 }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search participants..."
+            style={{
+              background: 'none',
+              border: 'none',
+              outline: 'none',
+              color: '#e9edef',
+              fontSize: '0.78rem',
+              width: '100%',
+            }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: 0, display: 'flex' }}
+              title="Clear search"
+            >
+              <Icon icon="solar:close-circle-bold" width="14" height="14" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -457,22 +643,43 @@ const ChatRoster = memo(function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
-                              whileTap={{ scale: 0.96 }}
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => handleUserClick(u)}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
                                 padding: '10px 16px',
-                                cursor: 'pointer',
+                                cursor: isMe ? 'default' : 'pointer',
                               }}
                               className="roster-item-card"
+                              title={isMe ? 'This is you' : `Click to mention @${u.nickname} in chat`}
                             >
                               <div className="online-avatar-pulse">
-                                {u.avatarUrl ? (
-                                  <img src={u.avatarUrl} alt={u.nickname} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                                {u.avatarUrl && !avatarErrors[u.nickname] ? (
+                                  <img
+                                    src={u.avatarUrl}
+                                    alt={u.nickname}
+                                    onError={() => handleAvatarError(u.nickname)}
+                                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+                                  />
                                 ) : (
-                                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#005c4b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                                  <div
+                                    style={{
+                                      width: '38px',
+                                      height: '38px',
+                                      borderRadius: '50%',
+                                      backgroundColor: isMe ? '#005c4b' : '#1f2c34',
+                                      color: '#ffffff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 700,
+                                      fontSize: '0.85rem',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    }}
+                                  >
                                     {(u.nickname || 'U').slice(0, 2).toUpperCase()}
                                   </div>
                                 )}
@@ -480,9 +687,27 @@ const ChatRoster = memo(function ChatRoster({
 
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
-                                    {u.nickname} {isMe && '(You)'}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
+                                      {u.nickname} {isMe && '(You)'}
+                                    </span>
+                                    {!isMe && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.65rem',
+                                          backgroundColor: 'rgba(0, 168, 132, 0.12)',
+                                          border: '1px solid rgba(0, 168, 132, 0.28)',
+                                          color: '#00a884',
+                                          padding: '1px 5px',
+                                          borderRadius: '6px',
+                                          fontWeight: 600,
+                                        }}
+                                        title={`Mention @${u.nickname}`}
+                                      >
+                                        @
+                                      </span>
+                                    )}
+                                  </div>
 
                                   {isTyping && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
@@ -496,7 +721,7 @@ const ChatRoster = memo(function ChatRoster({
                                   <span>{presence.text}</span>
                                 </div>
 
-                                <div style={{ marginTop: '4px' }}>
+                                <div>
                                   {renderRosterDeviceBadge(u)}
                                 </div>
                               </div>
@@ -568,7 +793,8 @@ const ChatRoster = memo(function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
-                              whileTap={{ scale: 0.96 }}
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => handleUserClick(u)}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -576,12 +802,18 @@ const ChatRoster = memo(function ChatRoster({
                                 gap: '12px',
                                 padding: '10px 16px',
                                 cursor: 'pointer',
-                                opacity: 0.65,
+                                opacity: 0.72,
                               }}
                               className="roster-item-card"
+                              title={`Click to mention @${u.nickname} in chat`}
                             >
-                              {u.avatarUrl ? (
-                                <img src={u.avatarUrl} alt={u.nickname} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} />
+                              {u.avatarUrl && !avatarErrors[u.nickname] ? (
+                                <img
+                                  src={u.avatarUrl}
+                                  alt={u.nickname}
+                                  onError={() => handleAvatarError(u.nickname)}
+                                  style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }}
+                                />
                               ) : (
                                 <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#202c33', color: '#8696a0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
                                   {(u.nickname || 'U').slice(0, 2).toUpperCase()}
@@ -589,13 +821,31 @@ const ChatRoster = memo(function ChatRoster({
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
-                                    {u.nickname}
-                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
+                                      {u.nickname}
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontSize: '0.65rem',
+                                        backgroundColor: 'rgba(134, 150, 160, 0.1)',
+                                        border: '1px solid rgba(134, 150, 160, 0.2)',
+                                        color: '#8696a0',
+                                        padding: '1px 5px',
+                                        borderRadius: '6px',
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      @
+                                    </span>
+                                  </div>
                                 </div>
                                 <div style={{ fontSize: '0.7rem', color: '#8696a0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" />
                                   <span>{presence.text}</span>
+                                </div>
+                                <div>
+                                  {renderRosterDeviceBadge(u)}
                                 </div>
                               </div>
                             </motion.div>

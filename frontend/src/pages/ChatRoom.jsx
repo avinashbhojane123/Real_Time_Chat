@@ -692,6 +692,9 @@ export default function ChatRoom() {
         messages={messages}
         typingUsers={typingUsers}
         statusUserList={statusUserList}
+        socketLatency={socketLatency}
+        setChatMessage={setChatMessage}
+        chatInputRef={chatInputRef}
 
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
