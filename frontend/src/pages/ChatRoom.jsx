@@ -82,6 +82,7 @@ export default function ChatRoom() {
 
   // Recipient User Calculation
   const otherUsers = users.filter((u) => u.nickname !== nickname);
+  const isGroupRoom = otherUsers.length > 1;
   const recipientUser = otherUsers.length > 0 ? otherUsers[0] : null;
   const isRecipientOnline = otherUsers.some((u) => u.isOnline);
 
@@ -694,6 +695,7 @@ export default function ChatRoom() {
         statusUserList={statusUserList}
         socketLatency={socketLatency}
         setInputText={setInputText}
+        onStartCall={webRTC.startCall}
 
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
@@ -743,6 +745,10 @@ export default function ChatRoom() {
           socketLatency={socketLatency}
           isSocketConnected={isSocketConnected}
           renderStatusAvatar={renderStatusAvatar}
+          isGroupRoom={isGroupRoom}
+          passcode={passcode}
+          usersCount={users.length}
+          onlineCount={users.filter((u) => u.isOnline).length}
           recipientUser={recipientUser}
           isRecipientOnline={isRecipientOnline}
           typingUsers={typingUsers}

@@ -814,11 +814,12 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
 
   const startCall = async (options = {}) => {
     const isVoice = Boolean(options?.isVoiceOnly);
+    const targetNickname = options?.targetNickname || (recipientUser ? recipientUser.nickname : undefined);
     updateCallState('calling');
     setShowVideoPanel(true);
     setPipMode('none');
     setIsVoiceOnlyCall(isVoice);
-    setRemoteUserName(recipientUser ? recipientUser.nickname : 'Participant');
+    setRemoteUserName(targetNickname || (recipientUser ? recipientUser.nickname : 'Participant'));
 
     try {
       const stream = await acquireMediaStream({ isVoice });
@@ -840,7 +841,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       socketRef.current?.emit('callUser', {
         passcode,
         callerName: nickname,
-        targetNickname: recipientUser ? recipientUser.nickname : undefined,
+        targetNickname,
         isVoiceOnly: isVoice,
       });
 
@@ -848,7 +849,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         passcode,
         offer: pc.localDescription,
         callerName: nickname,
-        targetNickname: recipientUser ? recipientUser.nickname : undefined,
+        targetNickname,
         isVoiceOnly: isVoice,
       });
     } catch (err) {

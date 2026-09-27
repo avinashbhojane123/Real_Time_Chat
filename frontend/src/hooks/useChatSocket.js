@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { getSocketBaseUrl } from '../utils/apiConfig';
-import { detectClientDevice, getBatteryInfo } from '../utils/deviceUtils';
+import { detectClientDevice, getBatteryInfo, detectNetworkInfo } from '../utils/deviceUtils';
 import { compressImageFile } from '../utils/imageUtils';
 import { saveWallpaperOffline, getWallpaperOffline } from '../utils/wallpaperStorage';
 import { startBackgroundAudioKeepAlive, stopBackgroundAudioKeepAlive } from '../utils/keepAliveAudio';
@@ -244,6 +244,23 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
     });
 
+    socket.on('userMetadataUpdated', ({ nickname: updatedNick, batteryLabel, batteryIsCharging, networkLabel }) => {
+      if (updatedNick) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.nickname === updatedNick
+              ? {
+                  ...u,
+                  ...(batteryLabel !== undefined ? { batteryLabel } : {}),
+                  ...(batteryIsCharging !== undefined ? { batteryIsCharging } : {}),
+                  ...(networkLabel !== undefined ? { networkLabel } : {}),
+                }
+              : u
+          )
+        );
+      }
+    });
+
     socket.on('userJoined', () => {
       // Backend automatically broadcasts updated 'usersList' to all room members upon join
     });
@@ -470,6 +487,63 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
     };
   }, [nickname, passcode]);
+
+  // Live Battery & Network Telemetry Telecast
+  useEffect(() => {
+    if (!socketRef.current || !isSocketConnected) return;
+
+    let batteryInstance = null;
+    const handleBatteryUpdate = () => {
+      if (!batteryInstance) return;
+      const level = Math.round(batteryInstance.level * 100);
+      const isCharging = batteryInstance.charging;
+      const label = `${isCharging ? '⚡' : '🔋'} ${level}%`;
+      socketRef.current?.emit('updateMetadata', {
+        passcode,
+        batteryLabel: label,
+        batteryIsCharging: isCharging,
+      });
+    };
+
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      navigator.getBattery().then((battery) => {
+        batteryInstance = battery;
+        battery.addEventListener('levelchange', handleBatteryUpdate);
+        battery.addEventListener('chargingchange', handleBatteryUpdate);
+      }).catch(() => {});
+    }
+
+    const handleNetworkUpdate = () => {
+      const net = detectNetworkInfo();
+      socketRef.current?.emit('updateMetadata', {
+        passcode,
+        networkLabel: net.label,
+      });
+    };
+
+    const connection =
+      typeof navigator !== 'undefined'
+        ? navigator.connection || navigator.mozConnection || navigator.webkitConnection
+        : null;
+
+    if (connection) {
+      connection.addEventListener('change', handleNetworkUpdate);
+    }
+    window.addEventListener('online', handleNetworkUpdate);
+    window.addEventListener('offline', handleNetworkUpdate);
+
+    return () => {
+      if (batteryInstance) {
+        batteryInstance.removeEventListener('levelchange', handleBatteryUpdate);
+        batteryInstance.removeEventListener('chargingchange', handleBatteryUpdate);
+      }
+      if (connection) {
+        connection.removeEventListener('change', handleNetworkUpdate);
+      }
+      window.removeEventListener('online', handleNetworkUpdate);
+      window.removeEventListener('offline', handleNetworkUpdate);
+    };
+  }, [isSocketConnected, passcode]);
 
   const handleMarkAsRead = (messageIds) => {
     if (socketRef.current && messageIds && messageIds.length > 0) {

@@ -26,6 +26,15 @@ const itemVariants = {
   },
 };
 
+const getInitials = (name) => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
 const ChatRoster = memo(function ChatRoster({
   isMobileDevice,
   showRosterPanel,
@@ -42,6 +51,7 @@ const ChatRoster = memo(function ChatRoster({
   setActiveStatusUser,
   setShowStatusCreator,
   setInputText,
+  onStartCall,
   setShowLogoutConfirm,
   setShowThemeModal,
   setShowClearConfirm,
@@ -52,12 +62,14 @@ const ChatRoster = memo(function ChatRoster({
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarErrors, setAvatarErrors] = useState({});
+  const [inspectingUser, setInspectingUser] = useState(null);
+  const [copiedHandle, setCopiedHandle] = useState(false);
 
   const handleAvatarError = (nick) => {
     setAvatarErrors((prev) => ({ ...prev, [nick]: true }));
   };
 
-  const handleUserClick = (u) => {
+  const handleMention = (u) => {
     if (u.nickname === nickname) return;
     if (setInputText) {
       setInputText((prev) => {
@@ -86,8 +98,26 @@ const ChatRoster = memo(function ChatRoster({
     });
   }, [users, searchQuery]);
 
-  const onlineUsers = useMemo(() => filteredUsers.filter((u) => u.isOnline), [filteredUsers]);
-  const offlineUsers = useMemo(() => filteredUsers.filter((u) => !u.isOnline), [filteredUsers]);
+  // Online users with "You" pinned at top, followed by alphabetical order
+  const onlineUsers = useMemo(() => {
+    const list = filteredUsers.filter((u) => u.isOnline);
+    return list.sort((a, b) => {
+      if (a.nickname === nickname) return -1;
+      if (b.nickname === nickname) return 1;
+      return (a.nickname || '').localeCompare(b.nickname || '');
+    });
+  }, [filteredUsers, nickname]);
+
+  // Offline users sorted by lastSeen DESC (most recently active first)
+  const offlineUsers = useMemo(() => {
+    const list = filteredUsers.filter((u) => !u.isOnline);
+    return list.sort((a, b) => {
+      const timeA = a.lastSeen ? new Date(a.lastSeen).getTime() : 0;
+      const timeB = b.lastSeen ? new Date(b.lastSeen).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return (a.nickname || '').localeCompare(b.nickname || '');
+    });
+  }, [filteredUsers]);
 
   // Real Team Activity Meter: Measures temporal message distribution in session
   const totalMsgs = messages.length;
@@ -573,6 +603,35 @@ const ChatRoster = memo(function ChatRoster({
 
       {/* Participants List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+        {filteredUsers.length === 0 && searchQuery.trim() ? (
+          <div style={{ padding: '36px 16px', textAlign: 'center', color: '#8696a0' }}>
+            <Icon icon="solar:magnifer-linear" width="36" height="36" style={{ color: '#8696a0', opacity: 0.5, marginBottom: '8px' }} />
+            <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#e9edef' }}>
+              No participants found
+            </div>
+            <div style={{ fontSize: '0.74rem', marginTop: '4px' }}>
+              No matches for "{searchQuery}"
+            </div>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              style={{
+                marginTop: '12px',
+                backgroundColor: 'rgba(0, 168, 132, 0.15)',
+                color: '#00a884',
+                border: '1px solid rgba(0, 168, 132, 0.3)',
+                borderRadius: '8px',
+                padding: '5px 14px',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Clear Search
+            </button>
+          </div>
+        ) : (
+          <>
             {/* Group 1 - ONLINE PARTICIPANTS */}
             <div style={{ marginBottom: '12px' }}>
               <div
@@ -622,8 +681,8 @@ const ChatRoster = memo(function ChatRoster({
                     >
                       {onlineUsers.length === 0 ? (
                         <div style={{ padding: '12px 16px', fontSize: '0.78rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Icon icon="line-md:loading-twotone-loop" width="18" height="18" style={{ color: '#00a884' }} />
-                          <span>Connecting participants...</span>
+                          <Icon icon="solar:users-group-two-rounded-bold-duotone" width="16" height="16" style={{ color: '#8696a0' }} />
+                          <span>No participants online right now.</span>
                         </div>
                       ) : (
                         onlineUsers.map((u, idx) => {
@@ -636,18 +695,18 @@ const ChatRoster = memo(function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => handleUserClick(u)}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setInspectingUser(u)}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
                                 padding: '10px 16px',
-                                cursor: isMe ? 'default' : 'pointer',
+                                cursor: 'pointer',
                               }}
                               className="roster-item-card"
-                              title={isMe ? 'This is you' : `Click to mention @${u.nickname} in chat`}
+                              title={`Click to view profile & actions for ${u.nickname}`}
                             >
                               <div className="online-avatar-pulse">
                                 {u.avatarUrl && !avatarErrors[u.nickname] ? (
@@ -673,7 +732,7 @@ const ChatRoster = memo(function ChatRoster({
                                       border: '1px solid rgba(255, 255, 255, 0.1)',
                                     }}
                                   >
-                                    {(u.nickname || 'U').slice(0, 2).toUpperCase()}
+                                    {getInitials(u.nickname)}
                                   </div>
                                 )}
                               </div>
@@ -684,31 +743,88 @@ const ChatRoster = memo(function ChatRoster({
                                     <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
                                       {u.nickname} {isMe && '(You)'}
                                     </span>
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {isTyping && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
+                                        <Icon icon="line-md:chat-bubble-twotone-loop" width="16" height="16" />
+                                        <span>typing...</span>
+                                      </div>
+                                    )}
+
                                     {!isMe && (
-                                      <span
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleMention(u);
+                                        }}
                                         style={{
-                                          fontSize: '0.65rem',
+                                          fontSize: '0.68rem',
                                           backgroundColor: 'rgba(0, 168, 132, 0.12)',
                                           border: '1px solid rgba(0, 168, 132, 0.28)',
                                           color: '#00a884',
-                                          padding: '1px 5px',
+                                          padding: '1px 6px',
                                           borderRadius: '6px',
-                                          fontWeight: 600,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
                                         }}
-                                        title={`Mention @${u.nickname}`}
+                                        title={`Mention @${u.nickname} in chat`}
                                       >
                                         @
-                                      </span>
+                                      </button>
+                                    )}
+
+                                    {!isMe && onStartCall && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStartCall({ isVoiceOnly: true, targetNickname: u.nickname });
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#00a884',
+                                            cursor: 'pointer',
+                                            padding: '3px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                          }}
+                                          title={`Voice call ${u.nickname}`}
+                                        >
+                                          <Icon icon="solar:phone-bold-duotone" width="16" height="16" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStartCall({ isVoiceOnly: false, targetNickname: u.nickname });
+                                          }}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#00a884',
+                                            cursor: 'pointer',
+                                            padding: '3px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                          }}
+                                          title={`Video call ${u.nickname}`}
+                                        >
+                                          <Icon icon="solar:videocamera-bold-duotone" width="16" height="16" />
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
-
-                                  {isTyping && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00a884', fontSize: '0.7rem', fontWeight: 700 }}>
-                                      <Icon icon="line-md:chat-bubble-twotone-loop" width="16" height="16" />
-                                      <span>typing...</span>
-                                    </div>
-                                  )}
                                 </div>
+
                                 <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" />
                                   <span>{presence.text}</span>
@@ -786,8 +902,8 @@ const ChatRoster = memo(function ChatRoster({
                               key={u.nickname || idx}
                               variants={itemVariants}
                               layout
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => handleUserClick(u)}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setInspectingUser(u)}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -795,10 +911,10 @@ const ChatRoster = memo(function ChatRoster({
                                 gap: '12px',
                                 padding: '10px 16px',
                                 cursor: 'pointer',
-                                opacity: 0.72,
+                                opacity: 0.76,
                               }}
                               className="roster-item-card"
-                              title={`Click to mention @${u.nickname} in chat`}
+                              title={`Click to view profile & actions for ${u.nickname}`}
                             >
                               {u.avatarUrl && !avatarErrors[u.nickname] ? (
                                 <img
@@ -809,7 +925,7 @@ const ChatRoster = memo(function ChatRoster({
                                 />
                               ) : (
                                 <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#202c33', color: '#8696a0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
-                                  {(u.nickname || 'U').slice(0, 2).toUpperCase()}
+                                  {getInitials(u.nickname)}
                                 </div>
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -818,20 +934,27 @@ const ChatRoster = memo(function ChatRoster({
                                     <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
                                       {u.nickname}
                                     </span>
-                                    <span
-                                      style={{
-                                        fontSize: '0.65rem',
-                                        backgroundColor: 'rgba(134, 150, 160, 0.1)',
-                                        border: '1px solid rgba(134, 150, 160, 0.2)',
-                                        color: '#8696a0',
-                                        padding: '1px 5px',
-                                        borderRadius: '6px',
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      @
-                                    </span>
                                   </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMention(u);
+                                    }}
+                                    style={{
+                                      fontSize: '0.68rem',
+                                      backgroundColor: 'rgba(134, 150, 160, 0.1)',
+                                      border: '1px solid rgba(134, 150, 160, 0.2)',
+                                      color: '#8696a0',
+                                      padding: '1px 6px',
+                                      borderRadius: '6px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                    title={`Mention @${u.nickname}`}
+                                  >
+                                    @
+                                  </button>
                                 </div>
                                 <div style={{ fontSize: '0.7rem', color: '#8696a0', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" />
@@ -850,6 +973,8 @@ const ChatRoster = memo(function ChatRoster({
                 )}
               </AnimatePresence>
             </div>
+          </>
+        )}
       </div>
 
       {/* uupm.cc Feature #4: Team Activity Heat Meter (Glassmorphic Hourly Bar Chart) */}
@@ -879,8 +1004,6 @@ const ChatRoster = memo(function ChatRoster({
         </div>
       </div>
 
-
-
       {/* Encrypted Session Badge Footer */}
       <div className="e2ee-footer-badge">
         <motion.div
@@ -894,6 +1017,263 @@ const ChatRoster = memo(function ChatRoster({
       </div>
     </motion.aside>
     )}
+
+    {/* Participant Profile & Action Popover / Modal */}
+    <AnimatePresence>
+      {inspectingUser && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setInspectingUser(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(11, 20, 26, 0.78)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 20 }}
+            transition={{ type: 'spring', stiffness: 450, damping: 30 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#1f2c34',
+              borderRadius: '16px',
+              padding: '20px',
+              maxWidth: '380px',
+              width: '100%',
+              border: '1px solid rgba(0, 168, 132, 0.3)',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#00a884', letterSpacing: '0.5px' }}>
+                PARTICIPANT PROFILE
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectingUser(null)}
+                style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: 0 }}
+              >
+                <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
+              </button>
+            </div>
+
+            {/* Profile Card Centerpiece */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '10px 0' }}>
+              <div style={{ position: 'relative' }}>
+                {inspectingUser.avatarUrl && !avatarErrors[inspectingUser.nickname] ? (
+                  <img
+                    src={inspectingUser.avatarUrl}
+                    alt={inspectingUser.nickname}
+                    onError={() => handleAvatarError(inspectingUser.nickname)}
+                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${inspectingUser.isOnline ? '#00a884' : '#8696a0'}` }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      backgroundColor: inspectingUser.nickname === nickname ? '#005c4b' : '#202c33',
+                      color: inspectingUser.isOnline ? '#00a884' : '#8696a0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '1.4rem',
+                      border: `2px solid ${inspectingUser.isOnline ? '#00a884' : '#8696a0'}`,
+                    }}
+                  >
+                    {getInitials(inspectingUser.nickname)}
+                  </div>
+                )}
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '2px',
+                    right: '2px',
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    backgroundColor: inspectingUser.isOnline ? '#00a884' : '#8696a0',
+                    border: '2px solid #1f2c34',
+                  }}
+                />
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e9edef' }}>
+                  {inspectingUser.nickname} {inspectingUser.nickname === nickname && '(You)'}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: inspectingUser.isOnline ? '#00a884' : '#8696a0', fontWeight: 600, marginTop: '2px' }}>
+                  {formatUserPresence(inspectingUser.isOnline, inspectingUser.lastSeen).text}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  handleMention(inspectingUser);
+                  setInspectingUser(null);
+                }}
+                style={{
+                  backgroundColor: 'rgba(0, 168, 132, 0.15)',
+                  color: '#00a884',
+                  border: '1px solid rgba(0, 168, 132, 0.3)',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Icon icon="solar:chat-round-dots-bold-duotone" width="16" height="16" />
+                <span>Mention</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`@${inspectingUser.nickname}`);
+                  setCopiedHandle(true);
+                  setTimeout(() => setCopiedHandle(false), 2000);
+                }}
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  color: '#e9edef',
+                  border: '1px solid rgba(134, 150, 160, 0.2)',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Icon icon={copiedHandle ? "solar:check-circle-bold" : "solar:copy-bold-duotone"} width="16" height="16" style={{ color: copiedHandle ? '#00a884' : '#8696a0' }} />
+                <span>{copiedHandle ? 'Copied!' : 'Copy @'}</span>
+              </button>
+
+              {inspectingUser.nickname !== nickname && inspectingUser.isOnline && onStartCall && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onStartCall({ isVoiceOnly: true, targetNickname: inspectingUser.nickname });
+                      setInspectingUser(null);
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(0, 168, 132, 0.2)',
+                      color: '#00a884',
+                      border: '1px solid rgba(0, 168, 132, 0.4)',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Icon icon="solar:phone-calling-rounded-bold-duotone" width="16" height="16" />
+                    <span>Voice Call</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onStartCall({ isVoiceOnly: false, targetNickname: inspectingUser.nickname });
+                      setInspectingUser(null);
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(0, 112, 243, 0.2)',
+                      color: '#0070f3',
+                      border: '1px solid rgba(0, 112, 243, 0.4)',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Icon icon="solar:videocamera-record-bold-duotone" width="16" height="16" />
+                    <span>Video Call</span>
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Detailed Specs Diagnostics Grid */}
+            <div style={{ backgroundColor: '#111b21', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid rgba(134, 150, 160, 0.12)' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8696a0', letterSpacing: '0.5px' }}>
+                CONNECTION & DEVICE SPECS
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.76rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#aebac1' }}>
+                  <Icon icon="solar:laptop-minimalistic-bold-duotone" width="14" height="14" style={{ color: '#00a884' }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {inspectingUser.deviceModel || inspectingUser.deviceType || 'Standard Device'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#aebac1' }}>
+                  <Icon icon="solar:monitor-bold-duotone" width="14" height="14" style={{ color: '#00a884' }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {inspectingUser.os || 'OS Unknown'} • {inspectingUser.browser || 'Browser'}
+                  </span>
+                </div>
+
+                {inspectingUser.batteryLabel && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#aebac1' }}>
+                    <Icon icon={inspectingUser.batteryIsCharging ? "solar:bolt-bold-duotone" : "solar:battery-charge-minimalistic-bold-duotone"} width="14" height="14" style={{ color: inspectingUser.batteryIsCharging ? '#00a884' : '#8696a0' }} />
+                    <span>{inspectingUser.batteryLabel} {inspectingUser.batteryIsCharging ? '(Charging)' : ''}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#aebac1' }}>
+                  <Icon icon="solar:wifi-router-bold-duotone" width="14" height="14" style={{ color: '#00a884' }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {inspectingUser.nickname === nickname
+                      ? (socketLatency !== null ? `${socketLatency}ms RTT` : 'Measuring ping...')
+                      : (inspectingUser.networkLabel || 'Encrypted Tunnel')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     </>
   );
 });

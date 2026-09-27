@@ -11,6 +11,10 @@ const ChatHeader = memo(function ChatHeader({
   setShowRosterPanel,
   showRailSidebar,
   setShowRailSidebar,
+  isGroupRoom = false,
+  passcode = '',
+  usersCount = 0,
+  onlineCount = 0,
   renderStatusAvatar,
   recipientUser,
   isRecipientOnline,
@@ -185,8 +189,69 @@ const ChatHeader = memo(function ChatHeader({
             </motion.div>
           </motion.button>
 
-          {/* Recipient User Info & Avatar with Pulsing Status Aura & 3D Card Flip */}
-          {recipientUser ? (
+          {/* Recipient User Info or Group Room Info with Pulsing Status Aura */}
+          {isGroupRoom ? (
+            <div
+              className="wa-header-user-info"
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, overflow: 'hidden', flex: 1 }}
+              onClick={() => setShowRosterPanel((prev) => !prev)}
+              title="Click to view all participants"
+            >
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(0, 168, 132, 0.16)',
+                  border: '1.5px solid #00a884',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#00a884',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon icon="solar:users-group-two-rounded-bold-duotone" width="22" height="22" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Room #{passcode || 'Chat'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.66rem',
+                      backgroundColor: 'rgba(0, 168, 132, 0.15)',
+                      color: '#00a884',
+                      padding: '1px 6px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      border: '1px solid rgba(0, 168, 132, 0.3)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Group ({usersCount})
+                  </span>
+                  <Icon icon="solar:shield-check-bold-duotone" width="16" height="16" style={{ color: '#00a884', opacity: 0.9, flexShrink: 0 }} title="End-to-end encrypted chat" />
+                </div>
+                {typingUsers && typingUsers.length > 0 ? (
+                  <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                    <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                      {typingUsers.join(', ')} typing...
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.72rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                    <Icon icon="solar:check-circle-bold-duotone" width="12" height="12" style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                      {onlineCount} online • {usersCount} members
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : recipientUser ? (
             <div className="wa-header-user-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, overflow: 'hidden', flex: 1 }} onClick={() => setShowRosterPanel(true)}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {(recipientUser?.hasStatus || recipientUser?.statusUrl) && (
@@ -243,15 +308,18 @@ const ChatHeader = memo(function ChatHeader({
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', flex: 1 }}>
-              <span style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Group Chat Space</span>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', flex: 1, cursor: 'pointer' }}
+              onClick={() => setShowRosterPanel((prev) => !prev)}
+            >
+              <span style={{ fontWeight: 700, fontSize: '0.94rem', color: '#e9edef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Room #{passcode || 'Chat'}</span>
               {typingUsers && typingUsers.length > 0 ? (
                 <div style={{ fontSize: '0.74rem', color: '#00a884', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
                   <Icon icon="line-md:chat-bubble-twotone-loop" width="14" height="14" style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{typingUsers.join(', ')} is typing...</span>
                 </div>
               ) : (
-                <div style={{ fontSize: '0.72rem', color: '#8696a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Click to view room participants</div>
+                <div style={{ fontSize: '0.72rem', color: '#8696a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Waiting for participants to join...</div>
               )}
             </div>
           )}

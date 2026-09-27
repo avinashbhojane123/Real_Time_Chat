@@ -161,6 +161,10 @@ export class ChatGateway
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
     }
+    for (const timer of this.userDisconnectDebounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.userDisconnectDebounceTimers.clear();
   }
 
   private async cleanupExpiredMessages() {
@@ -236,6 +240,15 @@ export class ChatGateway
   >();
 
   private socketMessageTimes = new Map<string, number[]>();
+  private userDisconnectDebounceTimers = new Map<string, NodeJS.Timeout>();
+
+  private clearUserDisconnectDebounceTimer(key: string) {
+    const timer = this.userDisconnectDebounceTimers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      this.userDisconnectDebounceTimers.delete(key);
+    }
+  }
 
   private watchPartyRooms = new Map<string, WatchPartyState>();
   private watchPartyCleanupTimers = new Map<string, NodeJS.Timeout>();
@@ -458,69 +471,6 @@ export class ChatGateway
       return;
     }
 
-    const room = await this.roomRepo.findOne({
-      where: {
-        passcode: userInfo.passcode,
-      },
-    });
-
-    if (room) {
-      const user = await this.userRepo.findOne({
-        where: {
-          nickname: userInfo.nickname,
-          roomId: room.id,
-        },
-      });
-
-      if (user) {
-        user.isOnline = false;
-        user.lastSeen = new Date();
-
-        await this.userRepo.save(user);
-      }
-
-      const activeNicknames = new Set(
-        Array.from(this.users.values())
-          .filter((s) => s.passcode === room.passcode)
-          .map((s) => s.nickname),
-      );
-
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const updatedUsers = await this.userRepo.find({
-        where: {
-          roomId: room.id,
-        },
-        order: {
-          nickname: 'ASC',
-        },
-      });
-
-      const relevantUpdatedUsers = updatedUsers.filter((u) => {
-        if (activeNicknames.has(u.nickname)) return true;
-        if (u.isOnline) return true;
-        if (!u.lastSeen) return true;
-        return new Date(u.lastSeen) > sevenDaysAgo;
-      });
-
-      this.server.to(room.passcode).emit(
-        'usersList',
-        relevantUpdatedUsers.map((user) => ({
-          id: user.id,
-          nickname: user.nickname,
-          isOnline: activeNicknames.has(user.nickname),
-          lastSeen: user.lastSeen,
-          deviceType: user.deviceType,
-          deviceModel: user.deviceModel,
-          browser: user.browser,
-          os: user.os,
-          avatarUrl: user.avatarUrl,
-          networkLabel: user.networkLabel,
-          batteryLabel: user.batteryLabel,
-          batteryIsCharging: user.batteryIsCharging,
-        })),
-      );
-    }
-
     this.server.to(userInfo.passcode).emit('userStoppedTyping', {
       nickname: userInfo.nickname,
     });
@@ -528,14 +478,95 @@ export class ChatGateway
       nickname: userInfo.nickname,
     });
 
-    this.server.to(userInfo.passcode).emit('userOffline', {
-      nickname: userInfo.nickname,
-      lastSeen: new Date(),
-    });
+    const userKey = `${userInfo.passcode.trim()}:${userInfo.nickname.trim()}`;
+    this.clearUserDisconnectDebounceTimer(userKey);
 
-    this.server.to(userInfo.passcode).emit('userLeft', {
-      nickname: userInfo.nickname,
-    });
+    const debounceTimer = setTimeout(async () => {
+      this.userDisconnectDebounceTimers.delete(userKey);
+
+      const isReconnected = Array.from(this.users.values()).some(
+        (info) =>
+          info.nickname === userInfo.nickname &&
+          info.passcode === userInfo.passcode,
+      );
+      if (isReconnected) {
+        return;
+      }
+
+      const room = await this.roomRepo.findOne({
+        where: {
+          passcode: userInfo.passcode,
+        },
+      });
+
+      if (room) {
+        const user = await this.userRepo.findOne({
+          where: {
+            nickname: userInfo.nickname,
+            roomId: room.id,
+          },
+        });
+
+        if (user) {
+          user.isOnline = false;
+          user.lastSeen = new Date();
+
+          await this.userRepo.save(user);
+        }
+
+        const activeNicknames = new Set(
+          Array.from(this.users.values())
+            .filter((s) => s.passcode === room.passcode)
+            .map((s) => s.nickname),
+        );
+
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const updatedUsers = await this.userRepo.find({
+          where: {
+            roomId: room.id,
+          },
+          order: {
+            nickname: 'ASC',
+          },
+        });
+
+        const relevantUpdatedUsers = updatedUsers.filter((u) => {
+          if (activeNicknames.has(u.nickname)) return true;
+          if (u.isOnline) return true;
+          if (!u.lastSeen) return true;
+          return new Date(u.lastSeen) > sevenDaysAgo;
+        });
+
+        this.server.to(room.passcode).emit(
+          'usersList',
+          relevantUpdatedUsers.map((user) => ({
+            id: user.id,
+            nickname: user.nickname,
+            isOnline: activeNicknames.has(user.nickname),
+            lastSeen: user.lastSeen,
+            deviceType: user.deviceType,
+            deviceModel: user.deviceModel,
+            browser: user.browser,
+            os: user.os,
+            avatarUrl: user.avatarUrl,
+            networkLabel: user.networkLabel,
+            batteryLabel: user.batteryLabel,
+            batteryIsCharging: user.batteryIsCharging,
+          })),
+        );
+      }
+
+      this.server.to(userInfo.passcode).emit('userOffline', {
+        nickname: userInfo.nickname,
+        lastSeen: new Date(),
+      });
+
+      this.server.to(userInfo.passcode).emit('userLeft', {
+        nickname: userInfo.nickname,
+      });
+    }, 2500);
+
+    this.userDisconnectDebounceTimers.set(userKey, debounceTimer);
 
     // Prevent buffer lock deadlock if disconnecting user was buffering in Watch Party
     const wpState = this.watchPartyRooms.get(userInfo.passcode);
@@ -628,6 +659,8 @@ export class ChatGateway
     client: Socket,
   ) {
     this.clearWatchPartyDisconnectTimer(data.passcode);
+    const userKey = `${data.passcode.trim()}:${data.nickname.trim()}`;
+    this.clearUserDisconnectDebounceTimer(userKey);
     console.log(
       'JOIN ROOM:',
       data.nickname,
@@ -1127,6 +1160,53 @@ export class ChatGateway
     client.to(trimmedPasscode).emit('userStopTyping', {
       nickname: session.nickname,
     });
+  }
+
+  @SubscribeMessage('updateMetadata')
+  async updateMetadata(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      passcode?: string;
+      batteryLabel?: string;
+      batteryIsCharging?: boolean;
+      networkLabel?: string;
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session) return;
+    const passcode = (data.passcode || session.passcode || '').trim();
+    const room = await this.roomRepo.findOne({ where: { passcode } });
+    if (!room) return;
+
+    const user = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!user) return;
+
+    let hasChanged = false;
+    if (data.batteryLabel !== undefined && data.batteryLabel !== user.batteryLabel) {
+      user.batteryLabel = data.batteryLabel;
+      hasChanged = true;
+    }
+    if (typeof data.batteryIsCharging === 'boolean' && data.batteryIsCharging !== user.batteryIsCharging) {
+      user.batteryIsCharging = data.batteryIsCharging;
+      hasChanged = true;
+    }
+    if (data.networkLabel !== undefined && data.networkLabel !== user.networkLabel) {
+      user.networkLabel = data.networkLabel;
+      hasChanged = true;
+    }
+
+    if (hasChanged) {
+      await this.userRepo.save(user);
+      this.server.to(passcode).emit('userMetadataUpdated', {
+        nickname: session.nickname,
+        batteryLabel: user.batteryLabel,
+        batteryIsCharging: user.batteryIsCharging,
+        networkLabel: user.networkLabel,
+      });
+    }
   }
 
   @SubscribeMessage('getUsers')
