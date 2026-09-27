@@ -1284,6 +1284,7 @@ export class ChatGateway
     @MessageBody()
     data: TypingDto,
   ) {
+    if (!this.checkRateLimit(client, 6, 2000)) return;
     const session = this.users.get(client.id);
     if (!session || session.isMuted) return;
 
@@ -1320,9 +1321,10 @@ export class ChatGateway
       batteryLabel?: string;
       batteryIsCharging?: boolean;
       networkLabel?: string;
+      avatarUrl?: string;
     },
   ) {
-    if (!this.checkRateLimit(client, 4, 3000)) return;
+    if (!this.checkRateLimit(client, 8, 3000)) return;
     const session = this.users.get(client.id);
     if (!session) return;
     const passcode = (data.passcode || session.passcode || '').trim();
@@ -1347,6 +1349,13 @@ export class ChatGateway
       user.networkLabel = data.networkLabel;
       hasChanged = true;
     }
+    if (data.avatarUrl !== undefined) {
+      const cleanAvatar = sanitizeAvatarUrl(data.avatarUrl);
+      if (cleanAvatar !== user.avatarUrl) {
+        user.avatarUrl = cleanAvatar;
+        hasChanged = true;
+      }
+    }
 
     if (hasChanged) {
       await this.userRepo.save(user);
@@ -1355,7 +1364,11 @@ export class ChatGateway
         batteryLabel: user.batteryLabel,
         batteryIsCharging: user.batteryIsCharging,
         networkLabel: user.networkLabel,
+        avatarUrl: user.avatarUrl,
       });
+      if (data.avatarUrl !== undefined) {
+        await this.broadcastUsersList(room.passcode, room.id);
+      }
     }
   }
 
@@ -1788,6 +1801,10 @@ export class ChatGateway
 
     const targets = this.findSocketsInRoom(data.passcode.trim(), data.targetNickname.trim());
     if (!targets.length) {
+      client.emit('directMessageError', {
+        targetNickname: data.targetNickname.trim(),
+        message: `@${data.targetNickname.trim()} is currently offline or away. Whisper was not delivered.`,
+      });
       return { success: false, message: `${data.targetNickname} is currently offline` };
     }
 

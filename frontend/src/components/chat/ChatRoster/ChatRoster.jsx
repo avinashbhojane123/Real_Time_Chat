@@ -67,6 +67,7 @@ const ChatRoster = memo(function ChatRoster({
   onClearInactiveUsers,
   onMuteUser,
   onSendDirectMessage,
+  onUpdateAvatar,
 }) {
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
@@ -1308,6 +1309,41 @@ const ChatRoster = memo(function ChatRoster({
                 <div style={{ fontSize: '0.78rem', color: inspectingUser.isOnline ? '#00a884' : '#8696a0', fontWeight: 600, marginTop: '2px' }}>
                   {formatUserPresence(inspectingUser.isOnline, inspectingUser.lastSeen).text}
                 </div>
+                {inspectingUser.nickname === nickname && onUpdateAvatar && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentUrl = inspectingUser.avatarUrl || '';
+                      const newUrl = window.prompt(
+                        'Enter new Avatar Image URL (or leave empty to reset to initials):',
+                        currentUrl
+                      );
+                      if (newUrl !== null) {
+                        onUpdateAvatar(newUrl.trim());
+                        setInspectingUser((prev) =>
+                          prev ? { ...prev, avatarUrl: newUrl.trim() } : null
+                        );
+                      }
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      backgroundColor: 'rgba(0, 168, 132, 0.15)',
+                      color: '#00a884',
+                      border: '1px solid rgba(0, 168, 132, 0.3)',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Icon icon="solar:camera-bold-duotone" width="13" height="13" />
+                    <span>Change Avatar</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1421,54 +1457,74 @@ const ChatRoster = memo(function ChatRoster({
 
             {/* Direct Whisper / Message Input */}
             {inspectingUser.nickname !== nickname && onSendDirectMessage && (
-              <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
-                <input
-                  type="text"
-                  placeholder={`Whisper to @${inspectingUser.nickname}...`}
-                  value={whisperMessage}
-                  onChange={(e) => setWhisperMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && whisperMessage.trim()) {
-                      onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
-                      setWhisperMessage('');
-                      setInspectingUser(null);
-                    }
-                  }}
+              inspectingUser.isOnline ? (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                  <input
+                    type="text"
+                    placeholder={`Whisper to @${inspectingUser.nickname}...`}
+                    value={whisperMessage}
+                    onChange={(e) => setWhisperMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && whisperMessage.trim()) {
+                        onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                        setWhisperMessage('');
+                        setInspectingUser(null);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#111b21',
+                      border: '1px solid rgba(134, 150, 160, 0.25)',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      color: '#e9edef',
+                      fontSize: '0.78rem',
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!whisperMessage.trim()}
+                    onClick={() => {
+                      if (whisperMessage.trim()) {
+                        onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                        setWhisperMessage('');
+                        setInspectingUser(null);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
+                      color: whisperMessage.trim() ? '#111b21' : '#8696a0',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: whisperMessage.trim() ? 'pointer' : 'default',
+                    }}
+                  >
+                    Whisper
+                  </button>
+                </div>
+              ) : (
+                <div
                   style={{
-                    flex: 1,
-                    backgroundColor: '#111b21',
-                    border: '1px solid rgba(134, 150, 160, 0.25)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    color: '#e9edef',
-                    fontSize: '0.78rem',
-                    outline: 'none',
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!whisperMessage.trim()}
-                  onClick={() => {
-                    if (whisperMessage.trim()) {
-                      onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
-                      setWhisperMessage('');
-                      setInspectingUser(null);
-                    }
-                  }}
-                  style={{
-                    backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
-                    color: whisperMessage.trim() ? '#111b21' : '#8696a0',
-                    border: 'none',
-                    borderRadius: '8px',
                     padding: '8px 12px',
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    cursor: whisperMessage.trim() ? 'pointer' : 'default',
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(134, 150, 160, 0.15)',
+                    fontSize: '0.74rem',
+                    color: '#8696a0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginTop: '2px',
                   }}
                 >
-                  Whisper
-                </button>
-              </div>
+                  <Icon icon="solar:clock-circle-bold-duotone" width="14" height="14" style={{ flexShrink: 0, color: '#8696a0' }} />
+                  <span>Participant is currently offline. Direct whispers require an active connection.</span>
+                </div>
+              )
             )}
 
             {/* Host Administration Controls */}

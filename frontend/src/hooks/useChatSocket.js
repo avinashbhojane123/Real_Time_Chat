@@ -246,7 +246,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
     });
 
-    socket.on('userMetadataUpdated', ({ nickname: updatedNick, batteryLabel, batteryIsCharging, networkLabel }) => {
+    socket.on('userMetadataUpdated', ({ nickname: updatedNick, batteryLabel, batteryIsCharging, networkLabel, avatarUrl }) => {
       if (updatedNick) {
         setUsers((prev) =>
           prev.map((u) =>
@@ -256,11 +256,16 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
                   ...(batteryLabel !== undefined ? { batteryLabel } : {}),
                   ...(batteryIsCharging !== undefined ? { batteryIsCharging } : {}),
                   ...(networkLabel !== undefined ? { networkLabel } : {}),
+                  ...(avatarUrl !== undefined ? { avatarUrl } : {}),
                 }
               : u
           )
         );
       }
+    });
+
+    socket.on('directMessageError', ({ message }) => {
+      showToast(message ? `❌ ${message}` : '❌ Whisper could not be delivered.');
     });
 
     socket.on('userJoined', () => {
@@ -1021,6 +1026,15 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
   };
 
+  const handleUpdateAvatar = (newAvatarUrl) => {
+    if (!socketRef.current || !passcode) return;
+    socketRef.current.emit('updateMetadata', {
+      passcode,
+      avatarUrl: newAvatarUrl,
+    });
+    showToast('✨ Avatar updated!');
+  };
+
   const currentUserObj = users.find((u) => u.nickname === nickname);
   const currentUserRole = currentUserObj?.role || 'member';
   const isCurrentUserMuted = Boolean(currentUserObj?.isMuted);
@@ -1068,6 +1082,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     handleClearInactiveUsers,
     handleMuteUser,
     handleSendDirectMessage,
+    handleUpdateAvatar,
     currentUserRole,
     isCurrentUserMuted,
     isCurrentUserBanned,

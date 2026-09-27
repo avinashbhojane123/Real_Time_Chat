@@ -110,6 +110,7 @@ export default function ChatRoom() {
     handleClearInactiveUsers,
     handleMuteUser,
     handleSendDirectMessage,
+    handleUpdateAvatar,
     currentUserRole,
     isCurrentUserMuted,
     isCurrentUserBanned,
@@ -778,6 +779,7 @@ export default function ChatRoom() {
         onClearInactiveUsers={handleClearInactiveUsers}
         onMuteUser={handleMuteUser}
         onSendDirectMessage={handleSendDirectMessage}
+        onUpdateAvatar={handleUpdateAvatar}
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
         setShowStatusCreator={setShowStatusCreator}
