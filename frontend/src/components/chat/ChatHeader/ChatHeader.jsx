@@ -52,7 +52,7 @@ const ChatHeader = memo(function ChatHeader({
         label: 'Measuring...',
       };
     }
-    if (ms < 90) {
+    if (ms < 100) {
       return {
         color: '#00a884',
         borderColor: 'rgba(0, 168, 132, 0.35)',
@@ -61,7 +61,7 @@ const ChatHeader = memo(function ChatHeader({
         label: 'Fast',
       };
     }
-    if (ms < 190) {
+    if (ms < 220) {
       return {
         color: '#06b6d4',
         borderColor: 'rgba(6, 182, 212, 0.35)',
@@ -70,7 +70,16 @@ const ChatHeader = memo(function ChatHeader({
         label: 'Good',
       };
     }
-    if (ms < 300) {
+    if (ms < 450) {
+      return {
+        color: '#10b981',
+        borderColor: 'rgba(16, 185, 129, 0.35)',
+        bgColor: 'rgba(16, 185, 129, 0.12)',
+        icon: 'line-md:signal-cellular-2-twotone',
+        label: 'Normal (Cloud)',
+      };
+    }
+    if (ms < 700) {
       return {
         color: '#f59e0b',
         borderColor: 'rgba(245, 158, 11, 0.35)',

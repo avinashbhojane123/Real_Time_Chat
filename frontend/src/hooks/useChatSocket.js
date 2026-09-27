@@ -16,7 +16,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [pinnedMessage, setPinnedMessage] = useState(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSocketConnected, setIsSocketConnected] = useState(true);
-  const [socketLatency, setSocketLatency] = useState(18);
+  const [socketLatency, setSocketLatency] = useState(null);
 
   const DEFAULT_WALLPAPER =
     'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop';
@@ -72,7 +72,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   useEffect(() => {
     if (!nickname || !passcode) return;
 
-    const socketUrl = getSocketBaseUrl();
+    const socketUrl = getSocketBaseUrl(baseUrl);
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -87,17 +87,13 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     const updateLatency = (rawMs) => {
       const cleanRaw = Math.max(4, Math.round(rawMs));
       setSocketLatency((prev) => {
-        if (!prev || prev <= 0) return cleanRaw;
+        if (prev === null || prev === undefined || prev <= 0) return cleanRaw;
         return Math.round(prev * 0.7 + cleanRaw * 0.3);
       });
     };
 
     socket.on('connect', async () => {
       setIsSocketConnected(true);
-      const startTime = Date.now();
-      socket.emit('clientPing', { clientTime: startTime }, () => {
-        setSocketLatency(Math.max(4, Date.now() - startTime));
-      });
       const clientDevice = detectClientDevice();
       const battery = await getBatteryInfo();
       socket.emit('joinRoom', {
@@ -113,6 +109,17 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       });
       socket.emit('getStatuses', { passcode });
       socket.emit('getUsers', { passcode });
+
+      // Measure clean idle network ping after room join burst is queued
+      setTimeout(() => {
+        if (socket.connected) {
+          const startTime = performance.now();
+          socket.emit('clientPing', { clientTime: Date.now() }, () => {
+            const elapsed = Math.round(performance.now() - startTime);
+            setSocketLatency(Math.max(4, elapsed));
+          });
+        }
+      }, 300);
     });
 
     socket.on('disconnect', (reason) => {
@@ -130,9 +137,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     // Periodic heartbeat to keep reverse proxies alive and monitor smoothed real-time latency (8s interval)
     const pingInterval = setInterval(() => {
       if (socket.connected) {
-        const pingStart = Date.now();
-        socket.emit('clientPing', { clientTime: pingStart }, () => {
-          updateLatency(Date.now() - pingStart);
+        const pingStart = performance.now();
+        socket.emit('clientPing', { clientTime: Date.now() }, () => {
+          updateLatency(performance.now() - pingStart);
         });
       }
     }, 8000);
@@ -148,9 +155,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
             s.connect();
           } else {
             // Socket claims to be connected: send immediate heartbeat ping to detect any stale half-open TCP pipe
-            const checkStart = Date.now();
-            socket.emit('clientPing', { clientTime: checkStart }, () => {
-              updateLatency(Date.now() - checkStart);
+            const checkStart = performance.now();
+            socket.emit('clientPing', { clientTime: Date.now() }, () => {
+              updateLatency(performance.now() - checkStart);
             });
             // Re-sync users and statuses to guarantee no missed events while device was asleep
             s.emit('getStatuses', { passcode });
