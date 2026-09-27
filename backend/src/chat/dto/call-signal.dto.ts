@@ -178,3 +178,22 @@ export class ScreenShareStatusDto {
   @IsString()
   targetSocketId?: string;
 }
+
+export class WebrtcMediaStateDto {
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  passcode!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  micMuted?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  cameraOff?: boolean;
+
+  @IsOptional()
+  @IsString()
+  targetSocketId?: string;
+}

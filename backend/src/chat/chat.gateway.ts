@@ -46,6 +46,7 @@ import {
   EndCallDto,
   TogglePipDto,
   ScreenShareStatusDto,
+  WebrtcMediaStateDto,
 } from './dto/call-signal.dto';
 import {
   CreateStatusDto,
@@ -239,12 +240,21 @@ export class ChatGateway
   private watchPartyRooms = new Map<string, WatchPartyState>();
   private watchPartyCleanupTimers = new Map<string, NodeJS.Timeout>();
   private watchPartyBufferTimers = new Map<string, NodeJS.Timeout>();
+  private watchPartyDisconnectTimers = new Map<string, NodeJS.Timeout>();
 
   private clearWatchPartyBufferTimer(passcode: string) {
     const timer = this.watchPartyBufferTimers.get(passcode);
     if (timer) {
       clearTimeout(timer);
       this.watchPartyBufferTimers.delete(passcode);
+    }
+  }
+
+  private clearWatchPartyDisconnectTimer(passcode: string) {
+    const timer = this.watchPartyDisconnectTimers.get(passcode);
+    if (timer) {
+      clearTimeout(timer);
+      this.watchPartyDisconnectTimers.delete(passcode);
     }
   }
 
@@ -543,29 +553,37 @@ export class ChatGateway
       });
     }
 
-    // Auto-pause Watch Party if a user leaves/disconnects during active movie playback
+    // Auto-pause Watch Party if a user leaves/disconnects during active movie playback (with 5-second grace period for quick reconnects)
     if (wpState && wpState.isActive && wpState.isPlaying) {
-      wpState.isPlaying = false;
-      wpState.currentTime = this.getCalculatedWatchPartyPosition(wpState);
-      wpState.lastUpdatedTimestamp = Date.now();
-      wpState.scheduledStartServerTime = undefined;
-      wpState.version = (wpState.version || 0) + 1;
-      this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
-        action: 'partner_disconnected',
-        videoSource: wpState.videoSource,
-        currentTime: wpState.currentTime,
-        isPlaying: false,
-        playbackRate: wpState.playbackRate,
-        isBuffering: false,
-        bufferingUsers: wpState.bufferingUsers || [],
-        lastUpdatedTimestamp: wpState.lastUpdatedTimestamp,
-        scheduledStartServerTime: undefined,
-        version: wpState.version,
-        lastActorNickname: userInfo.nickname,
-        hostNickname: wpState.hostNickname,
-        isHostOnly: wpState.isHostOnly,
-        serverTime: Date.now(),
-      });
+      this.clearWatchPartyDisconnectTimer(userInfo.passcode);
+      const timer = setTimeout(() => {
+        this.watchPartyDisconnectTimers.delete(userInfo.passcode);
+        const currentWp = this.watchPartyRooms.get(userInfo.passcode);
+        if (currentWp && currentWp.isActive && currentWp.isPlaying) {
+          currentWp.isPlaying = false;
+          currentWp.currentTime = this.getCalculatedWatchPartyPosition(currentWp);
+          currentWp.lastUpdatedTimestamp = Date.now();
+          currentWp.scheduledStartServerTime = undefined;
+          currentWp.version = (currentWp.version || 0) + 1;
+          this.server.to(userInfo.passcode).emit('watchPartyUpdate', {
+            action: 'partner_disconnected',
+            videoSource: currentWp.videoSource,
+            currentTime: currentWp.currentTime,
+            isPlaying: false,
+            playbackRate: currentWp.playbackRate,
+            isBuffering: false,
+            bufferingUsers: currentWp.bufferingUsers || [],
+            lastUpdatedTimestamp: currentWp.lastUpdatedTimestamp,
+            scheduledStartServerTime: undefined,
+            version: currentWp.version,
+            lastActorNickname: userInfo.nickname,
+            hostNickname: currentWp.hostNickname,
+            isHostOnly: currentWp.isHostOnly,
+            serverTime: Date.now(),
+          });
+        }
+      }, 5000);
+      this.watchPartyDisconnectTimers.set(userInfo.passcode, timer);
     }
 
     // Clean up in-memory Watch Party state with a 60-second grace period if no users remain
@@ -595,6 +613,7 @@ export class ChatGateway
     @ConnectedSocket()
     client: Socket,
   ) {
+    this.clearWatchPartyDisconnectTimer(data.passcode);
     console.log(
       'JOIN ROOM:',
       data.nickname,
@@ -1555,6 +1574,38 @@ export class ChatGateway
       isSharing: data.isSharing,
       from: session.nickname,
     });
+  }
+
+  @SubscribeMessage('webrtcMediaState')
+  webrtcMediaState(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: WebrtcMediaStateDto,
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+
+    const room = session.passcode.trim();
+    const callSession = this.findCallBySocketId(client.id);
+    const targetSocketId =
+      data.targetSocketId ||
+      (callSession
+        ? callSession.callerSocketId === client.id
+          ? callSession.calleeSocketId
+          : callSession.callerSocketId
+        : undefined);
+
+    const payload = {
+      from: session.nickname,
+      fromSocketId: client.id,
+      micMuted: data.micMuted,
+      cameraOff: data.cameraOff,
+    };
+
+    if (targetSocketId) {
+      this.server.to(targetSocketId).emit('webrtcMediaState', payload);
+    } else {
+      client.to(room).emit('webrtcMediaState', payload);
+    }
   }
 
   @SubscribeMessage('editMessage')

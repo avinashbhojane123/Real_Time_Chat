@@ -45,3 +45,46 @@ export function playMovieInviteChime() {
     console.debug('[AudioAlert] Web Audio playback skipped:', err);
   }
 }
+
+/**
+ * Synthesizes a soft, pleasant chime when a partner starts face cams in cinema mode.
+ */
+export function playIncomingFaceCamChime() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    const notes = [
+      { freq: 587.33, time: 0, dur: 0.35, gain: 0.18 }, // D5
+      { freq: 880.0, time: 0.16, dur: 0.65, gain: 0.22 }, // A5
+    ];
+
+    notes.forEach(({ freq, time, dur, gain }) => {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + time);
+
+      gainNode.gain.setValueAtTime(gain, now + time);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
+
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      osc.start(now + time);
+      osc.stop(now + time + dur);
+    });
+
+    setTimeout(() => {
+      try {
+        ctx.close().catch(() => {});
+      } catch (_) {}
+    }, 1200);
+  } catch (err) {
+    console.debug('[AudioAlert] Incoming face cam chime skipped:', err);
+  }
+}

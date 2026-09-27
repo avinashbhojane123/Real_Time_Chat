@@ -8,6 +8,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
   const [remoteStream, setRemoteStream] = useState(null);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [remoteCameraOff, setRemoteCameraOff] = useState(false);
+  const [remoteMicMuted, setRemoteMicMuted] = useState(false);
   const [videoFit, setVideoFit] = useState('contain');
   const [facingMode, setFacingMode] = useState('user');
   const [isStreamSwapped, setIsStreamSwapped] = useState(false);
@@ -294,6 +296,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     updateCallState('idle');
     setMicMuted(false);
     setCameraOff(false);
+    setRemoteCameraOff(false);
+    setRemoteMicMuted(false);
     setShowVideoPanel(false);
     setIsVoiceOnlyCall(false);
     setPipMode('none');
@@ -498,6 +502,11 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
           try {
             const params = sender.getParameters();
             params.degradationPreference = 'maintain-framerate';
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            // Cap video bitrate to 450 kbps so high-resolution movie streaming is never choked
+            params.encodings[0].maxBitrate = 450000;
             sender.setParameters(params).catch(() => {});
           } catch (_) {}
         }
@@ -618,6 +627,20 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
         setRemoteUserName(peerName);
         updateCallState('incoming');
         setShowVideoPanel(true);
+      } else if (callStateRef.current === 'calling') {
+        // Glare collision: both users called simultaneously.
+        // Deterministic tie-breaker: compare nicknames alphabetically
+        const myName = (nickname || '').trim().toLowerCase();
+        const theirName = (cName || from || '').trim().toLowerCase();
+        if (myName < theirName) {
+          console.log('[WebRTC] Glare detected: yielding to peer offer');
+          const peerName = cName || from || 'Participant';
+          setCallerName(peerName);
+          setRemoteUserName(peerName);
+          updateCallState('incoming');
+        } else {
+          console.log('[WebRTC] Glare detected: retaining our offer');
+        }
       } else if (callStateRef.current === 'active') {
         let pc = peerConnectionRef.current;
         if (!pc && localStreamRef.current) {
@@ -731,12 +754,18 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       triggerIceRestart();
     };
 
+    const handleWebrtcMediaState = ({ micMuted: isMuted, cameraOff: isOff }) => {
+      if (isMuted !== undefined) setRemoteMicMuted(Boolean(isMuted));
+      if (isOff !== undefined) setRemoteCameraOff(Boolean(isOff));
+    };
+
     socket.on('callUser', handleCallUser);
     socket.on('acceptCall', handleCallAccepted);
     socket.on('callAccepted', handleCallAccepted);
     socket.on('webrtcOffer', handleWebrtcOffer);
     socket.on('webrtcAnswer', handleWebrtcAnswer);
     socket.on('webrtcCandidate', handleWebrtcCandidate);
+    socket.on('webrtcMediaState', handleWebrtcMediaState);
     socket.on('screenShareStatus', handleScreenShareStatus);
     socket.on('callBusy', handleCallBusy);
     socket.on('callTimeout', handleCallTimeout);
@@ -757,6 +786,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       socket.off('webrtcOffer', handleWebrtcOffer);
       socket.off('webrtcAnswer', handleWebrtcAnswer);
       socket.off('webrtcCandidate', handleWebrtcCandidate);
+      socket.off('webrtcMediaState', handleWebrtcMediaState);
       socket.off('screenShareStatus', handleScreenShareStatus);
       socket.off('callBusy', handleCallBusy);
       socket.off('callTimeout', handleCallTimeout);
@@ -893,20 +923,34 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        setMicMuted(!audioTrack.enabled);
+        const newMuted = !audioTrack.enabled;
+        setMicMuted(newMuted);
+        socketRef.current?.emit('webrtcMediaState', {
+          passcode,
+          micMuted: newMuted,
+          cameraOff: cameraOffRef.current,
+          targetSocketId: targetSocketIdRef.current,
+        });
       }
     }
-  }, []);
+  }, [passcode, socketRef]);
 
   const toggleCamera = useCallback(() => {
     if (localStreamRef.current) {
       const videoTrack = localStreamRef.current.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
-        setCameraOff(!videoTrack.enabled);
+        const newOff = !videoTrack.enabled;
+        setCameraOff(newOff);
+        socketRef.current?.emit('webrtcMediaState', {
+          passcode,
+          cameraOff: newOff,
+          micMuted: micMutedRef.current,
+          targetSocketId: targetSocketIdRef.current,
+        });
       }
     }
-  }, []);
+  }, [passcode, socketRef]);
 
   const flipCamera = async () => {
     if (isVoiceOnlyRef.current) return;
@@ -1231,6 +1275,8 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     remoteStream,
     micMuted,
     cameraOff,
+    remoteCameraOff,
+    remoteMicMuted,
     videoFit,
     setVideoFit,
     facingMode,

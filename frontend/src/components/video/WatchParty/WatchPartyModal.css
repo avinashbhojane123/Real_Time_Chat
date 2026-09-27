@@ -1400,13 +1400,9 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 168, 132, 0.2);
   z-index: 1000;
   overflow: hidden;
-  touch-action: none;
-  cursor: grab;
+  touch-action: auto;
+  cursor: default;
   transition: width 0.25s ease, border-color 0.2s ease;
-}
-
-.watch-party-face-cams:active {
-  cursor: grabbing;
 }
 
 .watch-party-face-cams.minimized {
@@ -1433,6 +1429,13 @@
   padding: 6px 10px;
   background: rgba(0, 0, 0, 0.45);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.face-cams-header:active {
+  cursor: grabbing;
 }
 
 .face-cams-header-badge {

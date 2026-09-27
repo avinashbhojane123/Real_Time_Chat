@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useDragControls } from 'motion/react';
 import { Icon } from '@iconify/react';
 import Hls from 'hls.js';
 import { getTrendingMovies, searchMovies, getStreamSources, getProxiedStreamUrl } from '../../../services/movieService';
+import { playIncomingFaceCamChime } from '../../../utils/audioAlert';
 import './WatchPartyModal.css';
 
 const REACTION_EMOJIS = ['🍿', '❤️', '🔥', '😂', '👏', '😭'];
@@ -743,6 +744,14 @@ export default function WatchPartyModal({
   });
   const partyLocalVideoRef = useRef(null);
   const partyRemoteVideoRef = useRef(null);
+  const faceCamDragControls = useDragControls();
+
+  // Play audio chime when incoming face cam call occurs in cinema mode
+  useEffect(() => {
+    if (webRTC?.callState === 'incoming') {
+      playIncomingFaceCamChime();
+    }
+  }, [webRTC?.callState]);
 
   // Sync webRTC streams to Watch Party face cams
   useEffect(() => {
@@ -1232,7 +1241,18 @@ export default function WatchPartyModal({
                 type="button"
                 className={`watch-party-btn-icon ${webRTC.callState === 'active' ? 'active call-active-glow' : ''} ${webRTC.callState === 'incoming' ? 'incoming-pulse' : ''}`}
                 onClick={() => {
+                  const isPartnerAvailable = Boolean(recipientUser && (recipientUser.isOnline || recipientUser.online));
                   if (webRTC.callState === 'idle') {
+                    if (!recipientUser) {
+                      setSyncNotice('⚠️ No other user in this room to start Face Cams with');
+                      setTimeout(() => setSyncNotice(null), 3500);
+                      return;
+                    }
+                    if (!isPartnerAvailable) {
+                      setSyncNotice(`⚠️ ${recipientUser.nickname || 'Partner'} is currently offline`);
+                      setTimeout(() => setSyncNotice(null), 3500);
+                      return;
+                    }
                     webRTC.startCall();
                     setShowFaceCams(true);
                     setFaceCamsMinimized(false);
@@ -1249,7 +1269,13 @@ export default function WatchPartyModal({
                     ? (showFaceCams ? 'Hide Face Cams' : 'Show Face Cams')
                     : webRTC.callState === 'incoming'
                       ? 'Accept Live Face Cam Call'
-                      : 'Start Live Face Cams while Watching'
+                      : webRTC.callState === 'calling'
+                        ? (showFaceCams ? 'Hide Face Cam Calling Window' : 'Show Face Cam Calling Window')
+                        : !recipientUser
+                          ? 'No other participants in room'
+                          : !(recipientUser?.isOnline || recipientUser?.online)
+                            ? `${recipientUser.nickname} is offline`
+                            : 'Start Live Face Cams while Watching'
                 }
               >
                 {webRTC.callState === 'active' && <span className="watch-party-pulse-dot" style={{ backgroundColor: '#00a884' }} />}
@@ -1933,7 +1959,10 @@ export default function WatchPartyModal({
         <AnimatePresence>
           {webRTC && showFaceCams && (webRTC.callState === 'active' || webRTC.callState === 'calling' || webRTC.callState === 'incoming') && (
             <motion.div
+              key={isCamsDocked ? 'docked-cams' : 'floating-cams'}
               drag={!isCamsDocked}
+              dragListener={false}
+              dragControls={faceCamDragControls}
               dragMomentum={false}
               dragConstraints={modalContainerRef}
               onDragStart={() => setIsDraggingPip(true)}
@@ -1944,8 +1973,16 @@ export default function WatchPartyModal({
               exit={{ opacity: 0, scale: 0.85, y: 15 }}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }}
             >
-              {/* Face Cams Header */}
-              <div className="face-cams-header">
+              {/* Face Cams Header (Dedicated drag handle) */}
+              <div
+                className="face-cams-header"
+                onPointerDown={(e) => {
+                  if (!isCamsDocked && !e.target.closest('button')) {
+                    faceCamDragControls.start(e);
+                  }
+                }}
+                style={{ cursor: isCamsDocked ? 'default' : 'grab' }}
+              >
                 <div className="face-cams-header-badge">
                   <span className="face-cam-live-indicator" />
                   <span>Live Faces</span>
@@ -2021,7 +2058,12 @@ export default function WatchPartyModal({
                             playsInline
                             muted
                             className="face-cam-video"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transform: webRTC?.facingMode === 'environment' ? 'none' : 'scaleX(-1)',
+                            }}
                           />
                         ) : (
                           <div className="face-cam-avatar-fallback">
@@ -2050,23 +2092,29 @@ export default function WatchPartyModal({
                   {/* Active Dual Face Cams (Sender & Receiver) */}
                   {webRTC.callState === 'active' && (
                     <div className="face-cams-grid">
-                      {/* Receiver (Partner) Cam */}
+                      {/* Receiver (Partner) Cam with Muted Audio (Audio already played via dedicated WebRTC element) */}
                       <div className="face-cam-card receiver">
                         <video
                           ref={partyRemoteVideoRef}
+                          muted
                           autoPlay
                           playsInline
-                          className="face-cam-video"
+                          className={`face-cam-video ${webRTC?.remoteCameraOff ? 'cam-off' : ''}`}
                         />
-                        {(!webRTC?.remoteStream || !webRTC.remoteStream.getVideoTracks()?.length) && (
+                        {(webRTC?.remoteCameraOff || !webRTC?.remoteStream || !webRTC.remoteStream.getVideoTracks()?.length) && (
                           <div className="face-cam-avatar-fallback">
                             <span className="avatar-letter">{(recipientUser?.nickname || 'P').slice(0, 2).toUpperCase()}</span>
-                            <span className="avatar-status">Connecting...</span>
+                            <span className="avatar-status">
+                              {webRTC?.remoteCameraOff ? 'Camera Off' : 'Connecting...'}
+                            </span>
                           </div>
                         )}
                         <div className="face-cam-tag">
                           <span className="face-cam-dot active" />
                           <span>{recipientUser?.nickname || webRTC.remoteUserName || 'Partner'}</span>
+                          {webRTC?.remoteMicMuted && (
+                            <Icon icon="solar:muted-bold" width="12" style={{ color: '#f15c6d', marginLeft: '4px' }} title="Partner microphone is muted" />
+                          )}
                         </div>
                       </div>
 
@@ -2078,7 +2126,7 @@ export default function WatchPartyModal({
                           playsInline
                           muted
                           className={`face-cam-video ${webRTC.cameraOff ? 'cam-off' : ''}`}
-                          style={{ transform: 'scaleX(-1)' }}
+                          style={{ transform: webRTC?.facingMode === 'environment' ? 'none' : 'scaleX(-1)' }}
                         />
                         {webRTC.cameraOff && (
                           <div className="face-cam-avatar-fallback">
