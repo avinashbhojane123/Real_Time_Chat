@@ -103,4 +103,16 @@ export class User {
     default: false,
   })
   batteryIsCharging!: boolean;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: 'member',
+  })
+  role!: 'host' | 'admin' | 'member';
+
+  @Column({
+    default: false,
+  })
+  isMuted!: boolean;
 }

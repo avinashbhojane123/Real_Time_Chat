@@ -17,6 +17,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isSocketConnected, setIsSocketConnected] = useState(true);
   const [socketLatency, setSocketLatency] = useState(null);
+  const [kickedInfo, setKickedInfo] = useState(null);
 
   const DEFAULT_WALLPAPER =
     'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop';
@@ -267,6 +268,36 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     socket.on('userLeft', () => {
       // Backend automatically broadcasts updated 'usersList' to all room members upon leave
+    });
+
+    socket.on('userKicked', ({ targetNickname, kickedBy }) => {
+      showToast(`⚠️ ${targetNickname} was removed from the room by ${kickedBy}`);
+    });
+
+    socket.on('userMuteToggled', ({ targetNickname, isMuted, mutedBy }) => {
+      setUsers((prev) =>
+        prev.map((u) => (u.nickname === targetNickname ? { ...u, isMuted } : u))
+      );
+      if (targetNickname === nickname) {
+        showToast(isMuted ? '🔇 You were muted by the room host.' : '🔊 You were unmuted by the room host.');
+      } else {
+        showToast(`${targetNickname} was ${isMuted ? 'muted' : 'unmuted'} by ${mutedBy}`);
+      }
+    });
+
+    socket.on('kickedFromRoom', ({ reason, kickedBy }) => {
+      setKickedInfo({ reason: reason || 'Removed by host', kickedBy: kickedBy || 'Host' });
+      showToast('⚠️ You have been removed from the room.');
+    });
+
+    socket.on('directMessage', (dm) => {
+      setMessages((prev) => {
+        if (prev.some((m) => String(m.id) === String(dm.id))) return prev;
+        return [...prev, dm];
+      });
+      if (dm.nickname !== nickname) {
+        showToast(`🔒 Direct whisper from @${dm.nickname}: ${dm.message ? dm.message.slice(0, 30) : 'File'}`);
+      }
     });
 
     // Typing Listeners
@@ -837,6 +868,52 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
   };
 
+  const handleKickUser = (targetNickname) => {
+    if (!socketRef.current || !targetNickname) return;
+    socketRef.current.emit('kickUser', {
+      passcode,
+      targetNickname,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to kick user');
+      }
+    });
+  };
+
+  const handleMuteUser = (targetNickname, isMuted) => {
+    if (!socketRef.current || !targetNickname) return;
+    socketRef.current.emit('muteUser', {
+      passcode,
+      targetNickname,
+      isMuted,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to update mute state');
+      }
+    });
+  };
+
+  const handleSendDirectMessage = (targetNickname, message, fileUrl = null, fileName = null, fileType = null, fileSize = null) => {
+    if (!socketRef.current || !targetNickname || (!message?.trim() && !fileUrl)) return;
+    socketRef.current.emit('sendDirectMessage', {
+      passcode,
+      targetNickname,
+      message: message ? message.trim() : '',
+      fileUrl,
+      fileName,
+      fileType,
+      fileSize,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to send direct message');
+      }
+    });
+  };
+
+  const currentUserObj = users.find((u) => u.nickname === nickname);
+  const currentUserRole = currentUserObj?.role || 'member';
+  const isCurrentUserMuted = Boolean(currentUserObj?.isMuted);
+
   return {
     messages,
     setMessages,
@@ -869,5 +946,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     roomCustomWallpaper,
     setRoomCustomWallpaper,
     sendUpdateRoomWallpaper,
+    kickedInfo,
+    setKickedInfo,
+    handleKickUser,
+    handleMuteUser,
+    handleSendDirectMessage,
+    currentUserRole,
+    isCurrentUserMuted,
   };
 }

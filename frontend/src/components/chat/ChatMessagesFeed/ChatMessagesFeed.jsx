@@ -456,6 +456,30 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                         transition: activeDragId === msg.id ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
                       }}
                     >
+                      {/* Private Direct Message / Whisper Banner */}
+                      {msg.isDirect && (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            backgroundColor: 'rgba(168, 85, 247, 0.16)',
+                            color: '#c084fc',
+                            border: '1px solid rgba(168, 85, 247, 0.35)',
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <Icon icon="solar:lock-keyhole-bold-duotone" width="13" height="13" />
+                          <span>
+                            {isMe ? `Whisper to @${msg.targetNickname}` : `Whisper from @${msg.nickname}`}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Sender Nickname Header for Incoming Messages */}
                       {!isMe && (
                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px', paddingRight: '28px' }}>

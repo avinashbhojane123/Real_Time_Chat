@@ -57,6 +57,11 @@ const ChatRoster = memo(function ChatRoster({
   setShowClearConfirm,
   onOpenWatchParty,
   isWatchPartyActive,
+  currentUserRole = 'member',
+  isCurrentUserMuted = false,
+  onKickUser,
+  onMuteUser,
+  onSendDirectMessage,
 }) {
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
@@ -64,6 +69,7 @@ const ChatRoster = memo(function ChatRoster({
   const [avatarErrors, setAvatarErrors] = useState({});
   const [inspectingUser, setInspectingUser] = useState(null);
   const [copiedHandle, setCopiedHandle] = useState(false);
+  const [whisperMessage, setWhisperMessage] = useState('');
 
   const handleAvatarError = (nick) => {
     setAvatarErrors((prev) => ({ ...prev, [nick]: true }));
@@ -496,6 +502,14 @@ const ChatRoster = memo(function ChatRoster({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: isMobileDevice ? '100%' : -10 }}
           transition={{ duration: 0.2 }}
+          drag={isMobileDevice ? 'x' : false}
+          dragConstraints={{ left: 0, right: 300 }}
+          dragElastic={0.2}
+          onDragEnd={(_, info) => {
+            if (info.offset.x > 80 || info.velocity.x > 250) {
+              setShowRosterPanel(false);
+            }
+          }}
           style={{
             width: isMobileDevice ? '100%' : '320px',
             position: isMobileDevice ? 'absolute' : 'relative',
@@ -507,6 +521,7 @@ const ChatRoster = memo(function ChatRoster({
             height: '100%',
             zIndex: isMobileDevice ? 100 : 30,
             flexShrink: 0,
+            touchAction: isMobileDevice ? 'pan-y' : 'auto',
           }}
         >
       {/* Header Bar */}
@@ -739,10 +754,67 @@ const ChatRoster = memo(function ChatRoster({
 
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#e9edef' }}>
                                       {u.nickname} {isMe && '(You)'}
                                     </span>
+                                    {u.role === 'host' && (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontSize: '0.64rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(255, 193, 7, 0.16)',
+                                          color: '#ffc107',
+                                          border: '1px solid rgba(255, 193, 7, 0.35)',
+                                          padding: '1px 5px',
+                                          borderRadius: '6px',
+                                        }}
+                                        title="Room Host"
+                                      >
+                                        👑 Host
+                                      </span>
+                                    )}
+                                    {u.role === 'admin' && (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontSize: '0.64rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(0, 168, 132, 0.16)',
+                                          color: '#00a884',
+                                          border: '1px solid rgba(0, 168, 132, 0.35)',
+                                          padding: '1px 5px',
+                                          borderRadius: '6px',
+                                        }}
+                                        title="Room Admin"
+                                      >
+                                        🛡️ Admin
+                                      </span>
+                                    )}
+                                    {u.isMuted && (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontSize: '0.64rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(239, 68, 68, 0.16)',
+                                          color: '#ef4444',
+                                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                                          padding: '1px 5px',
+                                          borderRadius: '6px',
+                                        }}
+                                        title="Muted by host"
+                                      >
+                                        🔇 Muted
+                                      </span>
+                                    )}
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -930,10 +1002,55 @@ const ChatRoster = memo(function ChatRoster({
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 600, fontSize: '0.84rem', color: '#8696a0' }}>
                                       {u.nickname}
                                     </span>
+                                    {u.role === 'host' && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                                          color: '#ffc107',
+                                          border: '1px solid rgba(255, 193, 7, 0.25)',
+                                          padding: '0 4px',
+                                          borderRadius: '4px',
+                                        }}
+                                      >
+                                        👑 Host
+                                      </span>
+                                    )}
+                                    {u.role === 'admin' && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(0, 168, 132, 0.1)',
+                                          color: '#00a884',
+                                          border: '1px solid rgba(0, 168, 132, 0.25)',
+                                          padding: '0 4px',
+                                          borderRadius: '4px',
+                                        }}
+                                      >
+                                        🛡️ Admin
+                                      </span>
+                                    )}
+                                    {u.isMuted && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                          color: '#ef4444',
+                                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                                          padding: '0 4px',
+                                          borderRadius: '4px',
+                                        }}
+                                      >
+                                        🔇 Muted
+                                      </span>
+                                    )}
                                   </div>
                                   <button
                                     type="button"
@@ -1124,7 +1241,7 @@ const ChatRoster = memo(function ChatRoster({
               </div>
             </div>
 
-            {/* Action Buttons Row */}
+              {/* Action Buttons Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               <button
                 type="button"
@@ -1231,6 +1348,133 @@ const ChatRoster = memo(function ChatRoster({
                 </>
               )}
             </div>
+
+            {/* Direct Whisper / Message Input */}
+            {inspectingUser.nickname !== nickname && onSendDirectMessage && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                <input
+                  type="text"
+                  placeholder={`Whisper to @${inspectingUser.nickname}...`}
+                  value={whisperMessage}
+                  onChange={(e) => setWhisperMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && whisperMessage.trim()) {
+                      onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                      setWhisperMessage('');
+                      setInspectingUser(null);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#111b21',
+                    border: '1px solid rgba(134, 150, 160, 0.25)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    color: '#e9edef',
+                    fontSize: '0.78rem',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!whisperMessage.trim()}
+                  onClick={() => {
+                    if (whisperMessage.trim()) {
+                      onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                      setWhisperMessage('');
+                      setInspectingUser(null);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
+                    color: whisperMessage.trim() ? '#111b21' : '#8696a0',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: whisperMessage.trim() ? 'pointer' : 'default',
+                  }}
+                >
+                  Whisper
+                </button>
+              </div>
+            )}
+
+            {/* Host Administration Controls */}
+            {(currentUserRole === 'host' || currentUserRole === 'admin') && inspectingUser.nickname !== nickname && (
+              <div
+                style={{
+                  marginTop: '4px',
+                  padding: '12px',
+                  backgroundColor: 'rgba(255, 193, 7, 0.07)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 193, 7, 0.25)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffc107', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>👑 HOST CONTROLS</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onMuteUser) {
+                        onMuteUser(inspectingUser.nickname, !inspectingUser.isMuted);
+                        setInspectingUser((prev) => prev ? ({ ...prev, isMuted: !prev.isMuted }) : null);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: inspectingUser.isMuted ? 'rgba(0, 168, 132, 0.2)' : 'rgba(239, 68, 68, 0.15)',
+                      color: inspectingUser.isMuted ? '#00a884' : '#ef4444',
+                      border: `1px solid ${inspectingUser.isMuted ? 'rgba(0, 168, 132, 0.4)' : 'rgba(239, 68, 68, 0.35)'}`,
+                      borderRadius: '8px',
+                      padding: '7px 10px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Icon icon={inspectingUser.isMuted ? "solar:volume-loud-bold-duotone" : "solar:muted-bold-duotone"} width="15" height="15" />
+                    <span>{inspectingUser.isMuted ? 'Unmute' : 'Mute'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to remove ${inspectingUser.nickname} from this room?`)) {
+                        if (onKickUser) onKickUser(inspectingUser.nickname);
+                        setInspectingUser(null);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      borderRadius: '8px',
+                      padding: '7px 10px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Icon icon="solar:user-cross-bold-duotone" width="15" height="15" />
+                    <span>Kick User</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Detailed Specs Diagnostics Grid */}
             <div style={{ backgroundColor: '#111b21', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid rgba(134, 150, 160, 0.12)' }}>

@@ -78,6 +78,12 @@ export default function ChatRoom() {
     roomTheme,
     roomCustomWallpaper,
     sendUpdateRoomWallpaper,
+    kickedInfo,
+    handleKickUser,
+    handleMuteUser,
+    handleSendDirectMessage,
+    currentUserRole,
+    isCurrentUserMuted,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User Calculation
@@ -495,6 +501,10 @@ export default function ChatRoom() {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
+    if (isCurrentUserMuted) {
+      showToast('🔇 You are muted by the room host and cannot send messages.');
+      return;
+    }
     const textToSend = typeof e === 'string' ? e.trim() : (customText || inputText).trim();
     if (!textToSend && !editingMsg) return;
 
@@ -696,7 +706,11 @@ export default function ChatRoom() {
         socketLatency={socketLatency}
         setInputText={setInputText}
         onStartCall={webRTC.startCall}
-
+        currentUserRole={currentUserRole}
+        isCurrentUserMuted={isCurrentUserMuted}
+        onKickUser={handleKickUser}
+        onMuteUser={handleMuteUser}
+        onSendDirectMessage={handleSendDirectMessage}
         renderStatusAvatar={renderStatusAvatar}
         setActiveStatusUser={setActiveStatusUser}
         setShowStatusCreator={setShowStatusCreator}
@@ -1146,6 +1160,83 @@ export default function ChatRoom() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Kicked from Room Modal */}
+      {kickedInfo && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(11, 20, 26, 0.92)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{
+              backgroundColor: '#1f2c34',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '380px',
+              width: '100%',
+              textAlign: 'center',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.7)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '14px',
+            }}
+          >
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon icon="solar:user-cross-bold-duotone" width="32" height="32" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#e9edef', margin: 0 }}>
+                Removed from Space
+              </h3>
+              <p style={{ fontSize: '0.84rem', color: '#8696a0', marginTop: '6px', marginBottom: 0 }}>
+                {kickedInfo.reason || 'You were removed from this room by the host.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                marginTop: '6px',
+                backgroundColor: '#00a884',
+                color: '#111b21',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 24px',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                width: '100%',
+              }}
+            >
+              Back to Home
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
