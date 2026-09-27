@@ -38,7 +38,7 @@ export class KeepAliveService implements OnModuleInit, OnModuleDestroy {
     }
 
     const intervalMinutes = Number(
-      this.configService.get<string>('KEEP_ALIVE_INTERVAL_MINUTES') || 10,
+      this.configService.get<string>('KEEP_ALIVE_INTERVAL_MINUTES') || 5,
     );
     const intervalMs = intervalMinutes * 60 * 1000;
 

@@ -5,6 +5,7 @@ import { getSocketBaseUrl } from '../utils/apiConfig';
 import { detectClientDevice, getBatteryInfo } from '../utils/deviceUtils';
 import { compressImageFile } from '../utils/imageUtils';
 import { saveWallpaperOffline, getWallpaperOffline } from '../utils/wallpaperStorage';
+import { startBackgroundAudioKeepAlive, stopBackgroundAudioKeepAlive } from '../utils/keepAliveAudio';
 
 export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [messages, setMessages] = useState([]);
@@ -76,8 +77,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 2500,
       timeout: 20000,
     });
     socketRef.current = socket;
@@ -117,7 +118,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       console.warn('[Socket] Connection error:', err?.message || err);
     });
 
-    // Periodic heartbeat to keep reverse proxies alive and monitor real latency
+    // Periodic heartbeat to keep reverse proxies and firewalls alive (25s interval)
     const pingInterval = setInterval(() => {
       if (socket.connected) {
         const pingStart = Date.now();
@@ -126,6 +127,43 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         });
       }
     }, 25000);
+
+    // Instant Device Wake-Up & Screen Unlock Handler
+    // Ensures 0-delay instant reconnection the moment a user unlocks their phone or focuses the tab
+    const handleDeviceWakeUp = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const s = socketRef.current;
+        if (s) {
+          if (!s.connected) {
+            console.log('[Socket] Device wake-up detected: reconnecting instantly!');
+            s.connect();
+          } else {
+            // Socket claims to be connected: send immediate heartbeat ping to detect any stale half-open TCP pipe
+            const checkStart = Date.now();
+            s.emit('clientPing', () => {
+              setSocketLatency(Math.max(8, Date.now() - checkStart));
+            });
+            // Re-sync users and statuses to guarantee no missed events while device was asleep
+            s.emit('getStatuses', { passcode });
+            s.emit('getUsers', { passcode });
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleDeviceWakeUp);
+    window.addEventListener('online', handleDeviceWakeUp);
+    window.addEventListener('pageshow', handleDeviceWakeUp);
+    window.addEventListener('focus', handleDeviceWakeUp);
+
+    // Keep mobile WebSockets alive in background by starting silent audio keep-alive on user interaction
+    const handleUserInteraction = () => {
+      startBackgroundAudioKeepAlive();
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+    window.addEventListener('pointerdown', handleUserInteraction, { once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
 
     // Chat History Event Listeners
     socket.on('chatHistory', (history) => {
@@ -392,6 +430,13 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     return () => {
       clearInterval(pingInterval);
+      document.removeEventListener('visibilitychange', handleDeviceWakeUp);
+      window.removeEventListener('online', handleDeviceWakeUp);
+      window.removeEventListener('pageshow', handleDeviceWakeUp);
+      window.removeEventListener('focus', handleDeviceWakeUp);
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+      stopBackgroundAudioKeepAlive();
       if (socket.connected) {
         socket.disconnect();
       }
