@@ -220,7 +220,7 @@ export default function WatchPartyModal({
       setLocalAudioDelayOffset(offsetMs);
       try {
         localStorage.setItem('watchPartyAudioDelayOffset', String(offsetMs));
-      } catch (_) {}
+      } catch (_) { }
     }
     if (offsetMs !== 0) {
       setSyncNotice(`🎧 Audio sync calibrated: ${offsetMs > 0 ? `+${offsetMs}` : offsetMs}ms for wireless headphones`);
@@ -366,7 +366,7 @@ export default function WatchPartyModal({
         setIsDesktopFill(true);
       });
     } else {
-      document.exitFullscreen?.().catch(() => {});
+      document.exitFullscreen?.().catch(() => { });
     }
   };
 
@@ -432,7 +432,7 @@ export default function WatchPartyModal({
             video.currentTime = currentTime;
           }
           if (isPlaying) {
-            video.play().catch(() => {});
+            video.play().catch(() => { });
           }
         });
 
@@ -614,7 +614,7 @@ export default function WatchPartyModal({
       if (player && typeof player.destroy === 'function') {
         try {
           player.destroy();
-        } catch (_) {}
+        } catch (_) { }
       }
       ytPlayerRef.current = null;
     };
@@ -627,7 +627,7 @@ export default function WatchPartyModal({
     try {
       iframe.contentWindow.postMessage(cmd, '*');
       iframe.contentWindow.postMessage(JSON.stringify(cmd), '*');
-    } catch (_) {}
+    } catch (_) { }
   }, []);
 
   // Execute synchronized scene seek on both partner screens
@@ -685,7 +685,7 @@ export default function WatchPartyModal({
           setCurrentTime(d.currentTime);
           if (d.duration > 0) setDuration(d.duration);
         }
-      } catch (_) {}
+      } catch (_) { }
     };
     window.addEventListener('message', handleMsg);
     return () => window.removeEventListener('message', handleMsg);
@@ -749,7 +749,7 @@ export default function WatchPartyModal({
       if (partyLocalVideoRef.current.srcObject !== webRTC.localStream) {
         partyLocalVideoRef.current.srcObject = webRTC.localStream;
       }
-      partyLocalVideoRef.current.play().catch(() => {});
+      partyLocalVideoRef.current.play().catch(() => { });
     }
   }, [webRTC?.localStream, webRTC?.callState, showFaceCams, faceCamsMinimized, isCamsDocked]);
 
@@ -758,7 +758,7 @@ export default function WatchPartyModal({
       if (partyRemoteVideoRef.current.srcObject !== webRTC.remoteStream) {
         partyRemoteVideoRef.current.srcObject = webRTC.remoteStream;
       }
-      partyRemoteVideoRef.current.play().catch(() => {});
+      partyRemoteVideoRef.current.play().catch(() => { });
     }
   }, [webRTC?.remoteStream, webRTC?.callState, showFaceCams, faceCamsMinimized, isCamsDocked]);
 
@@ -830,7 +830,7 @@ export default function WatchPartyModal({
     if (!isScrubbing) return;
     try {
       e.currentTarget.releasePointerCapture?.(e.pointerId);
-    } catch (_) {}
+    } catch (_) { }
     setIsScrubbing(false);
     const target = getScrubberPositionTime(e.clientX);
     seek(target);
@@ -1260,8 +1260,8 @@ export default function WatchPartyModal({
                   webRTC.callState === 'active'
                     ? (showFaceCams ? 'Hide Face Cams' : 'Show Face Cams')
                     : webRTC.callState === 'incoming'
-                    ? 'Accept Live Face Cam Call'
-                    : 'Start Live Face Cams while Watching'
+                      ? 'Accept Live Face Cam Call'
+                      : 'Start Live Face Cams while Watching'
                 }
               >
                 {webRTC.callState === 'active' && <span className="watch-party-pulse-dot" style={{ backgroundColor: '#00a884' }} />}
@@ -1270,8 +1270,8 @@ export default function WatchPartyModal({
                     webRTC.callState === 'active'
                       ? 'solar:videocamera-record-bold-duotone'
                       : webRTC.callState === 'incoming'
-                      ? 'solar:phone-calling-rounded-bold'
-                      : 'solar:videocamera-add-bold-duotone'
+                        ? 'solar:phone-calling-rounded-bold'
+                        : 'solar:videocamera-add-bold-duotone'
                   }
                   width="20"
                 />
@@ -1808,8 +1808,8 @@ export default function WatchPartyModal({
                       isMuted || volume === 0
                         ? 'solar:volume-cross-bold'
                         : volume < 0.5
-                        ? 'solar:volume-small-bold'
-                        : 'solar:volume-loud-bold'
+                          ? 'solar:volume-small-bold'
+                          : 'solar:volume-loud-bold'
                     }
                     width="18"
                   />
@@ -1923,8 +1923,8 @@ export default function WatchPartyModal({
                   {partnerSyncStatus === 'synced'
                     ? 'In Perfect Sync'
                     : partnerSyncStatus === 'buffering'
-                    ? 'Buffering...'
-                    : 'Realigning...'}
+                      ? 'Buffering...'
+                      : 'Realigning...'}
                 </span>
               </div>
 
@@ -2027,7 +2027,7 @@ export default function WatchPartyModal({
                               partyLocalVideoRef.current = el;
                               if (el && webRTC.localStream && el.srcObject !== webRTC.localStream) {
                                 el.srcObject = webRTC.localStream;
-                                el.play().catch(() => {});
+                                el.play().catch(() => { });
                               }
                             }}
                             autoPlay
@@ -2341,20 +2341,6 @@ export default function WatchPartyModal({
                       onChange={(e) => setCustomInputUrl(e.target.value)}
                       required
                       autoFocus
-                    />
-                    <input
-                      type="text"
-                      className="custom-url-input custom-url-title-input"
-                      placeholder="Movie Title (Optional - auto-detected)"
-                      value={customInputTitle}
-                      onChange={(e) => setCustomInputTitle(e.target.value)}
-                    />
-                    <input
-                      type="text"
-                      className="custom-url-input custom-url-title-input"
-                      placeholder="Subtitle WebVTT URL (.vtt) (Optional)"
-                      value={customSubtitleUrl}
-                      onChange={(e) => setCustomSubtitleUrl(e.target.value)}
                     />
                     <button type="submit" className="custom-url-btn">
                       <Icon icon="solar:play-bold" width="18" />
