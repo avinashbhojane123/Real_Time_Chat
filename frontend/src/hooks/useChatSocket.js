@@ -274,6 +274,22 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       showToast(`⚠️ ${targetNickname} was removed from the room by ${kickedBy}`);
     });
 
+    socket.on('userBanned', ({ targetNickname, bannedBy, reason }) => {
+      showToast(`⛔ ${targetNickname} was permanently banned by ${bannedBy}`);
+    });
+
+    socket.on('userUnbanned', ({ targetNickname, unbannedBy }) => {
+      showToast(`✅ ${targetNickname} was unbanned by ${unbannedBy}`);
+    });
+
+    socket.on('userPromoted', ({ targetNickname, role, promotedBy }) => {
+      showToast(`⭐ ${targetNickname} is now ${role} (by ${promotedBy})`);
+    });
+
+    socket.on('hostChanged', ({ newHost, previousHost }) => {
+      showToast(`👑 Room host transferred to @${newHost}`);
+    });
+
     socket.on('userMuteToggled', ({ targetNickname, isMuted, mutedBy }) => {
       setUsers((prev) =>
         prev.map((u) => (u.nickname === targetNickname ? { ...u, isMuted } : u))
@@ -910,9 +926,74 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
   };
 
+  const handleBanUser = (targetNickname, reason = 'Violating room rules') => {
+    if (!socketRef.current || !targetNickname) return;
+    socketRef.current.emit('banUser', {
+      passcode,
+      targetNickname,
+      reason,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to ban user');
+      }
+    });
+  };
+
+  const handleUnbanUser = (targetNickname) => {
+    if (!socketRef.current || !targetNickname) return;
+    socketRef.current.emit('unbanUser', {
+      passcode,
+      targetNickname,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to unban user');
+      }
+    });
+  };
+
+  const handlePromoteUser = (targetNickname, role) => {
+    if (!socketRef.current || !targetNickname) return;
+    socketRef.current.emit('promoteUser', {
+      passcode,
+      targetNickname,
+      role,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to update user role');
+      }
+    });
+  };
+
+  const handleTransferHost = (targetNickname) => {
+    if (!socketRef.current || !targetNickname) return;
+    socketRef.current.emit('transferHost', {
+      passcode,
+      targetNickname,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to transfer host');
+      }
+    });
+  };
+
+  const handleClearInactiveUsers = (daysInactive = 7) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('clearInactiveUsers', {
+      passcode,
+      daysInactive,
+    }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to clear inactive users');
+      } else if (res && res.success) {
+        showToast(`🧹 Removed ${res.removedCount} inactive participant(s)`);
+      }
+    });
+  };
+
   const currentUserObj = users.find((u) => u.nickname === nickname);
   const currentUserRole = currentUserObj?.role || 'member';
   const isCurrentUserMuted = Boolean(currentUserObj?.isMuted);
+  const isCurrentUserBanned = Boolean(currentUserObj?.isBanned);
 
   return {
     messages,
@@ -949,9 +1030,15 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     kickedInfo,
     setKickedInfo,
     handleKickUser,
+    handleBanUser,
+    handleUnbanUser,
+    handlePromoteUser,
+    handleTransferHost,
+    handleClearInactiveUsers,
     handleMuteUser,
     handleSendDirectMessage,
     currentUserRole,
     isCurrentUserMuted,
+    isCurrentUserBanned,
   };
 }

@@ -271,6 +271,8 @@ export class ChatGateway
       nickname: string;
       passcode: string;
       isPip?: boolean;
+      isMuted?: boolean;
+      role?: 'host' | 'admin' | 'member';
     }
   >();
 
@@ -354,6 +356,68 @@ export class ChatGateway
       }
     }
     return undefined;
+  }
+
+  private findSocketsInRoom(
+    passcode: string,
+    nickname?: string,
+    excludeSocketId?: string,
+  ): Array<{ socketId: string; nickname: string }> {
+    const cleanPass = passcode.trim();
+    const result: Array<{ socketId: string; nickname: string }> = [];
+    for (const [id, user] of this.users.entries()) {
+      if (user.passcode.trim() === cleanPass && id !== excludeSocketId) {
+        if (
+          !nickname ||
+          user.nickname.trim().toLowerCase() === nickname.trim().toLowerCase()
+        ) {
+          result.push({ socketId: id, nickname: user.nickname });
+        }
+      }
+    }
+    return result;
+  }
+
+  private async broadcastUsersList(roomPasscode: string, roomId: number) {
+    const activeNicknames = new Set(
+      Array.from(this.users.values())
+        .filter((s) => s.passcode === roomPasscode)
+        .map((s) => s.nickname),
+    );
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const roomUsers = await this.userRepo.find({
+      where: { roomId },
+      order: { nickname: 'ASC' },
+    });
+
+    const relevant = roomUsers.filter((u) => {
+      if (activeNicknames.has(u.nickname)) return true;
+      if (u.isOnline) return true;
+      if (!u.lastSeen) return true;
+      return new Date(u.lastSeen) > sevenDaysAgo;
+    });
+
+    this.server.to(roomPasscode).emit(
+      'usersList',
+      relevant.map((u) => ({
+        id: u.id,
+        nickname: u.nickname,
+        role: u.role || 'member',
+        isMuted: Boolean(u.isMuted),
+        isBanned: Boolean(u.isBanned),
+        isOnline: activeNicknames.has(u.nickname) || u.isOnline,
+        lastSeen: u.lastSeen,
+        deviceType: u.deviceType,
+        deviceModel: u.deviceModel,
+        browser: u.browser,
+        os: u.os,
+        avatarUrl: u.avatarUrl,
+        networkLabel: u.networkLabel,
+        batteryLabel: u.batteryLabel,
+        batteryIsCharging: u.batteryIsCharging,
+      })),
+    );
   }
 
   private getCalculatedWatchPartyPosition(state: WatchPartyState): number {
@@ -545,52 +609,39 @@ export class ChatGateway
         if (user) {
           user.isOnline = false;
           user.lastSeen = new Date();
-
           await this.userRepo.save(user);
+
+          // If the disconnected user was the host, perform host succession
+          if (user.role === 'host') {
+            const activeNicknames = new Set(
+              Array.from(this.users.values())
+                .filter((s) => s.passcode === room.passcode)
+                .map((s) => s.nickname),
+            );
+            if (activeNicknames.size > 0 && !activeNicknames.has(user.nickname)) {
+              const onlineRoomUsers = await this.userRepo.find({
+                where: { roomId: room.id },
+                order: { createdAt: 'ASC' },
+              });
+              const candidate =
+                onlineRoomUsers.find((u) => activeNicknames.has(u.nickname) && u.role === 'admin') ||
+                onlineRoomUsers.find((u) => activeNicknames.has(u.nickname) && u.nickname !== user.nickname);
+
+              if (candidate) {
+                user.role = 'member';
+                candidate.role = 'host';
+                await this.userRepo.save([user, candidate]);
+                this.server.to(room.passcode).emit('hostChanged', {
+                  newHostNickname: candidate.nickname,
+                  previousHostNickname: user.nickname,
+                  reason: 'Automatic succession after host disconnect',
+                });
+              }
+            }
+          }
         }
 
-        const activeNicknames = new Set(
-          Array.from(this.users.values())
-            .filter((s) => s.passcode === room.passcode)
-            .map((s) => s.nickname),
-        );
-
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const updatedUsers = await this.userRepo.find({
-          where: {
-            roomId: room.id,
-          },
-          order: {
-            nickname: 'ASC',
-          },
-        });
-
-        const relevantUpdatedUsers = updatedUsers.filter((u) => {
-          if (activeNicknames.has(u.nickname)) return true;
-          if (u.isOnline) return true;
-          if (!u.lastSeen) return true;
-          return new Date(u.lastSeen) > sevenDaysAgo;
-        });
-
-        this.server.to(room.passcode).emit(
-          'usersList',
-          relevantUpdatedUsers.map((user) => ({
-            id: user.id,
-            nickname: user.nickname,
-            role: user.role || 'member',
-            isMuted: Boolean(user.isMuted),
-            isOnline: activeNicknames.has(user.nickname),
-            lastSeen: user.lastSeen,
-            deviceType: user.deviceType,
-            deviceModel: user.deviceModel,
-            browser: user.browser,
-            os: user.os,
-            avatarUrl: user.avatarUrl,
-            networkLabel: user.networkLabel,
-            batteryLabel: user.batteryLabel,
-            batteryIsCharging: user.batteryIsCharging,
-          })),
-        );
+        await this.broadcastUsersList(room.passcode, room.id);
       }
 
       this.server.to(userInfo.passcode).emit('userOffline', {
@@ -745,6 +796,20 @@ export class ChatGateway
       },
     });
 
+    if (user && user.isBanned) {
+      client.emit('kickedFromRoom', {
+        reason: 'You are permanently banned from this room by the host.',
+        kickedBy: 'Host',
+      });
+      return { success: false, message: 'You are banned from this room' };
+    }
+
+    const activeNicknames = new Set(
+      Array.from(this.users.values())
+        .filter((s) => s.passcode === room.passcode.trim())
+        .map((s) => s.nickname),
+    );
+
     const existingHost = await this.userRepo.findOne({
       where: {
         roomId: room.id,
@@ -752,7 +817,8 @@ export class ChatGateway
       },
     });
 
-    const defaultRole = existingHost ? 'member' : 'host';
+    const hasActiveHost = existingHost && (activeNicknames.has(existingHost.nickname) || existingHost.nickname === data.nickname);
+    const defaultRole = hasActiveHost ? 'member' : 'host';
 
     if (!user) {
       user = this.userRepo.create({
@@ -772,7 +838,7 @@ export class ChatGateway
     } else {
       user.isOnline = true;
       user.lastSeen = null;
-      if (!existingHost && !user.role) {
+      if (!hasActiveHost && !user.role) {
         user.role = 'host';
       }
       user.deviceType = data.deviceType || user.deviceType;
@@ -803,6 +869,8 @@ export class ChatGateway
     this.users.set(client.id, {
       nickname: data.nickname,
       passcode: roomPasscode,
+      isMuted: Boolean(user.isMuted),
+      role: user.role,
     });
 
     // Re-bind reconnecting user to any active call session in this room
@@ -877,49 +945,7 @@ export class ChatGateway
       customWallpaper: activeWallpaper.customWallpaper,
       isDefault: isRoomDefault,
     });
-
-    const activeNicknames = new Set(
-      Array.from(this.users.values())
-        .filter((s) => s.passcode === roomPasscode)
-        .map((s) => s.nickname),
-    );
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const roomUsers = await this.userRepo.find({
-      where: {
-        roomId: room.id,
-      },
-      order: {
-        nickname: 'ASC',
-      },
-    });
-
-    const relevantRoomUsers = roomUsers.filter((u) => {
-      if (activeNicknames.has(u.nickname)) return true;
-      if (u.isOnline) return true;
-      if (!u.lastSeen) return true;
-      return new Date(u.lastSeen) > sevenDaysAgo;
-    });
-
-    this.server.to(room.passcode).emit(
-      'usersList',
-      relevantRoomUsers.map((user) => ({
-        id: user.id,
-        nickname: user.nickname,
-        role: user.role || 'member',
-        isMuted: Boolean(user.isMuted),
-        isOnline: activeNicknames.has(user.nickname) || user.isOnline,
-        lastSeen: user.lastSeen,
-        deviceType: user.deviceType,
-        deviceModel: user.deviceModel,
-        browser: user.browser,
-        os: user.os,
-        avatarUrl: user.avatarUrl,
-        networkLabel: user.networkLabel,
-        batteryLabel: user.batteryLabel,
-        batteryIsCharging: user.batteryIsCharging,
-      })),
-    );
+    await this.broadcastUsersList(room.passcode, room.id);
 
     this.server.to(room.passcode).emit('userOnline', {
       nickname: data.nickname,
@@ -1205,7 +1231,7 @@ export class ChatGateway
     data: TypingDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session) return;
+    if (!session || session.isMuted) return;
 
     const trimmedPasscode = (data.passcode || session.passcode).trim();
     client.to(trimmedPasscode).emit('userTyping', {
@@ -1314,9 +1340,9 @@ export class ChatGateway
     });
     if (!targetUser) return { success: false, message: 'User not found in room' };
 
-    // Disconnect target socket from room if online
-    const target = this.findSocketInRoom(data.passcode.trim(), data.targetNickname.trim());
-    if (target) {
+    // Disconnect all sockets of target user in room if online
+    const targets = this.findSocketsInRoom(data.passcode.trim(), data.targetNickname.trim());
+    for (const target of targets) {
       const targetSocket = this.server.sockets.sockets.get(target.socketId);
       if (targetSocket) {
         targetSocket.emit('kickedFromRoom', {
@@ -1337,45 +1363,256 @@ export class ChatGateway
       kickedBy: session.nickname,
     });
 
-    const activeNicknames = new Set(
-      Array.from(this.users.values())
-        .filter((s) => s.passcode === room.passcode)
-        .map((s) => s.nickname),
-    );
+    await this.broadcastUsersList(room.passcode, room.id);
+    return { success: true };
+  }
+
+  @SubscribeMessage('banUser')
+  async banUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      passcode: string;
+      targetNickname: string;
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode.trim() },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const hostUser = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!hostUser || (hostUser.role !== 'host' && hostUser.role !== 'admin')) {
+      return { success: false, message: 'Only room host or admin can ban participants' };
+    }
+
+    if (data.targetNickname.trim() === session.nickname.trim()) {
+      return { success: false, message: 'Cannot ban yourself' };
+    }
+
+    const targetUser = await this.userRepo.findOne({
+      where: { nickname: data.targetNickname.trim(), roomId: room.id },
+    });
+    if (!targetUser) return { success: false, message: 'User not found in room' };
+
+    targetUser.isBanned = true;
+    targetUser.bannedAt = new Date();
+    targetUser.isOnline = false;
+    targetUser.lastSeen = new Date();
+    await this.userRepo.save(targetUser);
+
+    const targets = this.findSocketsInRoom(data.passcode.trim(), data.targetNickname.trim());
+    for (const target of targets) {
+      const targetSocket = this.server.sockets.sockets.get(target.socketId);
+      if (targetSocket) {
+        targetSocket.emit('kickedFromRoom', {
+          reason: 'You have been permanently banned from this room by the host.',
+          kickedBy: session.nickname,
+        });
+        targetSocket.leave(data.passcode.trim());
+        this.users.delete(target.socketId);
+      }
+    }
+
+    this.server.to(data.passcode.trim()).emit('userBanned', {
+      targetNickname: data.targetNickname.trim(),
+      bannedBy: session.nickname,
+    });
+
+    await this.broadcastUsersList(room.passcode, room.id);
+    return { success: true };
+  }
+
+  @SubscribeMessage('unbanUser')
+  async unbanUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      passcode: string;
+      targetNickname: string;
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode.trim() },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const hostUser = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!hostUser || (hostUser.role !== 'host' && hostUser.role !== 'admin')) {
+      return { success: false, message: 'Only room host or admin can unban participants' };
+    }
+
+    const targetUser = await this.userRepo.findOne({
+      where: { nickname: data.targetNickname.trim(), roomId: room.id },
+    });
+    if (!targetUser) return { success: false, message: 'User not found in room' };
+
+    targetUser.isBanned = false;
+    targetUser.bannedAt = null;
+    await this.userRepo.save(targetUser);
+
+    this.server.to(data.passcode.trim()).emit('userUnbanned', {
+      targetNickname: data.targetNickname.trim(),
+      unbannedBy: session.nickname,
+    });
+
+    await this.broadcastUsersList(room.passcode, room.id);
+    return { success: true };
+  }
+
+  @SubscribeMessage('promoteUser')
+  async promoteUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      passcode: string;
+      targetNickname: string;
+      role: 'admin' | 'member';
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode.trim() },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const hostUser = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!hostUser || hostUser.role !== 'host') {
+      return { success: false, message: 'Only room host can promote or demote admins' };
+    }
+
+    const targetUser = await this.userRepo.findOne({
+      where: { nickname: data.targetNickname.trim(), roomId: room.id },
+    });
+    if (!targetUser) return { success: false, message: 'User not found in room' };
+
+    targetUser.role = data.role === 'admin' ? 'admin' : 'member';
+    await this.userRepo.save(targetUser);
+
+    for (const [id, user] of this.users.entries()) {
+      if (user.passcode === data.passcode.trim() && user.nickname === data.targetNickname.trim()) {
+        user.role = targetUser.role;
+      }
+    }
+
+    this.server.to(data.passcode.trim()).emit('userPromoted', {
+      targetNickname: targetUser.nickname,
+      role: targetUser.role,
+      promotedBy: session.nickname,
+    });
+
+    await this.broadcastUsersList(room.passcode, room.id);
+    return { success: true, role: targetUser.role };
+  }
+
+  @SubscribeMessage('transferHost')
+  async transferHost(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      passcode: string;
+      targetNickname: string;
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode.trim() },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const hostUser = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!hostUser || hostUser.role !== 'host') {
+      return { success: false, message: 'Only current host can transfer room ownership' };
+    }
+
+    const targetUser = await this.userRepo.findOne({
+      where: { nickname: data.targetNickname.trim(), roomId: room.id },
+    });
+    if (!targetUser) return { success: false, message: 'Target user not found' };
+
+    hostUser.role = 'member';
+    targetUser.role = 'host';
+    await this.userRepo.save([hostUser, targetUser]);
+
+    for (const [id, user] of this.users.entries()) {
+      if (user.passcode === data.passcode.trim()) {
+        if (user.nickname === hostUser.nickname) user.role = 'member';
+        if (user.nickname === targetUser.nickname) user.role = 'host';
+      }
+    }
+
+    this.server.to(data.passcode.trim()).emit('hostChanged', {
+      newHostNickname: targetUser.nickname,
+      previousHostNickname: hostUser.nickname,
+    });
+
+    await this.broadcastUsersList(room.passcode, room.id);
+    return { success: true };
+  }
+
+  @SubscribeMessage('clearInactiveUsers')
+  async clearInactiveUsers(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      passcode: string;
+    },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+      return { success: false, message: 'Unauthorized session' };
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: data.passcode.trim() },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const hostUser = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!hostUser || (hostUser.role !== 'host' && hostUser.role !== 'admin')) {
+      return { success: false, message: 'Only room host or admin can clear inactive participants' };
+    }
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const roomUsers = await this.userRepo.find({
-      where: { roomId: room.id },
-      order: { nickname: 'ASC' },
-    });
+    await this.userRepo
+      .createQueryBuilder()
+      .delete()
+      .from(User)
+      .where('roomId = :roomId AND isOnline = false AND (lastSeen IS NULL OR lastSeen < :sevenDaysAgo)', {
+        roomId: room.id,
+        sevenDaysAgo,
+      })
+      .execute();
 
-    const relevant = roomUsers.filter((u) => {
-      if (activeNicknames.has(u.nickname)) return true;
-      if (u.isOnline) return true;
-      if (!u.lastSeen) return true;
-      return new Date(u.lastSeen) > sevenDaysAgo;
-    });
-
-    this.server.to(room.passcode).emit(
-      'usersList',
-      relevant.map((u) => ({
-        id: u.id,
-        nickname: u.nickname,
-        role: u.role || 'member',
-        isMuted: Boolean(u.isMuted),
-        isOnline: activeNicknames.has(u.nickname) || u.isOnline,
-        lastSeen: u.lastSeen,
-        deviceType: u.deviceType,
-        deviceModel: u.deviceModel,
-        browser: u.browser,
-        os: u.os,
-        avatarUrl: u.avatarUrl,
-        networkLabel: u.networkLabel,
-        batteryLabel: u.batteryLabel,
-        batteryIsCharging: u.batteryIsCharging,
-      })),
-    );
-
+    await this.broadcastUsersList(room.passcode, room.id);
     return { success: true };
   }
 
@@ -1414,51 +1651,19 @@ export class ChatGateway
     targetUser.isMuted = Boolean(data.isMuted);
     await this.userRepo.save(targetUser);
 
+    for (const [id, user] of this.users.entries()) {
+      if (user.passcode === data.passcode.trim() && user.nickname === data.targetNickname.trim()) {
+        user.isMuted = targetUser.isMuted;
+      }
+    }
+
     this.server.to(data.passcode.trim()).emit('userMuteToggled', {
       targetNickname: data.targetNickname.trim(),
       isMuted: targetUser.isMuted,
       mutedBy: session.nickname,
     });
 
-    const activeNicknames = new Set(
-      Array.from(this.users.values())
-        .filter((s) => s.passcode === room.passcode)
-        .map((s) => s.nickname),
-    );
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const roomUsers = await this.userRepo.find({
-      where: { roomId: room.id },
-      order: { nickname: 'ASC' },
-    });
-
-    const relevant = roomUsers.filter((u) => {
-      if (activeNicknames.has(u.nickname)) return true;
-      if (u.isOnline) return true;
-      if (!u.lastSeen) return true;
-      return new Date(u.lastSeen) > sevenDaysAgo;
-    });
-
-    this.server.to(room.passcode).emit(
-      'usersList',
-      relevant.map((u) => ({
-        id: u.id,
-        nickname: u.nickname,
-        role: u.role || 'member',
-        isMuted: Boolean(u.isMuted),
-        isOnline: activeNicknames.has(u.nickname) || u.isOnline,
-        lastSeen: u.lastSeen,
-        deviceType: u.deviceType,
-        deviceModel: u.deviceModel,
-        browser: u.browser,
-        os: u.os,
-        avatarUrl: u.avatarUrl,
-        networkLabel: u.networkLabel,
-        batteryLabel: u.batteryLabel,
-        batteryIsCharging: u.batteryIsCharging,
-      })),
-    );
-
+    await this.broadcastUsersList(room.passcode, room.id);
     return { success: true, isMuted: targetUser.isMuted };
   }
 
@@ -1491,16 +1696,13 @@ export class ChatGateway
       return { success: false, message: 'Room not found' };
     }
 
-    const senderUser = await this.userRepo.findOne({
-      where: { nickname: session.nickname, roomId: room.id },
-    });
-    if (senderUser?.isMuted) {
+    if (session.isMuted) {
       client.emit('error', { message: 'You have been muted by the room host.' });
       return { success: false, message: 'You have been muted by the room host.' };
     }
 
-    const target = this.findSocketInRoom(data.passcode.trim(), data.targetNickname.trim());
-    if (!target) {
+    const targets = this.findSocketsInRoom(data.passcode.trim(), data.targetNickname.trim());
+    if (!targets.length) {
       return { success: false, message: `${data.targetNickname} is currently offline` };
     }
 
@@ -1518,8 +1720,13 @@ export class ChatGateway
       createdAt: new Date().toISOString(),
     };
 
-    this.server.to(target.socketId).emit('directMessage', directMsg);
-    client.emit('directMessage', directMsg);
+    for (const t of targets) {
+      this.server.to(t.socketId).emit('directMessage', directMsg);
+    }
+    const senderSockets = this.findSocketsInRoom(data.passcode.trim(), session.nickname);
+    for (const s of senderSockets) {
+      this.server.to(s.socketId).emit('directMessage', directMsg);
+    }
 
     return { success: true, message: directMsg };
   }
@@ -1598,6 +1805,13 @@ export class ChatGateway
   ) {
     const session = this.users.get(client.id);
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+
+    if (session.isMuted) {
+      client.emit('callError', {
+        message: 'You have been muted by the host and cannot place calls.',
+      });
+      return;
+    }
 
     const room = session.passcode.trim();
 
@@ -2217,7 +2431,7 @@ export class ChatGateway
     @MessageBody() data: ReactToMessageDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session) return;
+    if (!session || session.isMuted) return;
     if (
       session.passcode.trim().toLowerCase() !==
       (data.passcode || '').trim().toLowerCase()
@@ -2283,6 +2497,11 @@ export class ChatGateway
     const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode.trim())
       return { success: false };
+
+    if (session.isMuted) {
+      client.emit('error', { message: 'You are muted and cannot post status stories.' });
+      return { success: false, message: 'You are muted and cannot post status stories.' };
+    }
 
     const room = await this.roomRepo.findOne({
       where: { passcode: data.passcode.trim() },
@@ -2458,6 +2677,17 @@ export class ChatGateway
       return {
         success: false,
         message: 'Only the party host can control movie playback',
+      };
+    }
+
+    if (
+      session.isMuted &&
+      session.nickname !== state.hostNickname &&
+      ['play', 'pause', 'seek', 'rate', 'change_video'].includes(data.action)
+    ) {
+      return {
+        success: false,
+        message: 'You are muted and cannot control shared movie playback',
       };
     }
 

@@ -115,4 +115,15 @@ export class User {
     default: false,
   })
   isMuted!: boolean;
+
+  @Column({
+    default: false,
+  })
+  isBanned!: boolean;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+  })
+  bannedAt!: Date | null;
 }

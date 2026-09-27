@@ -60,6 +60,11 @@ const ChatRoster = memo(function ChatRoster({
   currentUserRole = 'member',
   isCurrentUserMuted = false,
   onKickUser,
+  onBanUser,
+  onUnbanUser,
+  onPromoteUser,
+  onTransferHost,
+  onClearInactiveUsers,
   onMuteUser,
   onSendDirectMessage,
 }) {
@@ -552,6 +557,36 @@ const ChatRoster = memo(function ChatRoster({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {(currentUserRole === 'host' || currentUserRole === 'admin') && onClearInactiveUsers && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              type="button"
+              onClick={() => {
+                if (window.confirm('🧹 Clean up inactive participants who have not been active for 7+ days? (Host and admins are preserved)')) {
+                  onClearInactiveUsers(7);
+                }
+              }}
+              style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444',
+                cursor: 'pointer',
+                padding: '5px 8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+              }}
+              title="Clean Inactive (7d+)"
+            >
+              <Icon icon="solar:trash-bin-trash-bold-duotone" width="15" height="15" />
+              <span>Clean</span>
+            </motion.button>
+          )}
+
           <motion.button
             whileHover={{ scale: 1.15, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
@@ -815,6 +850,25 @@ const ChatRoster = memo(function ChatRoster({
                                         🔇 Muted
                                       </span>
                                     )}
+                                    {u.isBanned && (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontSize: '0.64rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(239, 68, 68, 0.22)',
+                                          color: '#ef4444',
+                                          border: '1px solid rgba(239, 68, 68, 0.45)',
+                                          padding: '1px 5px',
+                                          borderRadius: '6px',
+                                        }}
+                                        title="Permanently banned"
+                                      >
+                                        ⛔ Banned
+                                      </span>
+                                    )}
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1049,6 +1103,22 @@ const ChatRoster = memo(function ChatRoster({
                                         }}
                                       >
                                         🔇 Muted
+                                      </span>
+                                    )}
+                                    {u.isBanned && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(239, 68, 68, 0.22)',
+                                          color: '#ef4444',
+                                          border: '1px solid rgba(239, 68, 68, 0.45)',
+                                          padding: '0 4px',
+                                          borderRadius: '4px',
+                                        }}
+                                        title="Permanently banned"
+                                      >
+                                        ⛔ Banned
                                       </span>
                                     )}
                                   </div>
@@ -1449,7 +1519,7 @@ const ChatRoster = memo(function ChatRoster({
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`Are you sure you want to remove ${inspectingUser.nickname} from this room?`)) {
+                      if (window.confirm(`Are you sure you want to kick ${inspectingUser.nickname} from this room?`)) {
                         if (onKickUser) onKickUser(inspectingUser.nickname);
                         setInspectingUser(null);
                       }
@@ -1472,6 +1542,152 @@ const ChatRoster = memo(function ChatRoster({
                     <Icon icon="solar:user-cross-bold-duotone" width="15" height="15" />
                     <span>Kick User</span>
                   </button>
+
+                  {/* Permanent Ban / Unban */}
+                  {inspectingUser.isBanned ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onUnbanUser) onUnbanUser(inspectingUser.nickname);
+                        setInspectingUser((prev) => prev ? ({ ...prev, isBanned: false }) : null);
+                      }}
+                      style={{
+                        backgroundColor: 'rgba(0, 168, 132, 0.2)',
+                        color: '#00a884',
+                        border: '1px solid rgba(0, 168, 132, 0.4)',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Icon icon="solar:shield-check-bold-duotone" width="15" height="15" />
+                      <span>Unban User</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const reason = window.prompt(`Enter ban reason for ${inspectingUser.nickname}:`, 'Violating room rules');
+                        if (reason !== null) {
+                          if (onBanUser) onBanUser(inspectingUser.nickname, reason || 'Violating room rules');
+                          setInspectingUser(null);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.5)',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Icon icon="solar:shield-cross-bold-duotone" width="15" height="15" />
+                      <span>Ban User</span>
+                    </button>
+                  )}
+
+                  {/* Promote / Demote (Host Only) */}
+                  {currentUserRole === 'host' && (
+                    inspectingUser.role === 'admin' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Demote ${inspectingUser.nickname} to standard Member?`)) {
+                            if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'member');
+                            setInspectingUser((prev) => prev ? ({ ...prev, role: 'member' }) : null);
+                          }
+                        }}
+                        style={{
+                          backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                          color: '#ffc107',
+                          border: '1px solid rgba(255, 193, 7, 0.35)',
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <Icon icon="solar:user-down-bold-duotone" width="15" height="15" />
+                        <span>Demote Member</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Promote ${inspectingUser.nickname} to Room Admin?`)) {
+                            if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'admin');
+                            setInspectingUser((prev) => prev ? ({ ...prev, role: 'admin' }) : null);
+                          }
+                        }}
+                        style={{
+                          backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                          color: '#60a5fa',
+                          border: '1px solid rgba(59, 130, 246, 0.4)',
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <Icon icon="solar:star-bold-duotone" width="15" height="15" />
+                        <span>Promote Admin</span>
+                      </button>
+                    )
+                  )}
+
+                  {/* Transfer Host (Host Only) */}
+                  {currentUserRole === 'host' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`⚠️ Are you sure you want to transfer HOST status to ${inspectingUser.nickname}? You will become an admin.`)) {
+                          if (onTransferHost) onTransferHost(inspectingUser.nickname);
+                          setInspectingUser(null);
+                        }
+                      }}
+                      style={{
+                        gridColumn: 'span 2',
+                        backgroundColor: 'rgba(234, 179, 8, 0.2)',
+                        color: '#facc15',
+                        border: '1px solid rgba(234, 179, 8, 0.4)',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Icon icon="solar:crown-bold-duotone" width="15" height="15" />
+                      <span>Transfer Room Host</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

@@ -80,10 +80,16 @@ export default function ChatRoom() {
     sendUpdateRoomWallpaper,
     kickedInfo,
     handleKickUser,
+    handleBanUser,
+    handleUnbanUser,
+    handlePromoteUser,
+    handleTransferHost,
+    handleClearInactiveUsers,
     handleMuteUser,
     handleSendDirectMessage,
     currentUserRole,
     isCurrentUserMuted,
+    isCurrentUserBanned,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User Calculation
@@ -709,6 +715,11 @@ export default function ChatRoom() {
         currentUserRole={currentUserRole}
         isCurrentUserMuted={isCurrentUserMuted}
         onKickUser={handleKickUser}
+        onBanUser={handleBanUser}
+        onUnbanUser={handleUnbanUser}
+        onPromoteUser={handlePromoteUser}
+        onTransferHost={handleTransferHost}
+        onClearInactiveUsers={handleClearInactiveUsers}
         onMuteUser={handleMuteUser}
         onSendDirectMessage={handleSendDirectMessage}
         renderStatusAvatar={renderStatusAvatar}
@@ -912,6 +923,7 @@ export default function ChatRoom() {
 
         {/* Bottom Input Control Bar */}
         <ChatInputBar
+          users={users}
           replyingTo={replyingTo}
           setReplyingTo={setReplyingTo}
           editingMsg={editingMsg}

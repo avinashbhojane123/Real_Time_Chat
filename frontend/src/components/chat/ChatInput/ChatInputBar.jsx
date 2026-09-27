@@ -1,4 +1,4 @@
-import React, { memo, useState, useRef, useEffect } from 'react';
+import React, { memo, useState, useRef, useEffect, useMemo } from 'react';
 import MagneticButton from '../../animated/MagneticButton';
 import VideoNoteRecorder from './VideoNoteRecorder';
 import './ChatInputBar.css';
@@ -8,6 +8,7 @@ const ChatInputBar = memo(function ChatInputBar({
   setReplyingTo,
   editingMsg,
   cancelEditing,
+  users = [],
   showEmojiPicker,
   setShowEmojiPicker,
   EMOJI_LIST,
@@ -51,6 +52,79 @@ const ChatInputBar = memo(function ChatInputBar({
   const recordMenuRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const isLongPressActiveRef = useRef(false);
+
+  // Mention Autocomplete
+  const inputRef = useRef(null);
+  const [mentionQuery, setMentionQuery] = useState(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+
+  const checkMentionTrigger = (text, cursorPos) => {
+    const pos = typeof cursorPos === 'number' ? cursorPos : text.length;
+    const textUpToCursor = text.slice(0, pos);
+    const lastWord = textUpToCursor.split(/\s/).pop();
+    if (lastWord && lastWord.startsWith('@')) {
+      setMentionQuery(lastWord.slice(1).toLowerCase());
+      setSelectedMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const handleTextChange = (e) => {
+    handleInputChange(e);
+    checkMentionTrigger(e.target.value, e.target.selectionStart);
+  };
+
+  const mentionMatches = useMemo(() => {
+    if (mentionQuery === null) return [];
+    return (users || [])
+      .filter((u) => u.nickname && u.nickname.toLowerCase().includes(mentionQuery))
+      .slice(0, 6);
+  }, [users, mentionQuery]);
+
+  const insertMention = (targetNick) => {
+    const pos = inputRef.current ? inputRef.current.selectionStart : inputText.length;
+    const textBefore = inputText.slice(0, pos);
+    const textAfter = inputText.slice(pos);
+    const lastAtIdx = textBefore.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const newText = textBefore.slice(0, lastAtIdx) + `@${targetNick} ` + textAfter;
+      setInputText(newText);
+      setMentionQuery(null);
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const newPos = lastAtIdx + targetNick.length + 2;
+          inputRef.current.setSelectionRange(newPos, newPos);
+        }
+      }, 10);
+    }
+  };
+
+  const handleInputKeyDown = (e) => {
+    if (mentionMatches.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex((prev) => (prev + 1) % mentionMatches.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex((prev) => (prev - 1 + mentionMatches.length) % mentionMatches.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(mentionMatches[selectedMentionIndex].nickname);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+  };
 
   // Close record mode menu on outside click
   useEffect(() => {
@@ -453,12 +527,80 @@ const ChatInputBar = memo(function ChatInputBar({
               )}
             </div>
 
+            {/* Mention Autocomplete Floating Popup */}
+            {mentionMatches.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '62px',
+                  left: '60px',
+                  maxWidth: '300px',
+                  width: 'calc(100% - 120px)',
+                  backgroundColor: 'rgba(32, 44, 51, 0.98)',
+                  backdropFilter: 'blur(16px)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(0, 168, 132, 0.35)',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.65)',
+                  padding: '6px',
+                  zIndex: 110,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#8696a0', padding: '4px 8px', letterSpacing: '0.5px' }}>
+                  MENTION PARTICIPANT
+                </div>
+                {mentionMatches.map((u, i) => (
+                  <div
+                    key={u.nickname}
+                    onClick={() => insertMention(u.nickname)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      backgroundColor: i === selectedMentionIndex ? 'rgba(0, 168, 132, 0.22)' : 'transparent',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={() => setSelectedMentionIndex(i)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 700, color: '#00a884', fontSize: '0.86rem' }}>
+                        @{u.nickname}
+                      </span>
+                      {u.isOnline ? (
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#00a884' }} />
+                      ) : (
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#8696a0' }} />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {u.role === 'host' && (
+                        <span style={{ fontSize: '0.64rem', color: '#ffc107', fontWeight: 700 }}>👑 Host</span>
+                      )}
+                      {u.role === 'admin' && (
+                        <span style={{ fontSize: '0.64rem', color: '#60a5fa', fontWeight: 700 }}>🛡️ Admin</span>
+                      )}
+                      {u.isMuted && (
+                        <span style={{ fontSize: '0.64rem', color: '#ef4444', fontWeight: 700 }}>🔇 Muted</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Input Text Field */}
             <input
+              ref={inputRef}
               type="text"
               placeholder={editingMsg ? 'Edit message...' : 'Type a message'}
               value={inputText}
-              onChange={handleInputChange}
+              onChange={handleTextChange}
+              onKeyDown={handleInputKeyDown}
               style={{
                 flex: 1,
                 height: '42px',
