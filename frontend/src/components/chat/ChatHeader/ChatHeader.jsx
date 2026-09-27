@@ -31,18 +31,64 @@ const ChatHeader = memo(function ChatHeader({
   onOpenWatchParty,
   isWatchPartyActive = false,
 }) {
-  const [latency, setLatency] = useState(externalLatency || 32);
+  const latency = externalLatency !== undefined && externalLatency !== null ? externalLatency : null;
 
-  useEffect(() => {
-    if (externalLatency !== undefined) {
-      setLatency(externalLatency);
-      return;
+  const getLatencyTier = (ms, isConnected) => {
+    if (!isConnected) {
+      return {
+        color: '#f15c6d',
+        borderColor: 'rgba(241, 92, 109, 0.35)',
+        bgColor: 'rgba(241, 92, 109, 0.1)',
+        icon: 'line-md:cloud-download-loop',
+        label: 'Offline (Reconnecting)',
+      };
     }
-    const interval = setInterval(() => {
-      setLatency(Math.floor(Math.random() * 24) + 25);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [externalLatency]);
+    if (ms === null || ms === undefined) {
+      return {
+        color: '#8696a0',
+        borderColor: 'rgba(134, 150, 160, 0.25)',
+        bgColor: 'rgba(255, 255, 255, 0.05)',
+        icon: 'line-md:loading-twotone-loop',
+        label: 'Measuring...',
+      };
+    }
+    if (ms < 90) {
+      return {
+        color: '#00a884',
+        borderColor: 'rgba(0, 168, 132, 0.35)',
+        bgColor: 'rgba(0, 168, 132, 0.12)',
+        icon: 'line-md:signal-cellular-3-twotone',
+        label: 'Fast',
+      };
+    }
+    if (ms < 190) {
+      return {
+        color: '#06b6d4',
+        borderColor: 'rgba(6, 182, 212, 0.35)',
+        bgColor: 'rgba(6, 182, 212, 0.12)',
+        icon: 'line-md:signal-cellular-2-twotone',
+        label: 'Good',
+      };
+    }
+    if (ms < 300) {
+      return {
+        color: '#f59e0b',
+        borderColor: 'rgba(245, 158, 11, 0.35)',
+        bgColor: 'rgba(245, 158, 11, 0.12)',
+        icon: 'line-md:signal-cellular-1-twotone',
+        label: 'Moderate Lag',
+      };
+    }
+    return {
+      color: '#f43f5e',
+      borderColor: 'rgba(244, 63, 94, 0.4)',
+      bgColor: 'rgba(244, 63, 94, 0.15)',
+      icon: 'solar:danger-triangle-bold',
+      label: 'High Latency',
+    };
+  };
+
+  const latencyTier = getLatencyTier(latency, isSocketConnected);
 
   return (
     <>
@@ -205,38 +251,34 @@ const ChatHeader = memo(function ChatHeader({
 
         {/* Action Icons & Connection Quality Meter */}
         <div className="wa-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          {/* WebSocket Signal & Latency Meter with Spring Pop */}
-          <motion.div
-            key={latency}
+          {/* WebSocket Signal & Latency Meter */}
+          <div
             className="wa-header-latency-pill"
-            initial={{ scale: 0.88, opacity: 0.7 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 25, ease: [0.2, 0, 0, 1] }}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              border: `1px solid ${isSocketConnected ? 'rgba(0, 168, 132, 0.25)' : 'rgba(241, 92, 109, 0.3)'}`,
+              gap: '5px',
+              backgroundColor: latencyTier.bgColor,
+              border: `1px solid ${latencyTier.borderColor}`,
               padding: '4px 9px',
               borderRadius: '14px',
               fontSize: '0.73rem',
               fontWeight: 600,
-              color: isSocketConnected ? '#00a884' : '#f15c6d',
+              color: latencyTier.color,
               cursor: 'default',
               userSelect: 'none',
-              transition: 'all 0.2s cubic-bezier(0.2, 0, 0, 1)',
+              transition: 'all 0.3s cubic-bezier(0.2, 0, 0, 1)',
               flexShrink: 0,
             }}
-            title={`WebSocket Status: ${isSocketConnected ? 'Connected' : 'Reconnecting...'} | Latency: ${latency}ms`}
+            title={`WebSocket Status: ${isSocketConnected ? 'Connected' : 'Reconnecting...'} | Latency: ${latency !== null ? `${latency}ms (${latencyTier.label})` : 'Measuring...'}`}
           >
             <Icon
-              icon={isSocketConnected ? 'line-md:signal-cellular-3-twotone' : 'line-md:cloud-download-loop'}
+              icon={latencyTier.icon}
               width="15"
               height="15"
             />
-            <span>{isSocketConnected ? `${latency}ms` : 'Offline'}</span>
-          </motion.div>
+            <span>{isSocketConnected ? (latency !== null ? `${latency}ms` : '--') : 'Offline'}</span>
+          </div>
 
           {/* WhatsApp Video Call Button with M3 State Layer & Tactile Motion Feedback */}
           <motion.button

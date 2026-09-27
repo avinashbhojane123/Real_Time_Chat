@@ -83,11 +83,20 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
     socketRef.current = socket;
 
+    // Latency smoothing engine: Exponential Moving Average (EMA) prevents temporary single-packet spikes from getting stuck
+    const updateLatency = (rawMs) => {
+      const cleanRaw = Math.max(4, Math.round(rawMs));
+      setSocketLatency((prev) => {
+        if (!prev || prev <= 0) return cleanRaw;
+        return Math.round(prev * 0.7 + cleanRaw * 0.3);
+      });
+    };
+
     socket.on('connect', async () => {
       setIsSocketConnected(true);
       const startTime = Date.now();
-      socket.emit('clientPing', () => {
-        setSocketLatency(Math.max(8, Date.now() - startTime));
+      socket.emit('clientPing', { clientTime: startTime }, () => {
+        setSocketLatency(Math.max(4, Date.now() - startTime));
       });
       const clientDevice = detectClientDevice();
       const battery = await getBatteryInfo();
@@ -118,15 +127,15 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       console.warn('[Socket] Connection error:', err?.message || err);
     });
 
-    // Periodic heartbeat to keep reverse proxies and firewalls alive (25s interval)
+    // Periodic heartbeat to keep reverse proxies alive and monitor smoothed real-time latency (8s interval)
     const pingInterval = setInterval(() => {
       if (socket.connected) {
         const pingStart = Date.now();
-        socket.emit('clientPing', () => {
-          setSocketLatency(Math.max(8, Date.now() - pingStart));
+        socket.emit('clientPing', { clientTime: pingStart }, () => {
+          updateLatency(Date.now() - pingStart);
         });
       }
-    }, 25000);
+    }, 8000);
 
     // Instant Device Wake-Up & Screen Unlock Handler
     // Ensures 0-delay instant reconnection the moment a user unlocks their phone or focuses the tab
@@ -140,8 +149,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
           } else {
             // Socket claims to be connected: send immediate heartbeat ping to detect any stale half-open TCP pipe
             const checkStart = Date.now();
-            s.emit('clientPing', () => {
-              setSocketLatency(Math.max(8, Date.now() - checkStart));
+            socket.emit('clientPing', { clientTime: checkStart }, () => {
+              updateLatency(Date.now() - checkStart);
             });
             // Re-sync users and statuses to guarantee no missed events while device was asleep
             s.emit('getStatuses', { passcode });

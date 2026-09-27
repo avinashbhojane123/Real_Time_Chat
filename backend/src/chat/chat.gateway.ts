@@ -1534,8 +1534,15 @@ export class ChatGateway
   }
 
   @SubscribeMessage('clientPing')
-  clientPing(@ConnectedSocket() client: Socket) {
-    return { success: true, timestamp: Date.now() };
+  clientPing(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data?: any,
+  ) {
+    return {
+      success: true,
+      timestamp: Date.now(),
+      clientTime: data?.clientTime,
+    };
   }
 
   @SubscribeMessage('togglePip')
