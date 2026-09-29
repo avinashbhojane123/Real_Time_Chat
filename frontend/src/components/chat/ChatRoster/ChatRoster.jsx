@@ -120,6 +120,8 @@ const ChatRoster = memo(function ChatRoster({
   isWatchPartyActive,
   currentUserRole = 'member',
   isCurrentUserMuted = false,
+  isCurrentUserCreator = false,
+  onReclaimHost,
   onKickUser,
   onBanUser,
   onUnbanUser,
@@ -132,6 +134,7 @@ const ChatRoster = memo(function ChatRoster({
 }) {
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
+  const [showBannedGroup, setShowBannedGroup] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarErrors, setAvatarErrors] = useState({});
   const [inspectingNickname, setInspectingNickname] = useState(null);
@@ -186,17 +189,21 @@ const ChatRoster = memo(function ChatRoster({
   const normalizeText = (str) =>
     (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-  // Filter Users in Real-Time by Name, Device, or Browser
+  // Filter Users in Real-Time by Name, Role, Device, Browser, or Moderation Flags
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) return users;
     const q = normalizeText(searchQuery);
     return users.filter((u) => {
       return (
         normalizeText(u.nickname).includes(q) ||
+        normalizeText(u.role).includes(q) ||
         normalizeText(u.deviceModel).includes(q) ||
         normalizeText(u.browser).includes(q) ||
         normalizeText(u.os).includes(q) ||
-        normalizeText(u.networkLabel).includes(q)
+        normalizeText(u.networkLabel).includes(q) ||
+        (u.isMuted && 'muted'.includes(q)) ||
+        (u.isBanned && 'banned'.includes(q)) ||
+        (u.isCreator && 'creator'.includes(q))
       );
     });
   }, [users, searchQuery]);
@@ -216,9 +223,17 @@ const ChatRoster = memo(function ChatRoster({
     });
   }, [filteredUsers, nickname]);
 
-  // Offline users sorted by role hierarchy, then lastSeen DESC (most recently active first)
+  // Banned users (dedicated view for room moderators)
+  const bannedUsers = useMemo(() => {
+    const list = filteredUsers.filter((u) => u.isBanned);
+    return list.sort((a, b) =>
+      (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' })
+    );
+  }, [filteredUsers]);
+
+  // Offline non-banned users sorted by role hierarchy, then lastSeen DESC (most recently active first)
   const offlineUsers = useMemo(() => {
-    const list = filteredUsers.filter((u) => !u.isOnline);
+    const list = filteredUsers.filter((u) => !u.isOnline && !u.isBanned);
     return list.sort((a, b) => {
       const prioA = rolePriority[a.role || 'member'] || 3;
       const prioB = rolePriority[b.role || 'member'] || 3;
@@ -229,6 +244,19 @@ const ChatRoster = memo(function ChatRoster({
       return (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' });
     });
   }, [filteredUsers]);
+
+  const getMuteLabel = (u) => {
+    if (!u.isMuted) return null;
+    if (u.mutedUntil) {
+      const diffMs = new Date(u.mutedUntil).getTime() - Date.now();
+      if (diffMs > 0) {
+        const mins = Math.ceil(diffMs / 60000);
+        return `🔇 Muted (${mins}m)`;
+      }
+      return '🔇 Muted (Expiring)';
+    }
+    return '🔇 Muted';
+  };
 
   // Render Real Platform, Battery & Connection Metadata Badge
   const renderRosterDeviceBadge = (u) => {
@@ -698,6 +726,35 @@ const ChatRoster = memo(function ChatRoster({
         </div>
       </div>
 
+      {isCurrentUserCreator && currentUserRole !== 'host' && onReclaimHost && (
+        <div style={{ padding: '8px 14px 0' }}>
+          <button
+            type="button"
+            onClick={onReclaimHost}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 193, 7, 0.15)',
+              border: '1px solid rgba(255, 193, 7, 0.35)',
+              color: '#ffc107',
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+            }}
+            title="As the original room creator, you can restore host ownership at any time."
+          >
+            <Icon icon="solar:crown-star-bold" width="16" height="16" />
+            <span>Reclaim Room Host Privileges</span>
+          </button>
+        </div>
+      )}
+
       {/* Real-time Search Filter Bar */}
       <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(134, 150, 160, 0.12)' }}>
         <div
@@ -933,9 +990,9 @@ const ChatRoster = memo(function ChatRoster({
                                           padding: '1px 5px',
                                           borderRadius: '6px',
                                         }}
-                                        title="Muted by host"
+                                        title={u.mutedUntil ? `Muted until ${new Date(u.mutedUntil).toLocaleTimeString()}` : "Muted by host"}
                                       >
-                                        🔇 Muted
+                                        {getMuteLabel(u)}
                                       </span>
                                     )}
                                     {u.isBanned && (
@@ -1214,8 +1271,9 @@ const ChatRoster = memo(function ChatRoster({
                                           padding: '0 4px',
                                           borderRadius: '4px',
                                         }}
+                                        title={u.mutedUntil ? `Muted until ${new Date(u.mutedUntil).toLocaleTimeString()}` : "Muted by host"}
                                       >
-                                        🔇 Muted
+                                        {getMuteLabel(u)}
                                       </span>
                                     )}
                                     {u.isBanned && (
@@ -1289,6 +1347,139 @@ const ChatRoster = memo(function ChatRoster({
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Group 3 - BANNED PARTICIPANTS (Host/Admin Moderation View) */}
+            {bannedUsers.length > 0 && (currentUserRole === 'host' || currentUserRole === 'admin') && (
+              <div style={{ marginTop: '4px' }}>
+                <div
+                  onClick={() => setShowBannedGroup(!showBannedGroup)}
+                  style={{
+                    padding: '6px 16px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#ef4444',
+                    letterSpacing: '0.5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    borderRadius: '8px',
+                    margin: '0 8px 4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon icon="solar:shield-cross-bold-duotone" width="16" height="16" style={{ color: '#ef4444' }} />
+                    <span>BANNED PARTICIPANTS ({bannedUsers.length})</span>
+                  </div>
+
+                  <motion.div
+                    animate={{ rotate: showBannedGroup ? 0 : -90 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                    style={{ display: 'flex', alignItems: 'center' }}
+                  >
+                    <Icon icon="lucide:chevron-down" width="16" height="16" />
+                  </motion.div>
+                </div>
+
+                <AnimatePresence>
+                  {showBannedGroup && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <motion.div variants={activeContainerVariants} initial="hidden" animate="show">
+                        {bannedUsers.map((u) => {
+                          return (
+                            <motion.div
+                              key={u.id || u.nickname}
+                              variants={itemVariants}
+                              onClick={() => setInspectingNickname(u.nickname)}
+                              className="roster-item-card"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '8px 16px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid rgba(239, 68, 68, 0.12)',
+                                backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                  color: '#ef4444',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '0.85rem',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {getInitials(u.nickname)}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#f87171', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    @{u.nickname}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: '0.64rem',
+                                      fontWeight: 700,
+                                      backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                                      color: '#ef4444',
+                                      padding: '1px 6px',
+                                      borderRadius: '6px',
+                                    }}
+                                  >
+                                    ⛔ Banned
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: '#8696a0', marginTop: '2px' }}>
+                                  Permanently excluded from room
+                                </div>
+                              </div>
+                              {onUnbanUser && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onUnbanUser(u.nickname);
+                                  }}
+                                  style={{
+                                    backgroundColor: 'rgba(0, 168, 132, 0.15)',
+                                    color: '#00a884',
+                                    border: '1px solid rgba(0, 168, 132, 0.35)',
+                                    borderRadius: '6px',
+                                    padding: '4px 8px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                  }}
+                                  title={`Unban @${u.nickname}`}
+                                >
+                                  Unban
+                                </button>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1602,82 +1793,102 @@ const ChatRoster = memo(function ChatRoster({
             </div>
 
             {/* Direct Whisper / Message Input */}
-            {inspectingUser.nickname !== nickname && onSendDirectMessage && (
-              isCurrentUserMuted ? (
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    fontSize: '0.74rem',
-                    color: '#f87171',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    marginTop: '2px',
-                  }}
-                >
-                  <Icon icon="solar:muted-bold-duotone" width="14" height="14" style={{ flexShrink: 0 }} />
-                  <span>You have been muted by the host and cannot send direct whispers.</span>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <input
-                      type="text"
-                      placeholder={`Whisper to @${inspectingUser.nickname}${inspectingUser.isOnline ? '' : ' (Offline)'}...`}
-                      value={whisperMessage}
-                      onChange={(e) => setWhisperMessage(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && whisperMessage.trim()) {
-                          onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
-                          setWhisperMessage('');
-                          setInspectingNickname(null);
-                        }
-                      }}
-                      style={{
-                        flex: 1,
-                        backgroundColor: '#111b21',
-                        border: '1px solid rgba(134, 150, 160, 0.25)',
-                        borderRadius: '8px',
-                        padding: '8px 10px',
-                        color: '#e9edef',
-                        fontSize: '0.78rem',
-                        outline: 'none',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      disabled={!whisperMessage.trim()}
-                      onClick={() => {
-                        if (whisperMessage.trim()) {
-                          onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
-                          setWhisperMessage('');
-                          setInspectingNickname(null);
-                        }
-                      }}
-                      style={{
-                        backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
-                        color: whisperMessage.trim() ? '#111b21' : '#8696a0',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        fontWeight: 700,
-                        fontSize: '0.78rem',
-                        cursor: whisperMessage.trim() ? 'pointer' : 'default',
-                      }}
-                    >
-                      Whisper
-                    </button>
+            {inspectingUser.isBanned ? (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  fontSize: '0.78rem',
+                  color: '#f87171',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '4px',
+                }}
+              >
+                <Icon icon="solar:shield-cross-bold-duotone" width="18" height="18" style={{ flexShrink: 0 }} />
+                <span>This participant is permanently banned from this room. Direct messaging and calls are disabled.</span>
+              </div>
+            ) : (
+              inspectingUser.nickname !== nickname && onSendDirectMessage && (
+                isCurrentUserMuted ? (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      fontSize: '0.74rem',
+                      color: '#f87171',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginTop: '2px',
+                    }}
+                  >
+                    <Icon icon="solar:muted-bold-duotone" width="14" height="14" style={{ flexShrink: 0 }} />
+                    <span>You have been muted by the host and cannot send direct whispers.</span>
                   </div>
-                  {!inspectingUser.isOnline && (
-                    <div style={{ fontSize: '0.68rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '2px' }}>
-                      <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" style={{ color: '#00a884' }} />
-                      <span>Participant is offline. Direct whisper will be stored and delivered to their chat.</span>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder={`Whisper to @${inspectingUser.nickname}${inspectingUser.isOnline ? '' : ' (Offline)'}...`}
+                        value={whisperMessage}
+                        onChange={(e) => setWhisperMessage(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && whisperMessage.trim()) {
+                            onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                            setWhisperMessage('');
+                            setInspectingNickname(null);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#111b21',
+                          border: '1px solid rgba(134, 150, 160, 0.25)',
+                          borderRadius: '8px',
+                          padding: '8px 10px',
+                          color: '#e9edef',
+                          fontSize: '0.78rem',
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!whisperMessage.trim()}
+                        onClick={() => {
+                          if (whisperMessage.trim()) {
+                            onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                            setWhisperMessage('');
+                            setInspectingNickname(null);
+                          }
+                        }}
+                        style={{
+                          backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
+                          color: whisperMessage.trim() ? '#111b21' : '#8696a0',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          cursor: whisperMessage.trim() ? 'pointer' : 'default',
+                        }}
+                      >
+                        Whisper
+                      </button>
                     </div>
-                  )}
-                </div>
+                    {!inspectingUser.isOnline && (
+                      <div style={{ fontSize: '0.68rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '2px' }}>
+                        <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" style={{ color: '#00a884' }} />
+                        <span>Participant is offline. Direct whisper will be stored and delivered to their chat.</span>
+                      </div>
+                    )}
+                  </div>
+                )
               )
             )}
 
@@ -1701,81 +1912,55 @@ const ChatRoster = memo(function ChatRoster({
                 <div style={{ fontSize: '0.72rem', fontWeight: 800, color: currentUserRole === 'host' ? '#ffc107' : '#60a5fa', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <span>{currentUserRole === 'host' ? '👑 HOST CONTROLS' : '🛡️ ADMIN MODERATION'}</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+
+                {inspectingUser.isBanned ? (
                   <button
                     type="button"
                     onClick={() => {
-                      if (onMuteUser) {
-                        onMuteUser(inspectingUser.nickname, !inspectingUser.isMuted);
-                      }
+                      if (onUnbanUser) onUnbanUser(inspectingUser.nickname);
+                      setInspectingNickname(null);
                     }}
                     style={{
-                      backgroundColor: inspectingUser.isMuted ? 'rgba(0, 168, 132, 0.2)' : 'rgba(239, 68, 68, 0.15)',
-                      color: inspectingUser.isMuted ? '#00a884' : '#ef4444',
-                      border: `1px solid ${inspectingUser.isMuted ? 'rgba(0, 168, 132, 0.4)' : 'rgba(239, 68, 68, 0.35)'}`,
-                      borderRadius: '8px',
-                      padding: '7px 10px',
-                      fontSize: '0.78rem',
+                      width: '100%',
+                      backgroundColor: 'rgba(0, 168, 132, 0.2)',
+                      color: '#00a884',
+                      border: '1px solid rgba(0, 168, 132, 0.4)',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      fontSize: '0.84rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
+                      gap: '8px',
                     }}
                   >
-                    <Icon icon={inspectingUser.isMuted ? "solar:volume-loud-bold-duotone" : "solar:muted-bold-duotone"} width="15" height="15" />
-                    <span>{inspectingUser.isMuted ? 'Unmute' : 'Mute'}</span>
+                    <Icon icon="solar:shield-check-bold-duotone" width="18" height="18" />
+                    <span>Unban Participant & Allow Rejoining</span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionModal({
-                        type: 'confirm',
-                        title: 'Kick Participant',
-                        message: `Are you sure you want to kick @${inspectingUser.nickname} from this room? They will be disconnected immediately.`,
-                        icon: 'solar:user-cross-bold-duotone',
-                        iconColor: '#ef4444',
-                        confirmLabel: 'Kick User',
-                        confirmColor: '#ef4444',
-                        onConfirm: () => {
-                          if (onKickUser) onKickUser(inspectingUser.nickname);
-                          setInspectingNickname(null);
-                          setActionModal(null);
-                        },
-                      });
-                    }}
-                    style={{
-                      backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                      color: '#ef4444',
-                      border: '1px solid rgba(239, 68, 68, 0.4)',
-                      borderRadius: '8px',
-                      padding: '7px 10px',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Icon icon="solar:user-cross-bold-duotone" width="15" height="15" />
-                    <span>Kick User</span>
-                  </button>
-
-                  {/* Permanent Ban / Unban */}
-                  {inspectingUser.isBanned ? (
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                     <button
                       type="button"
                       onClick={() => {
-                        if (onUnbanUser) onUnbanUser(inspectingUser.nickname);
+                        if (inspectingUser.isMuted) {
+                          if (onMuteUser) onMuteUser(inspectingUser.nickname, false);
+                        } else {
+                          setActionModal({
+                            type: 'mute_options',
+                            title: `Mute @${inspectingUser.nickname}`,
+                            message: `Select mute duration for @${inspectingUser.nickname}. Muted participants cannot send messages or place calls.`,
+                            targetNick: inspectingUser.nickname,
+                            icon: 'solar:muted-bold-duotone',
+                            iconColor: '#ef4444',
+                          });
+                        }
                       }}
                       style={{
-                        backgroundColor: 'rgba(0, 168, 132, 0.2)',
-                        color: '#00a884',
-                        border: '1px solid rgba(0, 168, 132, 0.4)',
+                        backgroundColor: inspectingUser.isMuted ? 'rgba(0, 168, 132, 0.2)' : 'rgba(239, 68, 68, 0.15)',
+                        color: inspectingUser.isMuted ? '#00a884' : '#ef4444',
+                        border: `1px solid ${inspectingUser.isMuted ? 'rgba(0, 168, 132, 0.4)' : 'rgba(239, 68, 68, 0.35)'}`,
                         borderRadius: '8px',
                         padding: '7px 10px',
                         fontSize: '0.78rem',
@@ -1787,10 +1972,47 @@ const ChatRoster = memo(function ChatRoster({
                         gap: '6px',
                       }}
                     >
-                      <Icon icon="solar:shield-check-bold-duotone" width="15" height="15" />
-                      <span>Unban User</span>
+                      <Icon icon={inspectingUser.isMuted ? "solar:volume-loud-bold-duotone" : "solar:muted-bold-duotone"} width="15" height="15" />
+                      <span>{inspectingUser.isMuted ? 'Unmute' : 'Mute'}</span>
                     </button>
-                  ) : (
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionModal({
+                          type: 'confirm',
+                          title: 'Kick Participant',
+                          message: `Are you sure you want to kick @${inspectingUser.nickname} from this room? They will be disconnected immediately.`,
+                          icon: 'solar:user-cross-bold-duotone',
+                          iconColor: '#ef4444',
+                          confirmLabel: 'Kick User',
+                          confirmColor: '#ef4444',
+                          onConfirm: () => {
+                            if (onKickUser) onKickUser(inspectingUser.nickname);
+                            setInspectingNickname(null);
+                            setActionModal(null);
+                          },
+                        });
+                      }}
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '8px',
+                        padding: '7px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Icon icon="solar:user-cross-bold-duotone" width="15" height="15" />
+                      <span>Kick User</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -1829,126 +2051,130 @@ const ChatRoster = memo(function ChatRoster({
                       <Icon icon="solar:shield-cross-bold-duotone" width="15" height="15" />
                       <span>Ban User</span>
                     </button>
-                  )}
 
-                  {/* Promote / Demote (Host Only) */}
-                  {currentUserRole === 'host' && (
-                    inspectingUser.role === 'admin' ? (
+                    {/* Promote / Demote (Host Only) */}
+                    {currentUserRole === 'host' && (
+                      inspectingUser.role === 'admin' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionModal({
+                              type: 'confirm',
+                              title: 'Demote Administrator',
+                              message: `Demote @${inspectingUser.nickname} back to standard Member privileges?`,
+                              icon: 'solar:user-down-bold-duotone',
+                              iconColor: '#ffc107',
+                              confirmLabel: 'Demote',
+                              confirmColor: '#ffc107',
+                              onConfirm: () => {
+                                if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'member');
+                                setActionModal(null);
+                              },
+                            });
+                          }}
+                          style={{
+                            backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                            color: '#ffc107',
+                            border: '1px solid rgba(255, 193, 7, 0.35)',
+                            borderRadius: '8px',
+                            padding: '7px 10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <Icon icon="solar:user-down-bold-duotone" width="15" height="15" />
+                          <span>Demote Member</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionModal({
+                              type: 'confirm',
+                              title: 'Promote to Admin',
+                              message: `Promote @${inspectingUser.nickname} to Room Administrator with moderation permissions?`,
+                              icon: 'solar:star-bold-duotone',
+                              iconColor: '#60a5fa',
+                              confirmLabel: 'Promote Admin',
+                              confirmColor: '#3b82f6',
+                              onConfirm: () => {
+                                if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'admin');
+                                setActionModal(null);
+                              },
+                            });
+                          }}
+                          style={{
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            color: '#60a5fa',
+                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                            borderRadius: '8px',
+                            padding: '7px 10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <Icon icon="solar:star-bold-duotone" width="15" height="15" />
+                          <span>Promote Admin</span>
+                        </button>
+                      )
+                    )}
+
+                    {/* Transfer Host (Host Only) - Protected: Target must be online */}
+                    {currentUserRole === 'host' && (
                       <button
                         type="button"
+                        disabled={!inspectingUser.isOnline}
                         onClick={() => {
+                          if (!inspectingUser.isOnline) return;
                           setActionModal({
                             type: 'confirm',
-                            title: 'Demote Administrator',
-                            message: `Demote @${inspectingUser.nickname} back to standard Member privileges?`,
-                            icon: 'solar:user-down-bold-duotone',
-                            iconColor: '#ffc107',
-                            confirmLabel: 'Demote',
-                            confirmColor: '#ffc107',
+                            title: 'Transfer Room Ownership',
+                            message: `👑 Are you sure you want to transfer HOST status to @${inspectingUser.nickname}? You will step down to an administrator and cannot undo this without their consent.`,
+                            icon: 'solar:crown-bold-duotone',
+                            iconColor: '#facc15',
+                            confirmLabel: 'Transfer Ownership',
+                            confirmColor: '#eab308',
                             onConfirm: () => {
-                              if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'member');
+                              if (onTransferHost) onTransferHost(inspectingUser.nickname);
+                              setInspectingNickname(null);
                               setActionModal(null);
                             },
                           });
                         }}
                         style={{
-                          backgroundColor: 'rgba(255, 193, 7, 0.15)',
-                          color: '#ffc107',
-                          border: '1px solid rgba(255, 193, 7, 0.35)',
+                          gridColumn: 'span 2',
+                          backgroundColor: inspectingUser.isOnline ? 'rgba(234, 179, 8, 0.2)' : 'rgba(134, 150, 160, 0.1)',
+                          color: inspectingUser.isOnline ? '#facc15' : '#8696a0',
+                          border: `1px solid ${inspectingUser.isOnline ? 'rgba(234, 179, 8, 0.4)' : 'rgba(134, 150, 160, 0.2)'}`,
                           borderRadius: '8px',
                           padding: '7px 10px',
                           fontSize: '0.78rem',
                           fontWeight: 700,
-                          cursor: 'pointer',
+                          cursor: inspectingUser.isOnline ? 'pointer' : 'not-allowed',
+                          opacity: inspectingUser.isOnline ? 1 : 0.6,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
                         }}
+                        title={inspectingUser.isOnline ? 'Transfer room ownership' : 'Participant must be online to transfer host'}
                       >
-                        <Icon icon="solar:user-down-bold-duotone" width="15" height="15" />
-                        <span>Demote Member</span>
+                        <Icon icon="solar:crown-bold-duotone" width="15" height="15" />
+                        <span>Transfer Room Host</span>
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActionModal({
-                            type: 'confirm',
-                            title: 'Promote to Admin',
-                            message: `Promote @${inspectingUser.nickname} to Room Administrator with moderation permissions?`,
-                            icon: 'solar:star-bold-duotone',
-                            iconColor: '#60a5fa',
-                            confirmLabel: 'Promote Admin',
-                            confirmColor: '#3b82f6',
-                            onConfirm: () => {
-                              if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'admin');
-                              setActionModal(null);
-                            },
-                          });
-                        }}
-                        style={{
-                          backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                          color: '#60a5fa',
-                          border: '1px solid rgba(59, 130, 246, 0.4)',
-                          borderRadius: '8px',
-                          padding: '7px 10px',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <Icon icon="solar:star-bold-duotone" width="15" height="15" />
-                        <span>Promote Admin</span>
-                      </button>
-                    )
-                  )}
-
-                  {/* Transfer Host (Host Only) */}
-                  {currentUserRole === 'host' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionModal({
-                          type: 'confirm',
-                          title: 'Transfer Room Ownership',
-                          message: `👑 Are you sure you want to transfer HOST status to @${inspectingUser.nickname}? You will step down to an administrator and cannot undo this without their consent.`,
-                          icon: 'solar:crown-bold-duotone',
-                          iconColor: '#facc15',
-                          confirmLabel: 'Transfer Ownership',
-                          confirmColor: '#eab308',
-                          onConfirm: () => {
-                            if (onTransferHost) onTransferHost(inspectingUser.nickname);
-                            setInspectingNickname(null);
-                            setActionModal(null);
-                          },
-                        });
-                      }}
-                      style={{
-                        gridColumn: 'span 2',
-                        backgroundColor: 'rgba(234, 179, 8, 0.2)',
-                        color: '#facc15',
-                        border: '1px solid rgba(234, 179, 8, 0.4)',
-                        borderRadius: '8px',
-                        padding: '7px 10px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <Icon icon="solar:crown-bold-duotone" width="15" height="15" />
-                      <span>Transfer Room Host</span>
-                    </button>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2089,47 +2315,141 @@ const ChatRoster = memo(function ChatRoster({
               />
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-              <button
-                type="button"
-                onClick={() => setActionModal(null)}
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                  color: '#aebac1',
-                  border: '1px solid rgba(134, 150, 160, 0.2)',
-                  borderRadius: '10px',
-                  padding: '8px 14px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (actionModal.type === 'prompt') {
-                    actionModal.onConfirm(actionInputValue);
-                  } else {
-                    actionModal.onConfirm();
-                  }
-                }}
-                style={{
-                  backgroundColor: actionModal.confirmColor || '#00a884',
-                  color: '#111b21',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '8px 16px',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
-                }}
-              >
-                {actionModal.confirmLabel || 'Confirm'}
-              </button>
-            </div>
+            {actionModal.type === 'mute_options' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMuteUser) onMuteUser(actionModal.targetNick, true, 5);
+                    setActionModal(null);
+                  }}
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>⏱️ Mute for 5 Minutes</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Quick Timeout</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMuteUser) onMuteUser(actionModal.targetNick, true, 60);
+                    setActionModal(null);
+                  }}
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>⏳ Mute for 1 Hour</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Extended</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMuteUser) onMuteUser(actionModal.targetNick, true);
+                    setActionModal(null);
+                  }}
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.5)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>🔇 Mute Indefinitely</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Permanent</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  style={{
+                    marginTop: '4px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                    color: '#aebac1',
+                    border: '1px solid rgba(134, 150, 160, 0.2)',
+                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActionModal(null)}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                    color: '#aebac1',
+                    border: '1px solid rgba(134, 150, 160, 0.2)',
+                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (actionModal.type === 'prompt') {
+                      actionModal.onConfirm(actionInputValue);
+                    } else {
+                      actionModal.onConfirm();
+                    }
+                  }}
+                  style={{
+                    backgroundColor: actionModal.confirmColor || '#00a884',
+                    color: '#111b21',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '8px 16px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+                  }}
+                >
+                  {actionModal.confirmLabel || 'Confirm'}
+                </button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

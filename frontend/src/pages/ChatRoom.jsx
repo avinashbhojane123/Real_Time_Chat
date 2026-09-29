@@ -112,7 +112,9 @@ export default function ChatRoom() {
     handleSendDirectMessage,
     handleUpdateAvatar,
     handleLeaveRoom,
+    handleReclaimHost,
     currentUserRole,
+    isCurrentUserCreator,
     isCurrentUserMuted,
     isCurrentUserBanned,
   } = useChatSocket({ nickname, passcode, baseUrl });
@@ -780,6 +782,8 @@ export default function ChatRoom() {
         setInputText={setInputText}
         onStartCall={webRTC.startCall}
         currentUserRole={currentUserRole}
+        isCurrentUserCreator={isCurrentUserCreator}
+        onReclaimHost={handleReclaimHost}
         isCurrentUserMuted={isCurrentUserMuted}
         onKickUser={handleKickUser}
         onBanUser={handleBanUser}

@@ -24,6 +24,8 @@
 
 /* Hover Elevation & Glow Effects (Animation #4) */
 .roster-item-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 58px;
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, box-shadow 0.2s ease;
 }
 

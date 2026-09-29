@@ -137,4 +137,15 @@ export class User {
     nullable: true,
   })
   sessionToken!: string | null;
+
+  @Column({
+    default: false,
+  })
+  isCreator!: boolean;
+
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+  })
+  mutedUntil!: Date | null;
 }

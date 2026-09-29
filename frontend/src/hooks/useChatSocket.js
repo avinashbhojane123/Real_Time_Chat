@@ -59,6 +59,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   }, [passcode]);
 
   const socketRef = useRef(null);
+  const isTerminatedByHostRef = useRef(false);
   const typingTimeoutRef = useRef(null);
   const typingTimersRef = useRef({});
 
@@ -127,7 +128,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('disconnect', (reason) => {
       console.warn('[Socket] Disconnected from server. Reason:', reason);
       setIsSocketConnected(false);
-      if (reason === 'io server disconnect') {
+      if (reason === 'io server disconnect' && !isTerminatedByHostRef.current) {
         socket.connect();
       }
     });
@@ -138,7 +139,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     // Periodic heartbeat to keep reverse proxies alive and monitor smoothed real-time latency (8s interval)
     const pingInterval = setInterval(() => {
-      if (socket.connected) {
+      if (socket.connected && !isTerminatedByHostRef.current) {
         const pingStart = performance.now();
         socket.emit('clientPing', { clientTime: Date.now() }, () => {
           updateLatency(performance.now() - pingStart);
@@ -149,6 +150,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     // Instant Device Wake-Up & Screen Unlock Handler
     // Ensures 0-delay instant reconnection the moment a user unlocks their phone or focuses the tab
     const handleDeviceWakeUp = () => {
+      if (isTerminatedByHostRef.current) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         const s = socketRef.current;
         if (s) {
@@ -185,7 +187,22 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     // Chat History Event Listeners
     socket.on('chatHistory', (history) => {
-      setMessages(history || []);
+      const msgs = history || [];
+      setMessages(msgs);
+      if (nickname) {
+        const myNick = nickname.trim().toLowerCase();
+        const unreadWhispers = msgs.filter(
+          (m) =>
+            m.isDirect &&
+            m.targetNickname &&
+            m.targetNickname.trim().toLowerCase() === myNick &&
+            (!m.readBy || !m.readBy.some((r) => isSameNick(r, myNick)))
+        );
+        if (unreadWhispers.length > 0) {
+          const senders = Array.from(new Set(unreadWhispers.map((m) => m.nickname))).slice(0, 3);
+          showToast(`📬 You have ${unreadWhispers.length} unread whisper(s) from @${senders.join(', @')}`);
+        }
+      }
     });
 
     socket.on('roomHistory', (history) => {
@@ -356,16 +373,28 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
 
     socket.on('kickedFromRoom', ({ reason, kickedBy }) => {
+      isTerminatedByHostRef.current = true;
       setKickedInfo({ reason: reason || 'Removed by host', kickedBy: kickedBy || 'Host' });
       showToast('⚠️ You have been removed from the room.');
+      try {
+        socket.disconnect();
+      } catch (err) {
+        // ignore
+      }
     });
 
     socket.on('sessionReplaced', ({ message }) => {
+      isTerminatedByHostRef.current = true;
       showToast(message || 'Your session has been resumed in another tab');
       setKickedInfo({
         reason: message || 'Your session has been resumed in another connection.',
         kickedBy: 'System',
       });
+      try {
+        socket.disconnect();
+      } catch (err) {
+        // ignore
+      }
     });
 
     socket.on('directMessage', (dm) => {
@@ -957,15 +986,22 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
   };
 
-  const handleMuteUser = (targetNickname, isMuted) => {
+  const handleMuteUser = (targetNickname, isMuted, durationMinutes = undefined) => {
     if (!socketRef.current || !targetNickname) return;
     socketRef.current.emit('muteUser', {
       passcode,
       targetNickname,
       isMuted,
+      durationMinutes,
     }, (res) => {
       if (res && !res.success) {
         showToast(res.message || 'Failed to update mute state');
+      } else if (res && res.success && isMuted) {
+        showToast(
+          durationMinutes
+            ? `🔇 Muted @${targetNickname} for ${durationMinutes} minute(s)`
+            : `🔇 Permanently muted @${targetNickname}`
+        );
       }
     });
   };
@@ -1069,6 +1105,17 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     } catch (e) {}
   };
 
+  const handleReclaimHost = () => {
+    if (!socketRef.current || !passcode) return;
+    socketRef.current.emit('reclaimHost', { passcode }, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to reclaim room host');
+      } else if (res && res.success) {
+        showToast('👑 You have successfully reclaimed room host privileges!');
+      }
+    });
+  };
+
   const currentUserObj = users.find(
     (u) =>
       typeof u.nickname === 'string' &&
@@ -1076,6 +1123,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       u.nickname.trim().toLowerCase() === nickname.trim().toLowerCase()
   );
   const currentUserRole = currentUserObj?.role || 'member';
+  const isCurrentUserCreator = Boolean(currentUserObj?.isCreator);
   const isCurrentUserMuted = Boolean(currentUserObj?.isMuted);
   const isCurrentUserBanned = Boolean(currentUserObj?.isBanned);
 
@@ -1123,7 +1171,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     handleSendDirectMessage,
     handleUpdateAvatar,
     handleLeaveRoom,
+    handleReclaimHost,
     currentUserRole,
+    isCurrentUserCreator,
     isCurrentUserMuted,
     isCurrentUserBanned,
   };
