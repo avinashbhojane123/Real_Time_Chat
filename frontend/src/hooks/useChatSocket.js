@@ -226,10 +226,15 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       setUsers(userList || []);
     });
 
+    const isSameNick = (n1, n2) =>
+      typeof n1 === 'string' &&
+      typeof n2 === 'string' &&
+      n1.trim().toLowerCase() === n2.trim().toLowerCase();
+
     socket.on('userOnline', ({ nickname: onlineUser }) => {
       if (onlineUser) {
         setUsers((prev) =>
-          prev.map((u) => (u.nickname && u.nickname.toLowerCase() === onlineUser.toLowerCase() ? { ...u, isOnline: true, lastSeen: null } : u))
+          prev.map((u) => (isSameNick(u.nickname, onlineUser) ? { ...u, isOnline: true, lastSeen: null } : u))
         );
       }
     });
@@ -238,10 +243,39 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       if (offlineUser) {
         setUsers((prev) =>
           prev.map((u) =>
-            u.nickname && u.nickname.toLowerCase() === offlineUser.toLowerCase()
+            isSameNick(u.nickname, offlineUser)
               ? { ...u, isOnline: false, lastSeen: offlineTime || new Date() }
               : u
           )
+        );
+      }
+    });
+
+    socket.on('userJoined', (payload) => {
+      const joinedNick = typeof payload === 'string' ? payload : payload?.nickname || payload?.user?.nickname;
+      const joinedUserObj = payload?.user;
+      if (joinedNick) {
+        setUsers((prev) => {
+          const exists = prev.some((u) => isSameNick(u.nickname, joinedNick));
+          if (exists) {
+            return prev.map((u) =>
+              isSameNick(u.nickname, joinedNick)
+                ? { ...u, isOnline: true, ...(joinedUserObj || {}) }
+                : u
+            );
+          }
+          if (joinedUserObj) {
+            return [...prev, { ...joinedUserObj, isOnline: true }];
+          }
+          return [...prev, { nickname: joinedNick, isOnline: true, role: 'member' }];
+        });
+      }
+    });
+
+    socket.on('userLeft', ({ nickname: leftNick }) => {
+      if (leftNick) {
+        setUsers((prev) =>
+          prev.map((u) => (isSameNick(u.nickname, leftNick) ? { ...u, isOnline: false } : u))
         );
       }
     });
@@ -250,7 +284,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       if (updatedNick) {
         setUsers((prev) =>
           prev.map((u) =>
-            u.nickname && u.nickname.toLowerCase() === updatedNick.toLowerCase()
+            isSameNick(u.nickname, updatedNick)
               ? {
                   ...u,
                   ...(batteryLabel !== undefined ? { batteryLabel } : {}),
@@ -268,39 +302,31 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       showToast(message ? `❌ ${message}` : '❌ Whisper could not be delivered.');
     });
 
-    socket.on('userJoined', () => {
-      // Backend automatically broadcasts updated 'usersList' to all room members upon join
-    });
-
-    socket.on('userLeft', () => {
-      // Backend automatically broadcasts updated 'usersList' to all room members upon leave
-    });
-
     socket.on('userKicked', ({ targetNickname, kickedBy }) => {
       showToast(`⚠️ ${targetNickname} was removed from the room by ${kickedBy}`);
       setUsers((prev) =>
-        prev.map((u) => (u.nickname === targetNickname ? { ...u, isOnline: false } : u))
+        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, isOnline: false } : u))
       );
     });
 
     socket.on('userBanned', ({ targetNickname, bannedBy }) => {
       showToast(`⛔ ${targetNickname} was permanently banned by ${bannedBy}`);
       setUsers((prev) =>
-        prev.map((u) => (u.nickname === targetNickname ? { ...u, isBanned: true, isOnline: false } : u))
+        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, isBanned: true, isOnline: false } : u))
       );
     });
 
     socket.on('userUnbanned', ({ targetNickname, unbannedBy }) => {
       showToast(`✅ ${targetNickname} was unbanned by ${unbannedBy}`);
       setUsers((prev) =>
-        prev.map((u) => (u.nickname === targetNickname ? { ...u, isBanned: false } : u))
+        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, isBanned: false } : u))
       );
     });
 
     socket.on('userPromoted', ({ targetNickname, role, promotedBy }) => {
       showToast(`⭐ ${targetNickname} is now ${role} (by ${promotedBy})`);
       setUsers((prev) =>
-        prev.map((u) => (u.nickname === targetNickname ? { ...u, role } : u))
+        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, role } : u))
       );
     });
 
@@ -312,7 +338,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         setUsers((prev) =>
           prev.map((u) => ({
             ...u,
-            role: u.nickname === nextHost ? 'host' : u.nickname === prevHost ? 'member' : u.role,
+            role: isSameNick(u.nickname, nextHost) ? 'host' : isSameNick(u.nickname, prevHost) ? 'member' : u.role,
           }))
         );
       }
@@ -320,9 +346,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     socket.on('userMuteToggled', ({ targetNickname, isMuted, mutedBy }) => {
       setUsers((prev) =>
-        prev.map((u) => (u.nickname === targetNickname ? { ...u, isMuted } : u))
+        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, isMuted } : u))
       );
-      if (targetNickname === nickname) {
+      if (isSameNick(targetNickname, nickname)) {
         showToast(isMuted ? '🔇 You were muted by the room host.' : '🔊 You were unmuted by the room host.');
       } else {
         showToast(`${targetNickname} was ${isMuted ? 'muted' : 'unmuted'} by ${mutedBy}`);
@@ -706,12 +732,11 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   };
 
   const handleDeleteMessage = (msgId) => {
-    if (window.confirm('Are you sure you want to delete this message?')) {
-      socketRef.current?.emit('deleteMessage', {
-        passcode,
-        messageId: msgId,
-      });
-    }
+    if (!msgId) return;
+    socketRef.current?.emit('deleteMessage', {
+      passcode,
+      messageId: msgId,
+    });
   };
 
   const handleClearHistory = () => {
@@ -958,6 +983,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     }, (res) => {
       if (res && !res.success) {
         showToast(res.message || 'Failed to send direct message');
+      } else if (res && res.isOfflineDelivery) {
+        showToast(`📬 Direct message saved. It will be delivered to @${targetNickname} when they return.`);
       }
     });
   };
@@ -1035,7 +1062,19 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     showToast('✨ Avatar updated!');
   };
 
-  const currentUserObj = users.find((u) => u.nickname === nickname);
+  const handleLeaveRoom = () => {
+    if (!socketRef.current || !passcode) return;
+    try {
+      socketRef.current.emit('leaveRoom', { passcode });
+    } catch (e) {}
+  };
+
+  const currentUserObj = users.find(
+    (u) =>
+      typeof u.nickname === 'string' &&
+      typeof nickname === 'string' &&
+      u.nickname.trim().toLowerCase() === nickname.trim().toLowerCase()
+  );
   const currentUserRole = currentUserObj?.role || 'member';
   const isCurrentUserMuted = Boolean(currentUserObj?.isMuted);
   const isCurrentUserBanned = Boolean(currentUserObj?.isBanned);
@@ -1083,6 +1122,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     handleMuteUser,
     handleSendDirectMessage,
     handleUpdateAvatar,
+    handleLeaveRoom,
     currentUserRole,
     isCurrentUserMuted,
     isCurrentUserBanned,

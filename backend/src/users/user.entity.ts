@@ -14,6 +14,8 @@ import { Room } from '../rooms/room.entity';
 
 @Unique(['roomId', 'nickname'])
 @Index(['roomId', 'nickname'])
+@Index(['roomId', 'isOnline'])
+@Index(['roomId', 'lastSeen'])
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn()

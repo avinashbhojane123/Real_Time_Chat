@@ -16,6 +16,14 @@ const listContainerVariants = {
   },
 };
 
+const listContainerVariantsInstant = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { duration: 0.15 },
+  },
+};
+
 const itemVariants = {
   hidden: { opacity: 0, y: 8, scale: 0.98 },
   show: {
@@ -34,6 +42,59 @@ const getInitials = (name) => {
   }
   return name.slice(0, 2).toUpperCase();
 };
+
+// Real Team Activity Meter: Measures temporal message distribution in session (Memoized to isolate message updates from participant roster)
+const TeamActivityMeter = memo(function TeamActivityMeter({ messages = [] }) {
+  const totalMsgs = messages.length;
+  const activityBars = useMemo(() => {
+    if (!messages || messages.length === 0) {
+      return Array(10).fill(12);
+    }
+    const now = Date.now();
+    const windowMs = 30 * 60 * 1000;
+    const buckets = Array(10).fill(0);
+    const sliceCount = Math.min(messages.length, 120);
+    const recent = messages.slice(-sliceCount);
+    for (const m of recent) {
+      const t = m.createdAt ? new Date(m.createdAt).getTime() : now;
+      const diff = now - t;
+      if (diff >= 0 && diff < windowMs) {
+        const bucketIdx = 9 - Math.min(9, Math.floor((diff / windowMs) * 10));
+        buckets[bucketIdx]++;
+      }
+    }
+    const maxVal = Math.max(1, ...buckets);
+    return buckets.map((count) => Math.max(12, Math.round((count / maxVal) * 100)));
+  }, [messages]);
+
+  return (
+    <div className="uupm-activity-meter-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#00a884', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Icon icon="solar:chart-square-bold-duotone" width="14" height="14" />
+          <span>TEAM ACTIVITY METER</span>
+        </div>
+        <div style={{ fontSize: '0.68rem', color: '#8696a0', fontWeight: 600 }}>
+          {totalMsgs} msgs in session
+        </div>
+      </div>
+
+      {/* 10 Animated Motion Activity Bars */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', height: '36px', gap: '4px' }}>
+        {activityBars.map((heightPct, idx) => (
+          <motion.div
+            key={idx}
+            initial={{ height: 0 }}
+            animate={{ height: `${heightPct}%` }}
+            transition={{ duration: 0.6, delay: idx * 0.04, ease: 'easeOut' }}
+            className="uupm-activity-bar"
+            title={`Slot ${idx + 1}: ${Math.round((heightPct / 100) * 12)} msgs`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+});
 
 const ChatRoster = memo(function ChatRoster({
   isMobileDevice,
@@ -73,9 +134,36 @@ const ChatRoster = memo(function ChatRoster({
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarErrors, setAvatarErrors] = useState({});
-  const [inspectingUser, setInspectingUser] = useState(null);
+  const [inspectingNickname, setInspectingNickname] = useState(null);
   const [copiedHandle, setCopiedHandle] = useState(false);
   const [whisperMessage, setWhisperMessage] = useState('');
+  const [actionModal, setActionModal] = useState(null);
+  const [actionInputValue, setActionInputValue] = useState('');
+
+  // Live derivation ensures inspectingUser never holds stale data
+  const inspectingUser = useMemo(() => {
+    if (!inspectingNickname) return null;
+    return users.find((u) => (u.nickname || '').toLowerCase() === inspectingNickname.toLowerCase()) || null;
+  }, [users, inspectingNickname]);
+
+  // Framer motion performance optimization: disable stagger on mobile or when list is large
+  const activeContainerVariants = useMemo(() => {
+    return (!isMobileDevice && users.length <= 40) ? listContainerVariants : listContainerVariantsInstant;
+  }, [isMobileDevice, users.length]);
+
+  // Participants who sent a direct whisper to me
+  const whisperSenders = useMemo(() => {
+    const map = new Map();
+    if (!messages || !nickname) return map;
+    const myNick = nickname.trim().toLowerCase();
+    for (const m of messages) {
+      if (m.isDirect && m.targetNickname && m.targetNickname.trim().toLowerCase() === myNick) {
+        const sender = (m.nickname || '').trim().toLowerCase();
+        map.set(sender, (map.get(sender) || 0) + 1);
+      }
+    }
+    return map;
+  }, [messages, nickname]);
 
   const handleAvatarError = (nick) => {
     setAvatarErrors((prev) => ({ ...prev, [nick]: true }));
@@ -141,29 +229,6 @@ const ChatRoster = memo(function ChatRoster({
       return (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' });
     });
   }, [filteredUsers]);
-
-  // Real Team Activity Meter: Measures temporal message distribution in session
-  const totalMsgs = messages.length;
-  const activityBars = useMemo(() => {
-    if (!messages || messages.length === 0) {
-      return Array(10).fill(12);
-    }
-    const now = Date.now();
-    const windowMs = 30 * 60 * 1000;
-    const buckets = Array(10).fill(0);
-    const sliceCount = Math.min(messages.length, 120);
-    const recent = messages.slice(-sliceCount);
-    for (const m of recent) {
-      const t = m.createdAt ? new Date(m.createdAt).getTime() : now;
-      const diff = now - t;
-      if (diff >= 0 && diff < windowMs) {
-        const bucketIdx = 9 - Math.min(9, Math.floor((diff / windowMs) * 10));
-        buckets[bucketIdx]++;
-      }
-    }
-    const maxVal = Math.max(1, ...buckets);
-    return buckets.map((count) => Math.max(12, Math.round((count / maxVal) * 100)));
-  }, [messages]);
 
   // Render Real Platform, Battery & Connection Metadata Badge
   const renderRosterDeviceBadge = (u) => {
@@ -576,9 +641,19 @@ const ChatRoster = memo(function ChatRoster({
               whileTap={{ scale: 0.9 }}
               type="button"
               onClick={() => {
-                if (window.confirm('🧹 Clean up inactive participants who have not been active for 7+ days? (Host and admins are preserved)')) {
-                  onClearInactiveUsers(7);
-                }
+                setActionModal({
+                  type: 'confirm',
+                  title: 'Clean Inactive Participants',
+                  message: 'Clean up participants who have not been active in this room for 7+ days? Host and room admins are permanently preserved.',
+                  icon: 'solar:trash-bin-trash-bold-duotone',
+                  iconColor: '#ef4444',
+                  confirmLabel: 'Clean Inactive',
+                  confirmColor: '#ef4444',
+                  onConfirm: () => {
+                    onClearInactiveUsers(7);
+                    setActionModal(null);
+                  },
+                });
               }}
               style={{
                 background: 'rgba(239, 68, 68, 0.12)',
@@ -738,7 +813,7 @@ const ChatRoster = memo(function ChatRoster({
                     style={{ overflow: 'hidden' }}
                   >
                     <motion.div
-                      variants={listContainerVariants}
+                      variants={activeContainerVariants}
                       initial="hidden"
                       animate="show"
                     >
@@ -755,11 +830,11 @@ const ChatRoster = memo(function ChatRoster({
 
                           return (
                             <motion.div
-                              key={u.nickname || idx}
+                              key={u.id || u.nickname || idx}
                               variants={itemVariants}
                               layout
                               whileTap={{ scale: 0.98 }}
-                              onClick={() => setInspectingUser(u)}
+                              onClick={() => setInspectingNickname(u.nickname)}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -880,6 +955,25 @@ const ChatRoster = memo(function ChatRoster({
                                         title="Permanently banned"
                                       >
                                         ⛔ Banned
+                                      </span>
+                                    )}
+                                    {whisperSenders.has((u.nickname || '').toLowerCase()) && (
+                                      <span
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontSize: '0.64rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(0, 168, 132, 0.16)',
+                                          color: '#00a884',
+                                          border: '1px solid rgba(0, 168, 132, 0.35)',
+                                          padding: '1px 5px',
+                                          borderRadius: '6px',
+                                        }}
+                                        title={`${whisperSenders.get((u.nickname || '').toLowerCase())} whisper message(s) received`}
+                                      >
+                                        💬 Whisper
                                       </span>
                                     )}
                                   </div>
@@ -1031,7 +1125,7 @@ const ChatRoster = memo(function ChatRoster({
                     style={{ overflow: 'hidden' }}
                   >
                     <motion.div
-                      variants={listContainerVariants}
+                      variants={activeContainerVariants}
                       initial="hidden"
                       animate="show"
                     >
@@ -1044,11 +1138,11 @@ const ChatRoster = memo(function ChatRoster({
                           const presence = formatUserPresence(u.isOnline, u.lastSeen);
                           return (
                             <motion.div
-                              key={u.nickname || idx}
+                              key={u.id || u.nickname || idx}
                               variants={itemVariants}
                               layout
                               whileTap={{ scale: 0.98 }}
-                              onClick={() => setInspectingUser(u)}
+                              onClick={() => setInspectingNickname(u.nickname)}
                               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                               style={{
                                 display: 'flex',
@@ -1140,6 +1234,22 @@ const ChatRoster = memo(function ChatRoster({
                                         ⛔ Banned
                                       </span>
                                     )}
+                                    {whisperSenders.has((u.nickname || '').toLowerCase()) && (
+                                      <span
+                                        style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 700,
+                                          backgroundColor: 'rgba(0, 168, 132, 0.16)',
+                                          color: '#00a884',
+                                          border: '1px solid rgba(0, 168, 132, 0.35)',
+                                          padding: '0 4px',
+                                          borderRadius: '4px',
+                                        }}
+                                        title={`${whisperSenders.get((u.nickname || '').toLowerCase())} whisper message(s) received`}
+                                      >
+                                        💬 Whisper
+                                      </span>
+                                    )}
                                   </div>
                                   <button
                                     type="button"
@@ -1184,31 +1294,7 @@ const ChatRoster = memo(function ChatRoster({
       </div>
 
       {/* uupm.cc Feature #4: Team Activity Heat Meter (Glassmorphic Hourly Bar Chart) */}
-      <div className="uupm-activity-meter-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#00a884', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Icon icon="solar:chart-square-bold-duotone" width="14" height="14" />
-            <span>TEAM ACTIVITY METER</span>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#8696a0', fontWeight: 600 }}>
-            {totalMsgs} msgs in session
-          </div>
-        </div>
-
-        {/* 10 Animated Motion Activity Bars */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', height: '36px', gap: '4px' }}>
-          {activityBars.map((heightPct, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ height: 0 }}
-              animate={{ height: `${heightPct}%` }}
-              transition={{ duration: 0.6, delay: idx * 0.04, ease: 'easeOut' }}
-              className="uupm-activity-bar"
-              title={`Slot ${idx + 1}: ${Math.round((heightPct / 100) * 12)} msgs`}
-            />
-          ))}
-        </div>
-      </div>
+      <TeamActivityMeter messages={messages} />
 
       {/* Encrypted Session Badge Footer */}
       <div className="e2ee-footer-badge">
@@ -1232,7 +1318,7 @@ const ChatRoster = memo(function ChatRoster({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={() => setInspectingUser(null)}
+          onClick={() => setInspectingNickname(null)}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1271,7 +1357,7 @@ const ChatRoster = memo(function ChatRoster({
               </div>
               <button
                 type="button"
-                onClick={() => setInspectingUser(null)}
+                onClick={() => setInspectingNickname(null)}
                 style={{ background: 'none', border: 'none', color: '#8696a0', cursor: 'pointer', padding: 0 }}
               >
                 <Icon icon="solar:close-circle-bold-duotone" width="22" height="22" />
@@ -1328,21 +1414,46 @@ const ChatRoster = memo(function ChatRoster({
                 <div style={{ fontSize: '0.78rem', color: inspectingUser.isOnline ? '#00a884' : '#8696a0', fontWeight: 600, marginTop: '2px' }}>
                   {formatUserPresence(inspectingUser.isOnline, inspectingUser.lastSeen).text}
                 </div>
+                {whisperSenders.has((inspectingUser.nickname || '').toLowerCase()) && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      backgroundColor: 'rgba(0, 168, 132, 0.14)',
+                      color: '#00a884',
+                      border: '1px solid rgba(0, 168, 132, 0.3)',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <Icon icon="solar:chat-round-line-bold" width="12" height="12" />
+                    <span>{whisperSenders.get((inspectingUser.nickname || '').toLowerCase())} whisper(s) received</span>
+                  </div>
+                )}
                 {inspectingUser.nickname === nickname && onUpdateAvatar && (
                   <button
                     type="button"
                     onClick={() => {
                       const currentUrl = inspectingUser.avatarUrl || '';
-                      const newUrl = window.prompt(
-                        'Enter new Avatar Image URL (or leave empty to reset to initials):',
-                        currentUrl
-                      );
-                      if (newUrl !== null) {
-                        onUpdateAvatar(newUrl.trim());
-                        setInspectingUser((prev) =>
-                          prev ? { ...prev, avatarUrl: newUrl.trim() } : null
-                        );
-                      }
+                      setActionInputValue(currentUrl);
+                      setActionModal({
+                        type: 'prompt',
+                        title: 'Update Profile Avatar',
+                        message: 'Enter an image URL for your profile avatar, or leave empty to use your initials:',
+                        placeholder: 'https://example.com/avatar.jpg',
+                        icon: 'solar:camera-bold-duotone',
+                        iconColor: '#00a884',
+                        confirmLabel: 'Save Avatar',
+                        confirmColor: '#00a884',
+                        onConfirm: (val) => {
+                          onUpdateAvatar((val || '').trim());
+                          setActionModal(null);
+                        },
+                      });
                     }}
                     style={{
                       marginTop: '6px',
@@ -1372,7 +1483,7 @@ const ChatRoster = memo(function ChatRoster({
                 type="button"
                 onClick={() => {
                   handleMention(inspectingUser);
-                  setInspectingUser(null);
+                  setInspectingNickname(null);
                 }}
                 style={{
                   backgroundColor: 'rgba(0, 168, 132, 0.15)',
@@ -1434,7 +1545,7 @@ const ChatRoster = memo(function ChatRoster({
                       onClick={() => {
                         if (!canCall) return;
                         onStartCall({ isVoiceOnly: true, targetNickname: inspectingUser.nickname });
-                        setInspectingUser(null);
+                        setInspectingNickname(null);
                       }}
                       style={{
                         backgroundColor: canCall ? 'rgba(0, 168, 132, 0.2)' : 'rgba(134, 150, 160, 0.1)',
@@ -1463,7 +1574,7 @@ const ChatRoster = memo(function ChatRoster({
                       onClick={() => {
                         if (!canCall) return;
                         onStartCall({ isVoiceOnly: false, targetNickname: inspectingUser.nickname });
-                        setInspectingUser(null);
+                        setInspectingNickname(null);
                       }}
                       style={{
                         backgroundColor: canCall ? 'rgba(0, 112, 243, 0.2)' : 'rgba(134, 150, 160, 0.1)',
@@ -1510,72 +1621,62 @@ const ChatRoster = memo(function ChatRoster({
                   <Icon icon="solar:muted-bold-duotone" width="14" height="14" style={{ flexShrink: 0 }} />
                   <span>You have been muted by the host and cannot send direct whispers.</span>
                 </div>
-              ) : inspectingUser.isOnline ? (
-                <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
-                  <input
-                    type="text"
-                    placeholder={`Whisper to @${inspectingUser.nickname}...`}
-                    value={whisperMessage}
-                    onChange={(e) => setWhisperMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && whisperMessage.trim()) {
-                        onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
-                        setWhisperMessage('');
-                        setInspectingUser(null);
-                      }
-                    }}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#111b21',
-                      border: '1px solid rgba(134, 150, 160, 0.25)',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      color: '#e9edef',
-                      fontSize: '0.78rem',
-                      outline: 'none',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!whisperMessage.trim()}
-                    onClick={() => {
-                      if (whisperMessage.trim()) {
-                        onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
-                        setWhisperMessage('');
-                        setInspectingUser(null);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
-                      color: whisperMessage.trim() ? '#111b21' : '#8696a0',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      fontSize: '0.78rem',
-                      cursor: whisperMessage.trim() ? 'pointer' : 'default',
-                    }}
-                  >
-                    Whisper
-                  </button>
-                </div>
               ) : (
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(134, 150, 160, 0.15)',
-                    fontSize: '0.74rem',
-                    color: '#8696a0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    marginTop: '2px',
-                  }}
-                >
-                  <Icon icon="solar:clock-circle-bold-duotone" width="14" height="14" style={{ flexShrink: 0, color: '#8696a0' }} />
-                  <span>Participant is currently offline. Direct whispers require an active connection.</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder={`Whisper to @${inspectingUser.nickname}${inspectingUser.isOnline ? '' : ' (Offline)'}...`}
+                      value={whisperMessage}
+                      onChange={(e) => setWhisperMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && whisperMessage.trim()) {
+                          onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                          setWhisperMessage('');
+                          setInspectingNickname(null);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        backgroundColor: '#111b21',
+                        border: '1px solid rgba(134, 150, 160, 0.25)',
+                        borderRadius: '8px',
+                        padding: '8px 10px',
+                        color: '#e9edef',
+                        fontSize: '0.78rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!whisperMessage.trim()}
+                      onClick={() => {
+                        if (whisperMessage.trim()) {
+                          onSendDirectMessage(inspectingUser.nickname, whisperMessage.trim());
+                          setWhisperMessage('');
+                          setInspectingNickname(null);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: whisperMessage.trim() ? '#00a884' : 'rgba(255,255,255,0.06)',
+                        color: whisperMessage.trim() ? '#111b21' : '#8696a0',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: whisperMessage.trim() ? 'pointer' : 'default',
+                      }}
+                    >
+                      Whisper
+                    </button>
+                  </div>
+                  {!inspectingUser.isOnline && (
+                    <div style={{ fontSize: '0.68rem', color: '#8696a0', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '2px' }}>
+                      <Icon icon="solar:clock-circle-bold-duotone" width="12" height="12" style={{ color: '#00a884' }} />
+                      <span>Participant is offline. Direct whisper will be stored and delivered to their chat.</span>
+                    </div>
+                  )}
                 </div>
               )
             )}
@@ -1606,7 +1707,6 @@ const ChatRoster = memo(function ChatRoster({
                     onClick={() => {
                       if (onMuteUser) {
                         onMuteUser(inspectingUser.nickname, !inspectingUser.isMuted);
-                        setInspectingUser((prev) => prev ? ({ ...prev, isMuted: !prev.isMuted }) : null);
                       }
                     }}
                     style={{
@@ -1631,10 +1731,20 @@ const ChatRoster = memo(function ChatRoster({
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`Are you sure you want to kick ${inspectingUser.nickname} from this room?`)) {
-                        if (onKickUser) onKickUser(inspectingUser.nickname);
-                        setInspectingUser(null);
-                      }
+                      setActionModal({
+                        type: 'confirm',
+                        title: 'Kick Participant',
+                        message: `Are you sure you want to kick @${inspectingUser.nickname} from this room? They will be disconnected immediately.`,
+                        icon: 'solar:user-cross-bold-duotone',
+                        iconColor: '#ef4444',
+                        confirmLabel: 'Kick User',
+                        confirmColor: '#ef4444',
+                        onConfirm: () => {
+                          if (onKickUser) onKickUser(inspectingUser.nickname);
+                          setInspectingNickname(null);
+                          setActionModal(null);
+                        },
+                      });
                     }}
                     style={{
                       backgroundColor: 'rgba(239, 68, 68, 0.2)',
@@ -1661,7 +1771,6 @@ const ChatRoster = memo(function ChatRoster({
                       type="button"
                       onClick={() => {
                         if (onUnbanUser) onUnbanUser(inspectingUser.nickname);
-                        setInspectingUser((prev) => prev ? ({ ...prev, isBanned: false }) : null);
                       }}
                       style={{
                         backgroundColor: 'rgba(0, 168, 132, 0.2)',
@@ -1685,11 +1794,22 @@ const ChatRoster = memo(function ChatRoster({
                     <button
                       type="button"
                       onClick={() => {
-                        const reason = window.prompt(`Enter ban reason for ${inspectingUser.nickname}:`, 'Violating room rules');
-                        if (reason !== null) {
-                          if (onBanUser) onBanUser(inspectingUser.nickname, reason || 'Violating room rules');
-                          setInspectingUser(null);
-                        }
+                        setActionInputValue('Violating room rules');
+                        setActionModal({
+                          type: 'prompt',
+                          title: 'Ban Participant',
+                          message: `Specify a reason for permanently banning @${inspectingUser.nickname} from rejoining:`,
+                          placeholder: 'Enter ban reason...',
+                          icon: 'solar:shield-cross-bold-duotone',
+                          iconColor: '#ef4444',
+                          confirmLabel: 'Ban User',
+                          confirmColor: '#ef4444',
+                          onConfirm: (reason) => {
+                            if (onBanUser) onBanUser(inspectingUser.nickname, (reason || '').trim() || 'Violating room rules');
+                            setInspectingNickname(null);
+                            setActionModal(null);
+                          },
+                        });
                       }}
                       style={{
                         backgroundColor: 'rgba(239, 68, 68, 0.25)',
@@ -1717,10 +1837,19 @@ const ChatRoster = memo(function ChatRoster({
                       <button
                         type="button"
                         onClick={() => {
-                          if (window.confirm(`Demote ${inspectingUser.nickname} to standard Member?`)) {
-                            if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'member');
-                            setInspectingUser((prev) => prev ? ({ ...prev, role: 'member' }) : null);
-                          }
+                          setActionModal({
+                            type: 'confirm',
+                            title: 'Demote Administrator',
+                            message: `Demote @${inspectingUser.nickname} back to standard Member privileges?`,
+                            icon: 'solar:user-down-bold-duotone',
+                            iconColor: '#ffc107',
+                            confirmLabel: 'Demote',
+                            confirmColor: '#ffc107',
+                            onConfirm: () => {
+                              if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'member');
+                              setActionModal(null);
+                            },
+                          });
                         }}
                         style={{
                           backgroundColor: 'rgba(255, 193, 7, 0.15)',
@@ -1744,10 +1873,19 @@ const ChatRoster = memo(function ChatRoster({
                       <button
                         type="button"
                         onClick={() => {
-                          if (window.confirm(`Promote ${inspectingUser.nickname} to Room Admin?`)) {
-                            if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'admin');
-                            setInspectingUser((prev) => prev ? ({ ...prev, role: 'admin' }) : null);
-                          }
+                          setActionModal({
+                            type: 'confirm',
+                            title: 'Promote to Admin',
+                            message: `Promote @${inspectingUser.nickname} to Room Administrator with moderation permissions?`,
+                            icon: 'solar:star-bold-duotone',
+                            iconColor: '#60a5fa',
+                            confirmLabel: 'Promote Admin',
+                            confirmColor: '#3b82f6',
+                            onConfirm: () => {
+                              if (onPromoteUser) onPromoteUser(inspectingUser.nickname, 'admin');
+                              setActionModal(null);
+                            },
+                          });
                         }}
                         style={{
                           backgroundColor: 'rgba(59, 130, 246, 0.2)',
@@ -1775,10 +1913,20 @@ const ChatRoster = memo(function ChatRoster({
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`⚠️ Are you sure you want to transfer HOST status to ${inspectingUser.nickname}? You will become an admin.`)) {
-                          if (onTransferHost) onTransferHost(inspectingUser.nickname);
-                          setInspectingUser(null);
-                        }
+                        setActionModal({
+                          type: 'confirm',
+                          title: 'Transfer Room Ownership',
+                          message: `👑 Are you sure you want to transfer HOST status to @${inspectingUser.nickname}? You will step down to an administrator and cannot undo this without their consent.`,
+                          icon: 'solar:crown-bold-duotone',
+                          iconColor: '#facc15',
+                          confirmLabel: 'Transfer Ownership',
+                          confirmColor: '#eab308',
+                          onConfirm: () => {
+                            if (onTransferHost) onTransferHost(inspectingUser.nickname);
+                            setInspectingNickname(null);
+                            setActionModal(null);
+                          },
+                        });
                       }}
                       style={{
                         gridColumn: 'span 2',
@@ -1841,6 +1989,146 @@ const ChatRoster = memo(function ChatRoster({
                   </span>
                 </div>
               </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* Non-Blocking Custom Confirmation & Prompt Modal (Zero thread freezing, zero WS timeout) */}
+    <AnimatePresence>
+      {actionModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setActionModal(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(11, 20, 26, 0.85)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9, y: 15 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.9, y: 15 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#1f2c34',
+              borderRadius: '16px',
+              padding: '22px',
+              maxWidth: '380px',
+              width: '100%',
+              border: `1px solid ${actionModal.confirmColor ? `${actionModal.confirmColor}44` : 'rgba(0, 168, 132, 0.3)'}`,
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {actionModal.icon && (
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    backgroundColor: actionModal.iconColor ? `${actionModal.iconColor}22` : 'rgba(0, 168, 132, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: actionModal.iconColor || '#00a884',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon icon={actionModal.icon} width="20" height="20" />
+                </div>
+              )}
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: '#e9edef' }}>
+                {actionModal.title}
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.82rem', color: '#aebac1', lineHeight: '1.45' }}>
+              {actionModal.message}
+            </div>
+
+            {actionModal.type === 'prompt' && (
+              <input
+                type="text"
+                autoFocus
+                placeholder={actionModal.placeholder || 'Enter value...'}
+                value={actionInputValue}
+                onChange={(e) => setActionInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    actionModal.onConfirm(actionInputValue);
+                  } else if (e.key === 'Escape') {
+                    setActionModal(null);
+                  }
+                }}
+                style={{
+                  backgroundColor: '#111b21',
+                  border: '1px solid rgba(134, 150, 160, 0.3)',
+                  borderRadius: '10px',
+                  padding: '9px 12px',
+                  color: '#e9edef',
+                  fontSize: '0.84rem',
+                  outline: 'none',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                }}
+              />
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setActionModal(null)}
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                  color: '#aebac1',
+                  border: '1px solid rgba(134, 150, 160, 0.2)',
+                  borderRadius: '10px',
+                  padding: '8px 14px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (actionModal.type === 'prompt') {
+                    actionModal.onConfirm(actionInputValue);
+                  } else {
+                    actionModal.onConfirm();
+                  }
+                }}
+                style={{
+                  backgroundColor: actionModal.confirmColor || '#00a884',
+                  color: '#111b21',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '8px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+                }}
+              >
+                {actionModal.confirmLabel || 'Confirm'}
+              </button>
             </div>
           </motion.div>
         </motion.div>

@@ -386,21 +386,36 @@ export class ChatGateway
 
   private async getFormattedUsersList(roomPasscode: string, roomId: number) {
     const cleanPass = roomPasscode.trim();
+    const activeSockets = Array.from(this.users.values()).filter(
+      (s) => s.passcode === cleanPass,
+    );
     const activeNicknames = new Set(
-      Array.from(this.users.values())
-        .filter((s) => s.passcode === cleanPass)
-        .map((s) => s.nickname.toLowerCase()),
+      activeSockets.map((s) => s.nickname.toLowerCase()),
     );
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const roomUsers = await this.userRepo
+    const activeNicksList = Array.from(activeNicknames);
+
+    const query = this.userRepo
       .createQueryBuilder('user')
-      .where('user.roomId = :roomId', { roomId })
-      .andWhere(
+      .where('user.roomId = :roomId', { roomId });
+
+    if (activeNicksList.length > 0) {
+      query.andWhere(
+        '(LOWER(user.nickname) IN (:...activeNicksList) OR user.isOnline = true OR user.lastSeen > :sevenDaysAgo OR (user.lastSeen IS NULL AND user.createdAt > :sevenDaysAgo))',
+        { activeNicksList, sevenDaysAgo },
+      );
+    } else {
+      query.andWhere(
         '(user.isOnline = true OR user.lastSeen > :sevenDaysAgo OR (user.lastSeen IS NULL AND user.createdAt > :sevenDaysAgo))',
         { sevenDaysAgo },
-      )
-      .orderBy('user.nickname', 'ASC')
+      );
+    }
+
+    const roomUsers = await query
+      .orderBy('user.isOnline', 'DESC')
+      .addOrderBy('user.lastSeen', 'DESC')
+      .take(150)
       .getMany();
 
     const relevant = roomUsers.filter((u) => {
@@ -632,16 +647,16 @@ export class ChatGateway
             const activeNicknames = new Set(
               Array.from(this.users.values())
                 .filter((s) => s.passcode === room.passcode)
-                .map((s) => s.nickname),
+                .map((s) => s.nickname.toLowerCase()),
             );
-            if (activeNicknames.size > 0 && !activeNicknames.has(user.nickname)) {
+            if (activeNicknames.size > 0 && !activeNicknames.has(user.nickname.toLowerCase())) {
               const onlineRoomUsers = await this.userRepo.find({
                 where: { roomId: room.id },
                 order: { createdAt: 'ASC' },
               });
               const candidate =
-                onlineRoomUsers.find((u) => activeNicknames.has(u.nickname) && u.role === 'admin' && !u.isMuted && !u.isBanned) ||
-                onlineRoomUsers.find((u) => activeNicknames.has(u.nickname) && u.nickname !== user.nickname && !u.isMuted && !u.isBanned);
+                onlineRoomUsers.find((u) => activeNicknames.has(u.nickname.toLowerCase()) && u.role === 'admin' && !u.isMuted && !u.isBanned) ||
+                onlineRoomUsers.find((u) => activeNicknames.has(u.nickname.toLowerCase()) && u.nickname.toLowerCase() !== user.nickname.toLowerCase() && !u.isMuted && !u.isBanned);
 
               if (candidate) {
                 user.role = 'member';
@@ -761,6 +776,133 @@ export class ChatGateway
       }, 60000);
       this.watchPartyCleanupTimers.set(userInfo.passcode, timer);
     }
+  }
+
+  @SubscribeMessage('leaveRoom')
+  async leaveRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data?: { passcode?: string },
+  ) {
+    const session = this.users.get(client.id);
+    if (!session) return { success: false };
+
+    const roomPasscode = (data?.passcode || session.passcode).trim();
+    const userKey = `${roomPasscode}:${session.nickname.trim()}`;
+    this.clearUserDisconnectDebounceTimer(userKey);
+
+    // End any active or pending call immediately without grace period
+    const activeCall = this.findCallBySocketId(client.id);
+    if (activeCall) {
+      if (activeCall.ringTimer) clearTimeout(activeCall.ringTimer);
+      this.clearCallDisconnectTimer(activeCall.callId);
+      this.activeCallSessions.delete(activeCall.callId);
+      const peerId =
+        activeCall.callerSocketId === client.id
+          ? activeCall.calleeSocketId
+          : activeCall.callerSocketId;
+      if (peerId) {
+        this.server.to(peerId).emit('callEnded', {
+          reason: 'Call ended: participant left the room.',
+          callId: activeCall.callId,
+        });
+      }
+    }
+
+    const room = await this.roomRepo.findOne({
+      where: { passcode: roomPasscode },
+    });
+
+    if (room) {
+      const user = await this.userRepo
+        .createQueryBuilder('user')
+        .where('user.roomId = :roomId AND LOWER(user.nickname) = LOWER(:nickname)', {
+          roomId: room.id,
+          nickname: session.nickname.trim(),
+        })
+        .getOne();
+
+      if (user) {
+        user.isOnline = false;
+        user.lastSeen = new Date();
+        await this.userRepo.save(user);
+
+        // Immediate host succession if host leaves
+        if (user.role === 'host') {
+          const activeNicknames = new Set(
+            Array.from(this.users.values())
+              .filter(
+                (s) =>
+                  s.passcode === room.passcode &&
+                  s.nickname.toLowerCase() !== user.nickname.toLowerCase(),
+              )
+              .map((s) => s.nickname.toLowerCase()),
+          );
+          if (activeNicknames.size > 0) {
+            const onlineRoomUsers = await this.userRepo.find({
+              where: { roomId: room.id },
+              order: { createdAt: 'ASC' },
+            });
+            const candidate =
+              onlineRoomUsers.find(
+                (u) =>
+                  activeNicknames.has(u.nickname.toLowerCase()) &&
+                  u.role === 'admin' &&
+                  !u.isMuted &&
+                  !u.isBanned,
+              ) ||
+              onlineRoomUsers.find(
+                (u) =>
+                  activeNicknames.has(u.nickname.toLowerCase()) &&
+                  u.nickname.toLowerCase() !== user.nickname.toLowerCase() &&
+                  !u.isMuted &&
+                  !u.isBanned,
+              );
+
+            if (candidate) {
+              user.role = 'member';
+              candidate.role = 'host';
+              await this.userRepo.save([user, candidate]);
+              for (const [id, sess] of this.users.entries()) {
+                if (sess.passcode === room.passcode) {
+                  if (sess.nickname.toLowerCase() === user.nickname.toLowerCase())
+                    sess.role = 'member';
+                  if (sess.nickname.toLowerCase() === candidate.nickname.toLowerCase())
+                    sess.role = 'host';
+                }
+              }
+              this.server.to(room.passcode).emit('hostChanged', {
+                newHostNickname: candidate.nickname,
+                newHost: candidate.nickname,
+                previousHostNickname: user.nickname,
+                previousHost: user.nickname,
+                reason: 'Host left the room',
+              });
+            }
+          }
+        }
+      }
+
+      this.users.delete(client.id);
+      client.leave(roomPasscode);
+
+      this.server.to(roomPasscode).emit('userStoppedTyping', {
+        nickname: session.nickname,
+      });
+      this.server.to(roomPasscode).emit('userStopTyping', {
+        nickname: session.nickname,
+      });
+      this.server.to(roomPasscode).emit('userOffline', {
+        nickname: session.nickname,
+        lastSeen: new Date(),
+      });
+      this.server.to(roomPasscode).emit('userLeft', {
+        nickname: session.nickname,
+      });
+
+      await this.broadcastUsersList(room.passcode, room.id);
+    }
+
+    return { success: true };
   }
 
   @SubscribeMessage('joinRoom')
@@ -1026,6 +1168,22 @@ export class ChatGateway
 
     this.server.to(room.passcode).emit('userJoined', {
       nickname: user.nickname,
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        role: user.role || 'member',
+        isOnline: true,
+        isMuted: Boolean(user.isMuted),
+        isBanned: Boolean(user.isBanned),
+        avatarUrl: user.avatarUrl,
+        deviceType: user.deviceType,
+        deviceModel: user.deviceModel,
+        browser: user.browser,
+        os: user.os,
+        networkLabel: user.networkLabel,
+        batteryLabel: user.batteryLabel,
+        batteryIsCharging: user.batteryIsCharging,
+      },
     });
 
     const now = new Date();
@@ -1065,21 +1223,15 @@ export class ChatGateway
       return { success: false, message: 'Rate limit exceeded' };
     }
 
-    let session = this.users.get(client.id);
+    const session = this.users.get(client.id);
     if (!session || session.passcode !== data.passcode) {
-      if (data.passcode) {
-        session = {
-          nickname: data.nickname || 'User',
-          passcode: data.passcode,
-        };
-        this.users.set(client.id, session);
-        client.join(data.passcode);
-      } else {
-        return {
-          success: false,
-          message: 'Unauthorized connection details',
-        };
-      }
+      client.emit('error', {
+        message: 'Unauthorized: Please join the room first',
+      });
+      return {
+        success: false,
+        message: 'Unauthorized: Please join the room first',
+      };
     }
 
     const room = await this.roomRepo.findOne({
@@ -1329,7 +1481,7 @@ export class ChatGateway
     data: TypingDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session) return;
+    if (!session || session.isMuted) return;
 
     const trimmedPasscode = (data.passcode || session.passcode).trim();
     client.to(trimmedPasscode).emit('userStoppedTyping', {
@@ -1352,7 +1504,7 @@ export class ChatGateway
       avatarUrl?: string;
     },
   ) {
-    if (!this.checkRateLimit(client, 8, 3000)) return;
+    if (!this.checkRateLimit(client, 4, 4000)) return;
     const session = this.users.get(client.id);
     if (!session) return;
     const passcode = (data.passcode || session.passcode || '').trim();
@@ -1369,17 +1521,29 @@ export class ChatGateway
     if (!user) return;
 
     let hasChanged = false;
-    if (data.batteryLabel !== undefined && data.batteryLabel !== user.batteryLabel) {
-      user.batteryLabel = data.batteryLabel;
-      hasChanged = true;
+    if (data.batteryLabel !== undefined) {
+      const cleanBat =
+        typeof data.batteryLabel === 'string'
+          ? data.batteryLabel.trim().slice(0, 30)
+          : null;
+      if (cleanBat !== user.batteryLabel) {
+        user.batteryLabel = cleanBat;
+        hasChanged = true;
+      }
     }
     if (typeof data.batteryIsCharging === 'boolean' && data.batteryIsCharging !== user.batteryIsCharging) {
       user.batteryIsCharging = data.batteryIsCharging;
       hasChanged = true;
     }
-    if (data.networkLabel !== undefined && data.networkLabel !== user.networkLabel) {
-      user.networkLabel = data.networkLabel;
-      hasChanged = true;
+    if (data.networkLabel !== undefined) {
+      const cleanNet =
+        typeof data.networkLabel === 'string'
+          ? data.networkLabel.trim().slice(0, 50)
+          : null;
+      if (cleanNet !== user.networkLabel) {
+        user.networkLabel = cleanNet;
+        hasChanged = true;
+      }
     }
     if (data.avatarUrl !== undefined) {
       const cleanAvatar = sanitizeAvatarUrl(data.avatarUrl);
@@ -1983,20 +2147,28 @@ export class ChatGateway
       return { success: false, message: 'Cannot whisper yourself' };
     }
 
-    const targets = this.findSocketsInRoom(data.passcode.trim(), data.targetNickname.trim());
-    if (!targets.length) {
+    const targetNickname = data.targetNickname.trim();
+    const targetUser = await this.userRepo
+      .createQueryBuilder('user')
+      .where('user.roomId = :roomId AND LOWER(user.nickname) = LOWER(:target)', {
+        roomId: room.id,
+        target: targetNickname,
+      })
+      .getOne();
+
+    if (!targetUser) {
       client.emit('directMessageError', {
-        targetNickname: data.targetNickname.trim(),
-        message: `@${data.targetNickname.trim()} is currently offline or away. Whisper was not delivered.`,
+        targetNickname,
+        message: `@${targetNickname} is not a member of this room.`,
       });
-      return { success: false, message: `${data.targetNickname} is currently offline` };
+      return { success: false, message: `Participant "${targetNickname}" not found in this room` };
     }
 
     const savedDirectMsg = await this.messageRepo.save(
       this.messageRepo.create({
         roomId: room.id,
         nickname: session.nickname,
-        targetNickname: data.targetNickname.trim(),
+        targetNickname: targetUser.nickname,
         message: data.message ? data.message.trim() : '',
         fileUrl: data.fileUrl ?? null,
         fileName: data.fileName ?? null,
@@ -2006,6 +2178,7 @@ export class ChatGateway
       }),
     );
 
+    const targets = this.findSocketsInRoom(data.passcode.trim(), targetUser.nickname);
     for (const t of targets) {
       this.server.to(t.socketId).emit('directMessage', savedDirectMsg);
     }
@@ -2014,7 +2187,11 @@ export class ChatGateway
       this.server.to(s.socketId).emit('directMessage', savedDirectMsg);
     }
 
-    return { success: true, message: savedDirectMsg };
+    return {
+      success: true,
+      message: savedDirectMsg,
+      isOfflineDelivery: targets.length === 0,
+    };
   }
 
   @SubscribeMessage('getUsers')
@@ -2069,14 +2246,20 @@ export class ChatGateway
     }
 
     // Resolve target socket (explicit socket ID, targeted nickname, or other participant in 2-person room)
-    const target = data.targetSocketId
-      ? { socketId: data.targetSocketId, nickname: data.targetNickname || 'Participant' }
-      : this.findSocketInRoom(room, data.targetNickname, client.id);
+    let target: { socketId: string; nickname: string } | undefined = undefined;
+    if (data.targetSocketId) {
+      const targetSession = this.users.get(data.targetSocketId);
+      if (targetSession && targetSession.passcode.trim() === room) {
+        target = { socketId: data.targetSocketId, nickname: targetSession.nickname };
+      }
+    } else {
+      target = this.findSocketInRoom(room, data.targetNickname, client.id);
+    }
 
-    // If target nickname was specified but no matching online user was found
-    if (data.targetNickname && !target) {
+    // If target was specified but no matching online user was found in this room
+    if ((data.targetNickname || data.targetSocketId) && !target) {
       client.emit('callError', {
-        message: `${data.targetNickname} is currently offline.`,
+        message: `${data.targetNickname || 'Participant'} is currently offline or unavailable.`,
       });
       return;
     }
@@ -2098,12 +2281,40 @@ export class ChatGateway
         return;
       }
       const targetActiveCall = this.findCallBySocketId(target.socketId);
-      if (targetActiveCall && targetActiveCall.state === 'active') {
-        client.emit('callBusy', {
-          nickname: target.nickname,
-          reason: 'User is currently on another call.',
-        });
-        return;
+      if (targetActiveCall) {
+        if (targetActiveCall.state === 'active') {
+          client.emit('callBusy', {
+            nickname: target.nickname,
+            reason: 'User is currently on another call.',
+          });
+          return;
+        }
+
+        // WebRTC Glare: Both participants initiated a call to each other simultaneously!
+        if (
+          targetActiveCall.state === 'calling' &&
+          targetActiveCall.callerSocketId === target.socketId &&
+          targetActiveCall.calleeSocketId === client.id
+        ) {
+          const myNick = session.nickname.toLowerCase();
+          const peerNick = target.nickname.toLowerCase();
+          if (myNick > peerNick) {
+            client.emit('callInfo', {
+              message: `${target.nickname} is already calling you.`,
+            });
+            return;
+          } else {
+            // Lexicographically smaller nickname becomes the caller; cancel peer's colliding pending session
+            if (targetActiveCall.ringTimer) clearTimeout(targetActiveCall.ringTimer);
+            this.activeCallSessions.delete(targetActiveCall.callId);
+          }
+        } else if (targetActiveCall.state === 'calling') {
+          client.emit('callBusy', {
+            nickname: target.nickname,
+            reason: 'User is currently placing or receiving another call.',
+          });
+          return;
+        }
       }
     }
 
@@ -2212,8 +2423,11 @@ export class ChatGateway
       this.server.to(callSession.callerSocketId).emit('callAccepted', acceptPayload);
       this.server.to(callSession.callerSocketId).emit('acceptCall', acceptPayload);
     } else if (data.targetSocketId) {
-      this.server.to(data.targetSocketId).emit('callAccepted', acceptPayload);
-      this.server.to(data.targetSocketId).emit('acceptCall', acceptPayload);
+      const targetSession = this.users.get(data.targetSocketId);
+      if (targetSession && targetSession.passcode.trim() === room) {
+        this.server.to(data.targetSocketId).emit('callAccepted', acceptPayload);
+        this.server.to(data.targetSocketId).emit('acceptCall', acceptPayload);
+      }
     }
     client.to(room).emit('callAccepted', acceptPayload);
     client.to(room).emit('acceptCall', acceptPayload);
@@ -2285,7 +2499,10 @@ export class ChatGateway
       (callSession && callSession.callerSocketId === client.id ? callSession.calleeSocketId : undefined);
 
     if (targetSocketId) {
-      this.server.to(targetSocketId).emit('webrtcOffer', offerPayload);
+      const targetSession = this.users.get(targetSocketId);
+      if (targetSession && targetSession.passcode.trim() === room) {
+        this.server.to(targetSocketId).emit('webrtcOffer', offerPayload);
+      }
     } else {
       client.to(room).emit('webrtcOffer', offerPayload);
     }
@@ -2319,11 +2536,14 @@ export class ChatGateway
       (callSession && callSession.calleeSocketId === client.id ? callSession.callerSocketId : undefined);
 
     if (targetSocketId) {
-      this.server.to(targetSocketId).emit('webrtcAnswer', answerPayload);
-      this.server.to(targetSocketId).emit('callAccepted', {
-        receiverName: data.receiverName || session.nickname,
-        from: session.nickname,
-      });
+      const targetSession = this.users.get(targetSocketId);
+      if (targetSession && targetSession.passcode.trim() === room) {
+        this.server.to(targetSocketId).emit('webrtcAnswer', answerPayload);
+        this.server.to(targetSocketId).emit('callAccepted', {
+          receiverName: data.receiverName || session.nickname,
+          from: session.nickname,
+        });
+      }
     } else {
       client.to(room).emit('webrtcAnswer', answerPayload);
       client.to(room).emit('callAccepted', {
@@ -2357,7 +2577,10 @@ export class ChatGateway
         : undefined);
 
     if (targetSocketId) {
-      this.server.to(targetSocketId).emit('webrtcCandidate', candidatePayload);
+      const targetSession = this.users.get(targetSocketId);
+      if (targetSession && targetSession.passcode.trim() === room) {
+        this.server.to(targetSocketId).emit('webrtcCandidate', candidatePayload);
+      }
     } else {
       client.to(room).emit('webrtcCandidate', candidatePayload);
     }
@@ -2640,7 +2863,10 @@ export class ChatGateway
     const user = await this.userRepo.findOne({
       where: { nickname: session.nickname, roomId: room.id },
     });
-    if (!user) return { success: false, message: 'User not verified in room' };
+    if (!user || (user.role !== 'host' && user.role !== 'admin')) {
+      client.emit('error', { message: 'Only room host or admin can clear history.' });
+      return { success: false, message: 'Only room host or admin can clear history.' };
+    }
 
     await this.messageRepo.delete({ roomId: room.id });
 
@@ -2649,7 +2875,7 @@ export class ChatGateway
     await this.roomRepo.save(room);
 
     console.log(
-      `[ClearHistory] Room ${targetPasscode} history cleared by user ${session.nickname}`,
+      `[ClearHistory] Room ${targetPasscode} history cleared by ${user.role} ${session.nickname}`,
     );
 
     this.server.to(targetPasscode).emit('historyCleared');
@@ -2672,6 +2898,14 @@ export class ChatGateway
       where: { passcode: targetPasscode },
     });
     if (!room) return { success: false, message: 'Room not found' };
+
+    const user = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!user || (user.role !== 'host' && user.role !== 'admin')) {
+      client.emit('error', { message: 'Only room host or admin can pin messages.' });
+      return { success: false, message: 'Only room host or admin can pin messages.' };
+    }
 
     let pinnedMsg: Message | null = null;
     if (data.messageId) {
@@ -2935,6 +3169,11 @@ export class ChatGateway
     const targetPasscode = (data.passcode || session?.passcode || '').trim();
     if (!session || !targetPasscode || session.passcode !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
+    }
+
+    if (session.isMuted) {
+      client.emit('error', { message: 'You have been muted by the host and cannot control the watch party.' });
+      return { success: false, message: 'You have been muted by the host and cannot control the watch party.' };
     }
 
     let state = this.watchPartyRooms.get(targetPasscode);
@@ -3316,6 +3555,13 @@ export class ChatGateway
       return;
     }
 
+    if (session.isMuted) {
+      client.emit('error', {
+        message: 'You are muted and cannot post watch party comments.',
+      });
+      return;
+    }
+
     this.server.to(targetPasscode).emit('watchPartyComment', {
       id: `${Date.now()}-${Math.random()}`,
       from: session.nickname,
@@ -3343,6 +3589,26 @@ export class ChatGateway
       return { success: false, message: 'Unauthorized session' };
     }
 
+    const room = await this.roomRepo.findOne({
+      where: { passcode: targetPasscode },
+    });
+    if (!room) {
+      return { success: false, message: 'Room not found' };
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { nickname: session.nickname, roomId: room.id },
+    });
+    if (!user || (user.role !== 'host' && user.role !== 'admin')) {
+      client.emit('error', {
+        message: 'Only room host or admin can update room wallpaper.',
+      });
+      return {
+        success: false,
+        message: 'Only room host or admin can update room wallpaper.',
+      };
+    }
+
     const currentCached = this.roomWallpapers.get(targetPasscode) || {
       theme: 'wa-doodle',
       customWallpaper: null,
@@ -3365,15 +3631,6 @@ export class ChatGateway
     this.roomWallpapers.set(targetPasscode, updatedState);
 
     try {
-      let room = await this.roomRepo.findOne({
-        where: { passcode: targetPasscode },
-      });
-      if (!room) {
-        room = this.roomRepo.create({
-          passcode: targetPasscode,
-          roomName: `Room-${targetPasscode}`,
-        });
-      }
       room.theme = newTheme;
       room.customWallpaper = newWallpaper;
       await this.roomRepo.save(room);

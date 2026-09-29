@@ -43,6 +43,7 @@ export default function StatusModal({
   const [showViewers, setShowViewers] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replySentToast, setReplySentToast] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const videoRef = useRef(null);
 
   // Creator state
@@ -553,19 +554,38 @@ export default function StatusModal({
                       <span>{(currentStatus?.viewers || currentStatus?.viewedBy || []).length} Views</span>
                     </button>
                     {onDeleteStatus && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm('Delete this status story?')) {
-                            onDeleteStatus(currentStatus.id);
-                            handleNextStory();
-                          }
-                        }}
-                        style={{ background: 'none', border: 'none', color: '#f15c6d', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
-                        <span>Delete</span>
-                      </button>
+                      showDeleteConfirm ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#f15c6d', fontWeight: 600 }}>Delete story?</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDeleteStatus(currentStatus.id);
+                              setShowDeleteConfirm(false);
+                              handleNextStory();
+                            }}
+                            style={{ background: 'rgba(239, 68, 68, 0.25)', border: '1px solid rgba(239, 68, 68, 0.5)', color: '#ef4444', fontWeight: 700, fontSize: '0.75rem', borderRadius: '6px', padding: '2px 8px', cursor: 'pointer' }}
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowDeleteConfirm(false)}
+                            style={{ background: 'rgba(255, 255, 255, 0.1)', border: 'none', color: '#8696a0', fontSize: '0.75rem', borderRadius: '6px', padding: '2px 8px', cursor: 'pointer' }}
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowDeleteConfirm(true)}
+                          style={{ background: 'none', border: 'none', color: '#f15c6d', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+                          <span>Delete</span>
+                        </button>
+                      )
                     )}
                   </div>
                 ) : (

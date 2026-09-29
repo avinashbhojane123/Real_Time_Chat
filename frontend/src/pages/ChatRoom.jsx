@@ -111,17 +111,23 @@ export default function ChatRoom() {
     handleMuteUser,
     handleSendDirectMessage,
     handleUpdateAvatar,
+    handleLeaveRoom,
     currentUserRole,
     isCurrentUserMuted,
     isCurrentUserBanned,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   // Recipient User & Presence Calculation
-  const otherUsers = (users || []).filter((u) => u.nickname !== nickname);
+  const otherUsers = (users || []).filter(
+    (u) =>
+      typeof u.nickname === 'string' &&
+      typeof nickname === 'string' &&
+      u.nickname.trim().toLowerCase() !== nickname.trim().toLowerCase()
+  );
   const otherOnlineUsers = otherUsers.filter((u) => u.isOnline);
   const recipientUser = otherUsers.length === 1 ? otherUsers[0] : (otherOnlineUsers.length > 0 ? otherOnlineUsers[0] : null);
   const isRecipientOnline = Boolean(recipientUser && recipientUser.isOnline);
-  const isGroupRoom = true; // All passcode sessions represent collaborative rooms
+  const isGroupRoom = otherUsers.length > 1; // 1-on-1 private view when 2 participants, group room when 3+!
 
   // WebRTC Video/Voice Call Hook
   const webRTC = useWebRTC({ socketRef, passcode, nickname, recipientUser, showToast });
@@ -139,13 +145,16 @@ export default function ChatRoom() {
     try {
       webRTC?.cleanUpCall?.();
     } catch (e) {}
+    try {
+      handleLeaveRoom?.();
+    } catch (e) {}
     terminateSession();
     sessionStorage.clear();
     localStorage.removeItem('passcode');
     localStorage.removeItem('nickname');
     localStorage.removeItem('avatarUrl');
     navigate('/', { replace: true });
-  }, [navigate, webRTC]);
+  }, [navigate, webRTC, handleLeaveRoom]);
 
   // Option A: Active Inactivity TTL Watcher & User Activity Listeners
   useEffect(() => {
