@@ -91,6 +91,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   useEffect(() => {
     if (!nickname || !passcode) return;
 
+    const socketUrl = getSocketBaseUrl(baseUrl);
     const socket = io(socketUrl, {
       transports: ['polling', 'websocket'],
       upgrade: true,
