@@ -43,6 +43,9 @@ const getInitials = (name) => {
   return name.slice(0, 2).toUpperCase();
 };
 
+const isSameNick = (a, b) =>
+  (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
 // Real Team Activity Meter: Measures temporal message distribution in session (Memoized to isolate message updates from participant roster)
 const TeamActivityMeter = memo(function TeamActivityMeter({ messages = [] }) {
   const totalMsgs = messages.length;
@@ -178,7 +181,7 @@ const ChatRoster = memo(function ChatRoster({
   };
 
   const handleMention = (u) => {
-    if (u.nickname === nickname) return;
+    if (isSameNick(u.nickname, nickname)) return;
     if (setInputText) {
       setInputText((prev) => {
         const mention = `@${u.nickname} `;
@@ -219,8 +222,8 @@ const ChatRoster = memo(function ChatRoster({
   const onlineUsers = useMemo(() => {
     const list = filteredUsers.filter((u) => u.isOnline);
     return list.sort((a, b) => {
-      if (a.nickname === nickname) return -1;
-      if (b.nickname === nickname) return 1;
+      if (isSameNick(a.nickname, nickname)) return -1;
+      if (isSameNick(b.nickname, nickname)) return 1;
       const prioA = rolePriority[a.role || 'member'] || 3;
       const prioB = rolePriority[b.role || 'member'] || 3;
       if (prioA !== prioB) return prioA - prioB;
@@ -887,7 +890,7 @@ const ChatRoster = memo(function ChatRoster({
                       ) : (
                         onlineUsers.map((u, idx) => {
                           const presence = formatUserPresence(u.isOnline, u.lastSeen);
-                          const isMe = u.nickname === nickname;
+                          const isMe = isSameNick(u.nickname, nickname);
                           const isTyping =
                             typingUsers &&
                             typingUsers.some(
@@ -1580,7 +1583,7 @@ const ChatRoster = memo(function ChatRoster({
                       width: '64px',
                       height: '64px',
                       borderRadius: '50%',
-                      backgroundColor: inspectingUser.nickname === nickname ? '#005c4b' : '#202c33',
+                      backgroundColor: isSameNick(inspectingUser.nickname, nickname) ? '#005c4b' : '#202c33',
                       color: inspectingUser.isOnline ? '#00a884' : '#8696a0',
                       display: 'flex',
                       alignItems: 'center',
@@ -1609,7 +1612,7 @@ const ChatRoster = memo(function ChatRoster({
 
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e9edef' }}>
-                  {inspectingUser.nickname} {inspectingUser.nickname === nickname && '(You)'}
+                  {inspectingUser.nickname} {isSameNick(inspectingUser.nickname, nickname) && '(You)'}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: inspectingUser.isOnline ? '#00a884' : '#8696a0', fontWeight: 600, marginTop: '2px' }}>
                   {formatUserPresence(inspectingUser.isOnline, inspectingUser.lastSeen).text}
@@ -1634,7 +1637,7 @@ const ChatRoster = memo(function ChatRoster({
                     <span>{whisperSenders.get((inspectingUser.nickname || '').toLowerCase())} whisper(s) received</span>
                   </div>
                 )}
-                {inspectingUser.nickname === nickname && onUpdateAvatar && (
+                {isSameNick(inspectingUser.nickname, nickname) && onUpdateAvatar && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1672,6 +1675,34 @@ const ChatRoster = memo(function ChatRoster({
                   >
                     <Icon icon="solar:camera-bold-duotone" width="13" height="13" />
                     <span>Change Avatar</span>
+                  </button>
+                )}
+                {isSameNick(inspectingUser.nickname, nickname) && isCurrentUserCreator && currentUserRole !== 'host' && onReclaimHost && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onReclaimHost();
+                      setInspectingNickname(null);
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      marginLeft: '6px',
+                      backgroundColor: 'rgba(255, 193, 7, 0.18)',
+                      color: '#ffc107',
+                      border: '1px solid rgba(255, 193, 7, 0.4)',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                    title="Reclaim host ownership as the original creator"
+                  >
+                    <Icon icon="solar:crown-star-bold" width="13" height="13" />
+                    <span>Reclaim Host</span>
                   </button>
                 )}
               </div>
@@ -1730,7 +1761,7 @@ const ChatRoster = memo(function ChatRoster({
                 <span>{copiedHandle ? 'Copied!' : 'Copy @'}</span>
               </button>
 
-              {inspectingUser.nickname !== nickname && inspectingUser.isOnline && onStartCall && (() => {
+              {!isSameNick(inspectingUser.nickname, nickname) && inspectingUser.isOnline && onStartCall && (() => {
                 const canCall = !isCurrentUserMuted && !inspectingUser.isMuted;
                 const callDisabledReason = isCurrentUserMuted
                   ? 'You are muted by the host and cannot place calls'
@@ -1821,7 +1852,7 @@ const ChatRoster = memo(function ChatRoster({
                 <span>This participant is permanently banned from this room. Direct messaging and calls are disabled.</span>
               </div>
             ) : (
-              inspectingUser.nickname !== nickname && onSendDirectMessage && (
+              !isSameNick(inspectingUser.nickname, nickname) && onSendDirectMessage && (
                 isCurrentUserMuted ? (
                   <div
                     style={{
@@ -1901,8 +1932,29 @@ const ChatRoster = memo(function ChatRoster({
               )
             )}
 
-            {/* Host / Admin Moderation Controls */}
-            {inspectingUser.nickname !== nickname && (
+            {/* Creator Immunity Notice */}
+            {inspectingUser.isCreator && !isSameNick(inspectingUser.nickname, nickname) && (
+              <div
+                style={{
+                  marginTop: '4px',
+                  padding: '8px 12px',
+                  backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(168, 85, 247, 0.25)',
+                  fontSize: '0.74rem',
+                  color: '#c084fc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Icon icon="solar:crown-star-bold" width="16" height="16" style={{ flexShrink: 0 }} />
+                <span>Original Room Creator (Immune from room moderation)</span>
+              </div>
+            )}
+
+            {/* Host / Admin Moderation Controls (Room Creator is protected from moderation) */}
+            {!isSameNick(inspectingUser.nickname, nickname) && !inspectingUser.isCreator && (
               (currentUserRole === 'host' && inspectingUser.role !== 'host') ||
               (currentUserRole === 'admin' && inspectingUser.role !== 'host' && inspectingUser.role !== 'admin')
             ) && (
@@ -2218,7 +2270,7 @@ const ChatRoster = memo(function ChatRoster({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#aebac1' }}>
                   <Icon icon="solar:wifi-router-bold-duotone" width="14" height="14" style={{ color: '#00a884' }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {inspectingUser.nickname === nickname
+                    {isSameNick(inspectingUser.nickname, nickname)
                       ? (socketLatency !== null ? `${socketLatency}ms RTT` : 'Measuring ping...')
                       : (inspectingUser.networkLabel || 'Encrypted Tunnel')}
                   </span>

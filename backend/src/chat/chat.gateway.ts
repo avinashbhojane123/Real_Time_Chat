@@ -196,7 +196,7 @@ export class ChatGateway
         .delete()
         .from(User)
         .where(
-          'role = :memberRole AND (isBanned IS NULL OR isBanned = false) AND isOnline = false AND ((lastSeen IS NOT NULL AND lastSeen <= :thirtyDaysAgo) OR (lastSeen IS NULL AND createdAt <= :thirtyDaysAgo))',
+          'role = :memberRole AND (isBanned IS NULL OR isBanned = false) AND (isCreator IS NULL OR isCreator = false) AND isOnline = false AND ((lastSeen IS NOT NULL AND lastSeen <= :thirtyDaysAgo) OR (lastSeen IS NULL AND createdAt <= :thirtyDaysAgo))',
           {
             memberRole: 'member',
             thirtyDaysAgo,
@@ -662,12 +662,12 @@ export class ChatGateway
                 onlineRoomUsers.find((u) => activeNicknames.has(u.nickname.toLowerCase()) && u.nickname.toLowerCase() !== user.nickname.toLowerCase() && !u.isMuted && !u.isBanned);
 
               if (candidate) {
-                user.role = 'member';
+                user.role = 'admin';
                 candidate.role = 'host';
                 await this.userRepo.save([user, candidate]);
                 for (const [id, sess] of this.users.entries()) {
                   if (sess.passcode === room.passcode) {
-                    if (sess.nickname.toLowerCase() === user.nickname.toLowerCase()) sess.role = 'member';
+                    if (sess.nickname.toLowerCase() === user.nickname.toLowerCase()) sess.role = 'admin';
                     if (sess.nickname.toLowerCase() === candidate.nickname.toLowerCase()) sess.role = 'host';
                   }
                 }
@@ -868,13 +868,13 @@ export class ChatGateway
               );
 
             if (candidate) {
-              user.role = 'member';
+              user.role = 'admin';
               candidate.role = 'host';
               await this.userRepo.save([user, candidate]);
               for (const [id, sess] of this.users.entries()) {
                 if (sess.passcode === room.passcode) {
                   if (sess.nickname.toLowerCase() === user.nickname.toLowerCase())
-                    sess.role = 'member';
+                    sess.role = 'admin';
                   if (sess.nickname.toLowerCase() === candidate.nickname.toLowerCase())
                     sess.role = 'host';
                 }
@@ -1477,6 +1477,39 @@ export class ChatGateway
       return { success: false, message: 'Unauthorized' };
     }
 
+    const room = await this.roomRepo.findOne({
+      where: { passcode: targetPasscode },
+    });
+    if (!room) return { success: false, message: 'Room not found' };
+
+    const voterUser = await this.userRepo
+      .createQueryBuilder('user')
+      .where('user.roomId = :roomId AND LOWER(user.nickname) = LOWER(:nickname)', {
+        roomId: room.id,
+        nickname: session.nickname.trim(),
+      })
+      .getOne();
+    if (!voterUser || voterUser.isBanned) {
+      client.emit('error', { message: 'You are banned or not authorized to vote on polls.' });
+      return { success: false, message: 'You are banned from voting' };
+    }
+    if (voterUser.isMuted) {
+      if (voterUser.mutedUntil && new Date(voterUser.mutedUntil) <= new Date()) {
+        voterUser.isMuted = false;
+        voterUser.mutedUntil = null;
+        await this.userRepo.save(voterUser);
+        session.isMuted = false;
+        this.server.to(room.passcode).emit('userMuteToggled', {
+          targetNickname: voterUser.nickname,
+          isMuted: false,
+          mutedBy: 'System (Timed Mute Expired)',
+        });
+      } else {
+        client.emit('error', { message: 'You are muted and cannot vote on polls.' });
+        return { success: false, message: 'You are muted and cannot vote on polls.' };
+      }
+    }
+
     const message = await this.messageRepo.findOne({
       where: { id: payload.messageId },
     });
@@ -1691,6 +1724,9 @@ export class ChatGateway
     if (targetUser.role === 'host') {
       return { success: false, message: 'Cannot kick the room host' };
     }
+    if (targetUser.isCreator) {
+      return { success: false, message: 'Cannot kick the original room creator' };
+    }
     if (hostUser.role === 'admin' && targetUser.role === 'admin') {
       return { success: false, message: 'Admins cannot kick other admins' };
     }
@@ -1790,6 +1826,9 @@ export class ChatGateway
 
     if (targetUser.role === 'host') {
       return { success: false, message: 'Cannot ban the room host' };
+    }
+    if (targetUser.isCreator) {
+      return { success: false, message: 'Cannot ban the original room creator' };
     }
     if (hostUser.role === 'admin' && targetUser.role === 'admin') {
       return { success: false, message: 'Admins cannot ban other admins' };
@@ -2148,7 +2187,7 @@ export class ChatGateway
       .delete()
       .from(User)
       .where(
-        'roomId = :roomId AND role = :memberRole AND (isBanned IS NULL OR isBanned = false) AND isOnline = false AND ((lastSeen IS NOT NULL AND lastSeen < :cutoffDate) OR (lastSeen IS NULL AND createdAt < :cutoffDate))',
+        'roomId = :roomId AND role = :memberRole AND (isBanned IS NULL OR isBanned = false) AND (isCreator IS NULL OR isCreator = false) AND isOnline = false AND ((lastSeen IS NOT NULL AND lastSeen < :cutoffDate) OR (lastSeen IS NULL AND createdAt < :cutoffDate))',
         {
           roomId: room.id,
           memberRole: 'member',
@@ -2215,6 +2254,9 @@ export class ChatGateway
 
     if (targetUser.role === 'host') {
       return { success: false, message: 'Cannot mute the room host' };
+    }
+    if (targetUser.isCreator) {
+      return { success: false, message: 'Cannot mute the original room creator' };
     }
     if (hostUser.role === 'admin' && targetUser.role === 'admin') {
       return { success: false, message: 'Admins cannot mute other admins' };
@@ -3188,7 +3230,23 @@ export class ChatGateway
     const user = await this.userRepo.findOne({
       where: { nickname: session.nickname, roomId: room.id },
     });
-    if (user?.isBanned || user?.isMuted) return;
+    if (!user || user.isBanned) return;
+
+    if (session.isMuted || user.isMuted) {
+      if (user.mutedUntil && new Date(user.mutedUntil) <= new Date()) {
+        user.isMuted = false;
+        user.mutedUntil = null;
+        await this.userRepo.save(user);
+        session.isMuted = false;
+        this.server.to(room.passcode).emit('userMuteToggled', {
+          targetNickname: user.nickname,
+          isMuted: false,
+          mutedBy: 'System (Timed Mute Expired)',
+        });
+      } else {
+        return;
+      }
+    }
 
     const msg = await this.messageRepo.findOne({
       where: { id: data.messageId, roomId: room.id },
@@ -3259,8 +3317,20 @@ export class ChatGateway
     }
 
     if (session.isMuted || user?.isMuted) {
-      client.emit('error', { message: 'You are muted and cannot post status stories.' });
-      return { success: false, message: 'You are muted and cannot post status stories.' };
+      if (user?.mutedUntil && new Date(user.mutedUntil) <= new Date()) {
+        user.isMuted = false;
+        user.mutedUntil = null;
+        await this.userRepo.save(user);
+        session.isMuted = false;
+        this.server.to(room.passcode).emit('userMuteToggled', {
+          targetNickname: user.nickname,
+          isMuted: false,
+          mutedBy: 'System (Timed Mute Expired)',
+        });
+      } else {
+        client.emit('error', { message: 'You are muted and cannot post status stories.' });
+        return { success: false, message: 'You are muted and cannot post status stories.' };
+      }
     }
 
     const now = new Date();
@@ -3786,7 +3856,7 @@ export class ChatGateway
   }
 
   @SubscribeMessage('watchPartyComment')
-  watchPartyComment(
+  async watchPartyComment(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WatchPartyCommentDto,
   ) {
@@ -3797,10 +3867,26 @@ export class ChatGateway
     }
 
     if (session.isMuted) {
-      client.emit('error', {
-        message: 'You are muted and cannot post watch party comments.',
-      });
-      return;
+      const room = await this.roomRepo.findOne({ where: { passcode: targetPasscode } });
+      const user = room
+        ? await this.userRepo.findOne({ where: { nickname: session.nickname, roomId: room.id } })
+        : null;
+      if (user?.mutedUntil && new Date(user.mutedUntil) <= new Date()) {
+        user.isMuted = false;
+        user.mutedUntil = null;
+        await this.userRepo.save(user);
+        session.isMuted = false;
+        this.server.to(targetPasscode).emit('userMuteToggled', {
+          targetNickname: user.nickname,
+          isMuted: false,
+          mutedBy: 'System (Timed Mute Expired)',
+        });
+      } else {
+        client.emit('error', {
+          message: 'You are muted and cannot post watch party comments.',
+        });
+        return;
+      }
     }
 
     this.server.to(targetPasscode).emit('watchPartyComment', {

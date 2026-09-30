@@ -362,9 +362,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
     });
 
-    socket.on('userMuteToggled', ({ targetNickname, isMuted, mutedBy }) => {
+    socket.on('userMuteToggled', ({ targetNickname, isMuted, mutedUntil, mutedBy }) => {
       setUsers((prev) =>
-        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, isMuted } : u))
+        prev.map((u) => (isSameNick(u.nickname, targetNickname) ? { ...u, isMuted, mutedUntil } : u))
       );
       if (isSameNick(targetNickname, nickname)) {
         showToast(isMuted ? '🔇 You were muted by the room host.' : '🔊 You were unmuted by the room host.');
@@ -1022,6 +1022,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         showToast(res.message || 'Failed to send direct message');
       } else if (res && res.isOfflineDelivery) {
         showToast(`📬 Direct message saved. It will be delivered to @${targetNickname} when they return.`);
+      } else if (res && res.success) {
+        showToast(`💬 Whisper sent to @${targetNickname}`);
       }
     });
   };
@@ -1132,7 +1134,10 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   );
   const currentUserRole = currentUserObj?.role || 'member';
   const isCurrentUserCreator = Boolean(currentUserObj?.isCreator);
-  const isCurrentUserMuted = Boolean(currentUserObj?.isMuted);
+  const isCurrentUserMuted = Boolean(
+    currentUserObj?.isMuted &&
+    (!currentUserObj.mutedUntil || new Date(currentUserObj.mutedUntil) > new Date())
+  );
   const isCurrentUserBanned = Boolean(currentUserObj?.isBanned);
 
   return {
