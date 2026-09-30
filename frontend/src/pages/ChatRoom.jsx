@@ -686,8 +686,19 @@ export default function ChatRoom() {
       expiresAt: disappearingTimer > 0 ? new Date(Date.now() + disappearingTimer * 1000).toISOString() : null,
     };
 
+    if (!socketRef.current?.connected) {
+      showToast('⚠️ Reconnecting to chat room... Please try again in a moment.');
+      socketRef.current?.connect();
+      return;
+    }
+
     setMessages((prev) => [...prev, optimisticMsg]);
-    socketRef.current?.emit('sendMessage', payload);
+    socketRef.current?.emit('sendMessage', payload, (res) => {
+      if (res && !res.success) {
+        showToast(res.message || 'Failed to send message');
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+      }
+    });
     socketRef.current?.emit('stopTyping', { passcode, nickname });
     if (typeof e !== 'string') {
       setInputText('');

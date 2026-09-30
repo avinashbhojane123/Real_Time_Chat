@@ -93,7 +93,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     const socketUrl = getSocketBaseUrl(baseUrl);
     const socket = io(socketUrl, {
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       upgrade: true,
       rememberUpgrade: false,
       reconnection: true,
@@ -129,6 +129,11 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         networkLabel: clientDevice.network?.label,
         batteryLabel: battery.label,
         batteryIsCharging: battery.isCharging,
+      }, (res) => {
+        if (res && !res.success) {
+          console.warn('[Socket] joinRoom response:', res.message);
+          showToast(res.message || 'Failed to join room');
+        }
       });
       socket.emit('getStatuses', { passcode });
       socket.emit('getUsers', { passcode });
@@ -162,6 +167,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('connect_error', (err) => {
       console.warn('[Socket] Connection error:', err?.message || err);
       setIsSocketConnected(false);
+    });
+
+    socket.on('error', (err) => {
+      const msg = err?.message || (typeof err === 'string' ? err : 'Connection error');
+      console.warn('[Socket Error]:', msg);
+      showToast(msg);
     });
 
     // Periodic heartbeat to keep reverse proxies alive and monitor smoothed real-time latency (8s interval)

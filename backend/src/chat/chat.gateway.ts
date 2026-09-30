@@ -312,9 +312,13 @@ export class ChatGateway
             await this.userRepo.save(user);
 
             if (user.role === 'host') {
+              const cleanRoomPass = room.passcode.trim().toLowerCase();
               const activeNicknames = new Set(
                 Array.from(this.users.values())
-                  .filter((s) => s.passcode === room.passcode)
+                  .filter(
+                    (s) =>
+                      (s.passcode || '').trim().toLowerCase() === cleanRoomPass,
+                  )
                   .map((s) => s.nickname.toLowerCase()),
               );
               if (
@@ -347,7 +351,10 @@ export class ChatGateway
                   candidate.role = 'host';
                   await this.userRepo.save([user, candidate]);
                   for (const [, sess] of this.users.entries()) {
-                    if (sess.passcode === room.passcode) {
+                    if (
+                      (sess.passcode || '').trim().toLowerCase() ===
+                      cleanRoomPass
+                    ) {
                       if (
                         sess.nickname.toLowerCase() ===
                         user.nickname.toLowerCase()
@@ -360,13 +367,26 @@ export class ChatGateway
                         sess.role = 'host';
                     }
                   }
-                  this.server.to(room.passcode).emit('hostChanged', {
+                  this.server.to(room.passcode.trim()).emit('hostChanged', {
                     newHostNickname: candidate.nickname,
                     newHost: candidate.nickname,
                     previousHostNickname: user.nickname,
                     previousHost: user.nickname,
                     reason: 'Automatic succession after host disconnect',
                   });
+                  if (
+                    room.passcode.trim().toLowerCase() !== room.passcode.trim()
+                  ) {
+                    this.server
+                      .to(room.passcode.trim().toLowerCase())
+                      .emit('hostChanged', {
+                        newHostNickname: candidate.nickname,
+                        newHost: candidate.nickname,
+                        previousHostNickname: user.nickname,
+                        previousHost: user.nickname,
+                        reason: 'Automatic succession after host disconnect',
+                      });
+                  }
                 }
               }
             }
@@ -668,38 +688,6 @@ export class ChatGateway
       }
     }
 
-    if (user && existingSockets.length === 0) {
-      const isPrivileged =
-        user.role === 'host' || user.role === 'admin' || user.isCreator;
-      const isRecentMember =
-        user.lastSeen &&
-        Date.now() - new Date(user.lastSeen).getTime() < 24 * 60 * 60 * 1000;
-      const isTokenMismatch =
-        user.sessionToken &&
-        data.sessionToken &&
-        user.sessionToken !== data.sessionToken;
-
-      if (isTokenMismatch) {
-        if (isPrivileged) {
-          client.emit('error', {
-            message: `The nickname "${cleanNick}" belongs to a room host or admin. Please choose another nickname or reconnect using your original session.`,
-          });
-          return {
-            success: false,
-            message: `The nickname "${cleanNick}" belongs to a room host or admin.`,
-          };
-        } else if (isRecentMember) {
-          client.emit('error', {
-            message: `The nickname "${cleanNick}" was recently used by another participant in this room. Please choose another nickname.`,
-          });
-          return {
-            success: false,
-            message: `The nickname "${cleanNick}" was recently used in this room.`,
-          };
-        }
-      }
-    }
-
     const existingHost = await this.userRepo.findOne({
       where: {
         roomId: room.id,
@@ -775,6 +763,14 @@ export class ChatGateway
       isMuted: Boolean(user.isMuted),
       role: user.role,
     });
+
+    const userCleanNick = (user.nickname || '').trim().toLowerCase();
+    const userCleanPass = roomPasscode.toLowerCase();
+    const userCleanDataPass = dataPasscode.toLowerCase();
+    this.clearUserDisconnectDebounceTimer(`${userCleanPass}:${userCleanNick}`);
+    this.clearUserDisconnectDebounceTimer(
+      `${userCleanDataPass}:${userCleanNick}`,
+    );
 
     this.callingService.rebindReconnectingUser(
       this.server,

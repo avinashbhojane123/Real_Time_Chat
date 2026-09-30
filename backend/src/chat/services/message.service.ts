@@ -172,10 +172,23 @@ export class MessageService {
       readBy: savedMessage.readBy || [savedMessage.nickname],
     };
 
-    server.to(roomPasscode).to(dataPasscode).emit('newMessage', messagePayload);
+    server
+      .to(roomPasscode)
+      .to(roomPasscode.toLowerCase())
+      .to(dataPasscode)
+      .to(dataPasscode.toLowerCase())
+      .emit('newMessage', messagePayload);
+
+    server
+      .to(roomPasscode)
+      .to(roomPasscode.toLowerCase())
+      .to(dataPasscode)
+      .to(dataPasscode.toLowerCase())
+      .emit('message', messagePayload);
 
     return {
       success: true,
+      messageId: savedMessage.id,
     };
   }
 
