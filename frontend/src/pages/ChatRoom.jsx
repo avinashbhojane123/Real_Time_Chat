@@ -847,8 +847,8 @@ export default function ChatRoom() {
           renderStatusAvatar={renderStatusAvatar}
           isGroupRoom={isGroupRoom}
           passcode={passcode}
-          usersCount={users.length}
-          onlineCount={users.filter((u) => u.isOnline).length}
+          usersCount={users.filter((u) => !u.isBanned).length}
+          onlineCount={users.filter((u) => u.isOnline && !u.isBanned).length}
           recipientUser={recipientUser}
           isRecipientOnline={isRecipientOnline}
           typingUsers={typingUsers}

@@ -162,22 +162,31 @@ const ChatRoster = memo(function ChatRoster({
     return (!isMobileDevice && users.length <= 40) ? listContainerVariants : listContainerVariantsInstant;
   }, [isMobileDevice, users.length]);
 
-  // Participants who sent a direct whisper to me
+  // Participants who sent a direct whisper to me (recent within the last 2 hours)
   const whisperSenders = useMemo(() => {
     const map = new Map();
     if (!messages || !nickname) return map;
     const myNick = nickname.trim().toLowerCase();
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
     for (const m of messages) {
       if (m.isDirect && m.targetNickname && m.targetNickname.trim().toLowerCase() === myNick) {
-        const sender = (m.nickname || '').trim().toLowerCase();
-        map.set(sender, (map.get(sender) || 0) + 1);
+        const msgTime = m.createdAt ? new Date(m.createdAt).getTime() : Date.now();
+        if (msgTime >= twoHoursAgo) {
+          const sender = (m.nickname || '').trim().toLowerCase();
+          map.set(sender, (map.get(sender) || 0) + 1);
+        }
       }
     }
     return map;
   }, [messages, nickname]);
 
+  const hasAvatarError = (nick) => Boolean(avatarErrors[(nick || '').trim().toLowerCase()]);
+
   const handleAvatarError = (nick) => {
-    setAvatarErrors((prev) => ({ ...prev, [nick]: true }));
+    const key = (nick || '').trim().toLowerCase();
+    if (key) {
+      setAvatarErrors((prev) => ({ ...prev, [key]: true }));
+    }
   };
 
   const handleMention = (u) => {
@@ -209,9 +218,9 @@ const ChatRoster = memo(function ChatRoster({
         normalizeText(u.browser).includes(q) ||
         normalizeText(u.os).includes(q) ||
         normalizeText(u.networkLabel).includes(q) ||
-        (u.isMuted && 'muted'.includes(q)) ||
-        (u.isBanned && 'banned'.includes(q)) ||
-        (u.isCreator && 'creator'.includes(q))
+        (u.isMuted && ('muted'.includes(q) || q.includes('mute'))) ||
+        (u.isBanned && ('banned'.includes(q) || q.includes('ban'))) ||
+        (u.isCreator && ('creator'.includes(q) || q.includes('creat') || 'owner'.includes(q) || q.includes('owner')))
       );
     });
   }, [users, searchQuery]);
@@ -246,8 +255,8 @@ const ChatRoster = memo(function ChatRoster({
       const prioA = rolePriority[a.role || 'member'] || 3;
       const prioB = rolePriority[b.role || 'member'] || 3;
       if (prioA !== prioB) return prioA - prioB;
-      const timeA = a.lastSeen ? new Date(a.lastSeen).getTime() : 0;
-      const timeB = b.lastSeen ? new Date(b.lastSeen).getTime() : 0;
+      const timeA = a.lastSeen ? new Date(a.lastSeen).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const timeB = b.lastSeen ? new Date(b.lastSeen).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
       if (timeA !== timeB) return timeB - timeA;
       return (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' });
     });
@@ -916,7 +925,7 @@ const ChatRoster = memo(function ChatRoster({
                               title={`Click to view profile & actions for ${u.nickname}`}
                             >
                               <div className="online-avatar-pulse">
-                                {u.avatarUrl && !avatarErrors[u.nickname] ? (
+                                {u.avatarUrl && !hasAvatarError(u.nickname) ? (
                                   <img
                                     src={u.avatarUrl}
                                     alt={u.nickname}
@@ -1224,7 +1233,7 @@ const ChatRoster = memo(function ChatRoster({
                               className="roster-item-card"
                               title={`Click to view profile & actions for ${u.nickname}`}
                             >
-                              {u.avatarUrl && !avatarErrors[u.nickname] ? (
+                              {u.avatarUrl && !hasAvatarError(u.nickname) ? (
                                 <img
                                   src={u.avatarUrl}
                                   alt={u.nickname}
@@ -1570,7 +1579,7 @@ const ChatRoster = memo(function ChatRoster({
             {/* Profile Card Centerpiece */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '10px 0' }}>
               <div style={{ position: 'relative' }}>
-                {inspectingUser.avatarUrl && !avatarErrors[inspectingUser.nickname] ? (
+                {inspectingUser.avatarUrl && !hasAvatarError(inspectingUser.nickname) ? (
                   <img
                     src={inspectingUser.avatarUrl}
                     alt={inspectingUser.nickname}
@@ -2405,6 +2414,30 @@ const ChatRoster = memo(function ChatRoster({
                 <button
                   type="button"
                   onClick={() => {
+                    if (onMuteUser) onMuteUser(actionModal.targetNick, true, 15);
+                    setActionModal(null);
+                  }}
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>⏱️ Mute for 15 Minutes</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Short Cooloff</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
                     if (onMuteUser) onMuteUser(actionModal.targetNick, true, 60);
                     setActionModal(null);
                   }}
@@ -2423,7 +2456,31 @@ const ChatRoster = memo(function ChatRoster({
                   }}
                 >
                   <span>⏳ Mute for 1 Hour</span>
-                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Extended</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Standard Timeout</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onMuteUser) onMuteUser(actionModal.targetNick, true, 1440);
+                    setActionModal(null);
+                  }}
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>📅 Mute for 24 Hours</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.8 }}>Full Day</span>
                 </button>
 
                 <button

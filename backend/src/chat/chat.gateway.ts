@@ -592,11 +592,14 @@ export class ChatGateway
     // Yield microtask execution to handle fast socket reconnection
     await Promise.resolve();
 
+    const cleanNick = userInfo.nickname.trim().toLowerCase();
+    const cleanPass = userInfo.passcode.trim().toLowerCase();
+
     // Check if there's another active socket connected for the same user
     const isStillConnected = Array.from(this.users.values()).some(
       (info) =>
-        info.nickname === userInfo.nickname &&
-        info.passcode === userInfo.passcode,
+        info.nickname.trim().toLowerCase() === cleanNick &&
+        info.passcode.trim().toLowerCase() === cleanPass,
     );
 
     if (isStillConnected) {
@@ -610,7 +613,7 @@ export class ChatGateway
       nickname: userInfo.nickname,
     });
 
-    const userKey = `${userInfo.passcode.trim()}:${userInfo.nickname.trim()}`;
+    const userKey = `${cleanPass}:${cleanNick}`;
     this.clearUserDisconnectDebounceTimer(userKey);
 
     const debounceTimer = setTimeout(async () => {
@@ -618,8 +621,8 @@ export class ChatGateway
 
       const isReconnected = Array.from(this.users.values()).some(
         (info) =>
-          info.nickname === userInfo.nickname &&
-          info.passcode === userInfo.passcode,
+          info.nickname.trim().toLowerCase() === cleanNick &&
+          info.passcode.trim().toLowerCase() === cleanPass,
       );
       if (isReconnected) {
         return;
@@ -700,9 +703,9 @@ export class ChatGateway
 
     // Prevent buffer lock deadlock if disconnecting user was buffering in Watch Party
     const wpState = this.watchPartyRooms.get(userInfo.passcode);
-    if (wpState && wpState.bufferingUsers?.includes(userInfo.nickname)) {
+    if (wpState && wpState.bufferingUsers?.some((u) => u.toLowerCase() === cleanNick)) {
       wpState.bufferingUsers = wpState.bufferingUsers.filter(
-        (u) => u !== userInfo.nickname,
+        (u) => u.toLowerCase() !== cleanNick,
       );
       if (wpState.bufferingUsers.length === 0) {
         wpState.isBuffering = false;
@@ -790,7 +793,7 @@ export class ChatGateway
     if (!session) return { success: false };
 
     const roomPasscode = (data?.passcode || session.passcode).trim();
-    const userKey = `${roomPasscode}:${session.nickname.trim()}`;
+    const userKey = `${roomPasscode.toLowerCase()}:${session.nickname.trim().toLowerCase()}`;
     this.clearUserDisconnectDebounceTimer(userKey);
 
     // End any active or pending call immediately without grace period
@@ -922,7 +925,7 @@ export class ChatGateway
     client: Socket,
   ) {
     this.clearWatchPartyDisconnectTimer(data.passcode);
-    const userKey = `${data.passcode.trim()}:${data.nickname.trim()}`;
+    const userKey = `${data.passcode.trim().toLowerCase()}:${data.nickname.trim().toLowerCase()}`;
     this.clearUserDisconnectDebounceTimer(userKey);
     console.log(
       'JOIN ROOM:',
@@ -1763,14 +1766,19 @@ export class ChatGateway
     // Clean up Watch Party state if kicked participant was buffering or hosting
     const wpState = this.watchPartyRooms.get(data.passcode.trim());
     if (wpState) {
-      if (wpState.bufferingUsers?.includes(targetUser.nickname)) {
-        wpState.bufferingUsers = wpState.bufferingUsers.filter((u) => u !== targetUser.nickname);
+      if (wpState.bufferingUsers?.some((u) => u.toLowerCase() === targetUser.nickname.toLowerCase())) {
+        wpState.bufferingUsers = wpState.bufferingUsers.filter(
+          (u) => u.toLowerCase() !== targetUser.nickname.toLowerCase(),
+        );
       }
       if (wpState.hostNickname?.toLowerCase() === targetUser.nickname.toLowerCase()) {
         wpState.hostNickname = session.nickname;
         wpState.isHostOnly = false;
       }
     }
+
+    const kickedUserKey = `${data.passcode.trim().toLowerCase()}:${targetUser.nickname.trim().toLowerCase()}`;
+    this.clearUserDisconnectDebounceTimer(kickedUserKey);
 
     targetUser.isOnline = false;
     targetUser.lastSeen = new Date();
@@ -1871,14 +1879,19 @@ export class ChatGateway
     // Clean up Watch Party state if banned participant was buffering or hosting
     const wpState = this.watchPartyRooms.get(data.passcode.trim());
     if (wpState) {
-      if (wpState.bufferingUsers?.includes(targetUser.nickname)) {
-        wpState.bufferingUsers = wpState.bufferingUsers.filter((u) => u !== targetUser.nickname);
+      if (wpState.bufferingUsers?.some((u) => u.toLowerCase() === targetUser.nickname.toLowerCase())) {
+        wpState.bufferingUsers = wpState.bufferingUsers.filter(
+          (u) => u.toLowerCase() !== targetUser.nickname.toLowerCase(),
+        );
       }
       if (wpState.hostNickname?.toLowerCase() === targetUser.nickname.toLowerCase()) {
         wpState.hostNickname = session.nickname;
         wpState.isHostOnly = false;
       }
     }
+
+    const bannedUserKey = `${data.passcode.trim().toLowerCase()}:${targetUser.nickname.trim().toLowerCase()}`;
+    this.clearUserDisconnectDebounceTimer(bannedUserKey);
 
     this.server.to(data.passcode.trim()).emit('userBanned', {
       targetNickname: targetUser.nickname,
