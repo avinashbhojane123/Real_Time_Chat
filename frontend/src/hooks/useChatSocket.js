@@ -132,7 +132,11 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     });
 
     socket.on('disconnect', (reason) => {
-      console.warn('[Socket] Disconnected from server. Reason:', reason);
+      if (reason === 'io client disconnect') {
+        console.log('[Socket] Disconnected (client initiated teardown).');
+      } else {
+        console.warn('[Socket] Disconnected from server. Reason:', reason);
+      }
       setIsSocketConnected(false);
       if (reason === 'io server disconnect' && !isTerminatedByHostRef.current) {
         socket.connect();
