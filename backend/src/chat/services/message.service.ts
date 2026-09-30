@@ -58,9 +58,7 @@ export class MessageService {
       };
     }
 
-    const room = await findRoomByPasscode(
-      data.passcode || session.passcode,
-    );
+    const room = await findRoomByPasscode(data.passcode || session.passcode);
 
     if (!room) {
       return {
@@ -148,8 +146,8 @@ export class MessageService {
 
     const roomPasscode = room.passcode.trim();
     const dataPasscode = data.passcode.trim();
-    client.join(roomPasscode);
-    client.join(dataPasscode);
+    await client.join(roomPasscode);
+    await client.join(dataPasscode);
 
     const messagePayload = {
       id: savedMessage.id,
@@ -174,10 +172,7 @@ export class MessageService {
       readBy: savedMessage.readBy || [savedMessage.nickname],
     };
 
-    server
-      .to(roomPasscode)
-      .to(dataPasscode)
-      .emit('newMessage', messagePayload);
+    server.to(roomPasscode).to(dataPasscode).emit('newMessage', messagePayload);
 
     return {
       success: true,
@@ -197,7 +192,11 @@ export class MessageService {
       fileType?: string;
       fileSize?: number;
     },
-    findSocketsInRoom: (passcode: string, nickname?: string, excludeSocketId?: string) => Array<{ socketId: string; nickname: string }>,
+    findSocketsInRoom: (
+      passcode: string,
+      nickname?: string,
+      excludeSocketId?: string,
+    ) => Array<{ socketId: string; nickname: string }>,
   ) {
     if (!session || session.passcode.trim() !== data.passcode?.trim()) {
       return { success: false, message: 'Unauthorized session' };

@@ -279,112 +279,115 @@ export class ChatGateway
     const userKey = `${cleanPass}:${cleanNick}`;
     this.clearUserDisconnectDebounceTimer(userKey);
 
-    const debounceTimer = setTimeout(async () => {
-      this.userDisconnectDebounceTimers.delete(userKey);
+    const debounceTimer = setTimeout(() => {
+      void (async () => {
+        this.userDisconnectDebounceTimers.delete(userKey);
 
-      const isReconnected = Array.from(this.users.values()).some(
-        (info) =>
-          info.nickname.trim().toLowerCase() === cleanNick &&
-          info.passcode.trim().toLowerCase() === cleanPass,
-      );
-      if (isReconnected) return;
+        const isReconnected = Array.from(this.users.values()).some(
+          (info) =>
+            info.nickname.trim().toLowerCase() === cleanNick &&
+            info.passcode.trim().toLowerCase() === cleanPass,
+        );
+        if (isReconnected) return;
 
-      const room = await this.roomRepo.findOne({
-        where: { passcode: userInfo.passcode },
-      });
+        const room = await this.roomRepo.findOne({
+          where: { passcode: userInfo.passcode },
+        });
 
-      if (room) {
-        const user = await this.userRepo
-          .createQueryBuilder('user')
-          .where(
-            'user.roomId = :roomId AND LOWER(user.nickname) = LOWER(:nickname)',
-            {
-              roomId: room.id,
-              nickname: userInfo.nickname.trim(),
-            },
-          )
-          .getOne();
+        if (room) {
+          const user = await this.userRepo
+            .createQueryBuilder('user')
+            .where(
+              'user.roomId = :roomId AND LOWER(user.nickname) = LOWER(:nickname)',
+              {
+                roomId: room.id,
+                nickname: userInfo.nickname.trim(),
+              },
+            )
+            .getOne();
 
-        if (user) {
-          user.isOnline = false;
-          user.lastSeen = new Date();
-          await this.userRepo.save(user);
+          if (user) {
+            user.isOnline = false;
+            user.lastSeen = new Date();
+            await this.userRepo.save(user);
 
-          if (user.role === 'host') {
-            const activeNicknames = new Set(
-              Array.from(this.users.values())
-                .filter((s) => s.passcode === room.passcode)
-                .map((s) => s.nickname.toLowerCase()),
-            );
-            if (
-              activeNicknames.size > 0 &&
-              !activeNicknames.has(user.nickname.toLowerCase())
-            ) {
-              const onlineRoomUsers = await this.userRepo.find({
-                where: { roomId: room.id },
-                order: { createdAt: 'ASC' },
-              });
-              const candidate =
-                onlineRoomUsers.find(
-                  (u) =>
-                    activeNicknames.has(u.nickname.toLowerCase()) &&
-                    u.role === 'admin' &&
-                    !u.isMuted &&
-                    !u.isBanned,
-                ) ||
-                onlineRoomUsers.find(
-                  (u) =>
-                    activeNicknames.has(u.nickname.toLowerCase()) &&
-                    u.nickname.toLowerCase() !== user.nickname.toLowerCase() &&
-                    !u.isMuted &&
-                    !u.isBanned,
-                );
-
-              if (candidate) {
-                user.role = 'admin';
-                candidate.role = 'host';
-                await this.userRepo.save([user, candidate]);
-                for (const [, sess] of this.users.entries()) {
-                  if (sess.passcode === room.passcode) {
-                    if (
-                      sess.nickname.toLowerCase() ===
-                      user.nickname.toLowerCase()
-                    )
-                      sess.role = 'admin';
-                    if (
-                      sess.nickname.toLowerCase() ===
-                      candidate.nickname.toLowerCase()
-                    )
-                      sess.role = 'host';
-                  }
-                }
-                this.server.to(room.passcode).emit('hostChanged', {
-                  newHostNickname: candidate.nickname,
-                  newHost: candidate.nickname,
-                  previousHostNickname: user.nickname,
-                  previousHost: user.nickname,
-                  reason: 'Automatic succession after host disconnect',
+            if (user.role === 'host') {
+              const activeNicknames = new Set(
+                Array.from(this.users.values())
+                  .filter((s) => s.passcode === room.passcode)
+                  .map((s) => s.nickname.toLowerCase()),
+              );
+              if (
+                activeNicknames.size > 0 &&
+                !activeNicknames.has(user.nickname.toLowerCase())
+              ) {
+                const onlineRoomUsers = await this.userRepo.find({
+                  where: { roomId: room.id },
+                  order: { createdAt: 'ASC' },
                 });
+                const candidate =
+                  onlineRoomUsers.find(
+                    (u) =>
+                      activeNicknames.has(u.nickname.toLowerCase()) &&
+                      u.role === 'admin' &&
+                      !u.isMuted &&
+                      !u.isBanned,
+                  ) ||
+                  onlineRoomUsers.find(
+                    (u) =>
+                      activeNicknames.has(u.nickname.toLowerCase()) &&
+                      u.nickname.toLowerCase() !==
+                        user.nickname.toLowerCase() &&
+                      !u.isMuted &&
+                      !u.isBanned,
+                  );
+
+                if (candidate) {
+                  user.role = 'admin';
+                  candidate.role = 'host';
+                  await this.userRepo.save([user, candidate]);
+                  for (const [, sess] of this.users.entries()) {
+                    if (sess.passcode === room.passcode) {
+                      if (
+                        sess.nickname.toLowerCase() ===
+                        user.nickname.toLowerCase()
+                      )
+                        sess.role = 'admin';
+                      if (
+                        sess.nickname.toLowerCase() ===
+                        candidate.nickname.toLowerCase()
+                      )
+                        sess.role = 'host';
+                    }
+                  }
+                  this.server.to(room.passcode).emit('hostChanged', {
+                    newHostNickname: candidate.nickname,
+                    newHost: candidate.nickname,
+                    previousHostNickname: user.nickname,
+                    previousHost: user.nickname,
+                    reason: 'Automatic succession after host disconnect',
+                  });
+                }
               }
             }
           }
+
+          await this.roomModerationService.broadcastUsersList(
+            this.server,
+            room.passcode,
+            room.id,
+            this.users,
+          );
         }
 
-        await this.roomModerationService.broadcastUsersList(
-          this.server,
-          room.passcode,
-          room.id,
-          this.users,
-        );
-      }
-
-      this.server.to(userInfo.passcode).emit('userOffline', {
-        nickname: userInfo.nickname,
-        lastSeen: new Date(),
-      });
-      this.server.to(userInfo.passcode).emit('userLeft', {
-        nickname: userInfo.nickname,
-      });
+        this.server.to(userInfo.passcode).emit('userOffline', {
+          nickname: userInfo.nickname,
+          lastSeen: new Date(),
+        });
+        this.server.to(userInfo.passcode).emit('userLeft', {
+          nickname: userInfo.nickname,
+        });
+      })();
     }, 12000);
 
     this.userDisconnectDebounceTimers.set(userKey, debounceTimer);
@@ -421,7 +424,7 @@ export class ChatGateway
 
     if (room) {
       this.users.delete(client.id);
-      client.leave(roomPasscode);
+      void client.leave(roomPasscode);
 
       const remainingSockets = this.findSocketsInRoom(
         roomPasscode,
@@ -649,7 +652,7 @@ export class ChatGateway
             oldSocket.emit('sessionReplaced', {
               message: 'Your session has been resumed in another connection.',
             });
-            oldSocket.leave(cleanPass);
+            void oldSocket.leave(cleanPass);
             this.users.delete(existing.socketId);
             oldSocket.disconnect(true);
           }
@@ -761,10 +764,10 @@ export class ChatGateway
 
     const roomPasscode = room.passcode.trim();
     const dataPasscode = data.passcode.trim();
-    client.join(roomPasscode);
-    client.join(roomPasscode.toLowerCase());
-    client.join(dataPasscode);
-    client.join(dataPasscode.toLowerCase());
+    await client.join(roomPasscode);
+    await client.join(roomPasscode.toLowerCase());
+    await client.join(dataPasscode);
+    await client.join(dataPasscode.toLowerCase());
 
     this.users.set(client.id, {
       nickname: user.nickname,
@@ -1260,7 +1263,7 @@ export class ChatGateway
   }
 
   @SubscribeMessage('acceptCall')
-  async acceptCall(
+  acceptCall(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: AcceptCallDto,
   ) {
@@ -1275,18 +1278,12 @@ export class ChatGateway
   }
 
   @SubscribeMessage('declineCall')
-  async declineCall(
+  declineCall(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: DeclineCallDto,
   ) {
     const session = this.users.get(client.id);
-    return this.callingService.declineCall(
-      this.server,
-      client,
-      session,
-      data,
-      this.users,
-    );
+    return this.callingService.declineCall(this.server, client, session, data);
   }
 
   @SubscribeMessage('webrtcOffer')
@@ -1390,12 +1387,7 @@ export class ChatGateway
       return { success: false, message: 'Rate limit exceeded' };
     }
     const session = this.users.get(client.id);
-    return this.statusService.createStatus(
-      this.server,
-      client,
-      session,
-      data,
-    );
+    return this.statusService.createStatus(this.server, client, session, data);
   }
 
   @SubscribeMessage('getStatuses')
@@ -1428,7 +1420,7 @@ export class ChatGateway
   // --- Watch Party Handlers ---
 
   @SubscribeMessage('watchPartyAction')
-  async handleWatchPartyAction(
+  handleWatchPartyAction(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: WatchPartyActionDto,
   ) {
@@ -1450,6 +1442,11 @@ export class ChatGateway
     return this.watchPartyService.handleWatchPartyClockPing(client, data);
   }
 
+  @SubscribeMessage('clientPing')
+  handleClientPing(@MessageBody() data?: any) {
+    return { success: true, serverTime: Date.now(), ...(data || {}) };
+  }
+
   @SubscribeMessage('getWatchPartyState')
   getWatchPartyState(
     @ConnectedSocket() client: Socket,
@@ -1465,11 +1462,7 @@ export class ChatGateway
     @MessageBody() data: WatchPartyReactionDto,
   ) {
     const session = this.users.get(client.id);
-    this.watchPartyService.watchPartyReaction(
-      this.server,
-      session,
-      data,
-    );
+    this.watchPartyService.watchPartyReaction(this.server, session, data);
   }
 
   @SubscribeMessage('watchPartyComment')

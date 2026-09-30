@@ -38,7 +38,10 @@ export class WallpaperService {
           try {
             await this.roomRepo.save(room);
           } catch (e) {
-            console.error('[WallpaperService] Failed to save cleaned room wallpaper:', e);
+            console.error(
+              '[WallpaperService] Failed to save cleaned room wallpaper:',
+              e,
+            );
           }
         }
       }
@@ -78,7 +81,10 @@ export class WallpaperService {
         }
       }
     } catch (err) {
-      console.warn('[WallpaperService:Bootstrap] Room wallpaper verification skipped:', err);
+      console.warn(
+        '[WallpaperService:Bootstrap] Room wallpaper verification skipped:',
+        err,
+      );
     }
   }
 
@@ -94,7 +100,8 @@ export class WallpaperService {
       (activeWallpaper.customWallpaper.includes('/uploads/') ||
         activeWallpaper.customWallpaper.includes('/api/uploads/'))
     ) {
-      const match = activeWallpaper.customWallpaper.match(/uploads\/([^/?#]+)/i);
+      const match =
+        activeWallpaper.customWallpaper.match(/uploads\/([^/?#]+)/i);
       if (match && match[1]) {
         const filename = match[1];
         const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
@@ -166,7 +173,8 @@ export class WallpaperService {
     // Reject non-existent /uploads/ files
     if (
       newWallpaper &&
-      (newWallpaper.includes('/uploads/') || newWallpaper.includes('/api/uploads/'))
+      (newWallpaper.includes('/uploads/') ||
+        newWallpaper.includes('/api/uploads/'))
     ) {
       const match = newWallpaper.match(/uploads\/([^/?#]+)/i);
       if (match && match[1]) {

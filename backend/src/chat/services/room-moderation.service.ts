@@ -146,7 +146,11 @@ export class RoomModerationService {
     roomId: number,
     usersMap: Map<string, UserSession>,
   ) {
-    const list = await this.getFormattedUsersList(roomPasscode, roomId, usersMap);
+    const list = await this.getFormattedUsersList(
+      roomPasscode,
+      roomId,
+      usersMap,
+    );
     const cleanPass = roomPasscode.trim();
     server.to(cleanPass).emit('usersList', list);
     if (cleanPass.toLowerCase() !== cleanPass) {
@@ -175,7 +179,11 @@ export class RoomModerationService {
       return;
     }
 
-    const list = await this.getFormattedUsersList(room.passcode, room.id, usersMap);
+    const list = await this.getFormattedUsersList(
+      room.passcode,
+      room.id,
+      usersMap,
+    );
     client.emit('usersList', list);
   }
 
@@ -343,7 +351,7 @@ export class RoomModerationService {
           reason: 'You have been removed from the room by the host.',
           kickedBy: session.nickname,
         });
-        targetSocket.leave(data.passcode.trim());
+        void targetSocket.leave(data.passcode.trim());
         usersMap.delete(target.socketId);
         targetSocket.disconnect(true);
       }
@@ -461,7 +469,7 @@ export class RoomModerationService {
             'You have been permanently banned from this room by the host.',
           kickedBy: session.nickname,
         });
-        targetSocket.leave(data.passcode.trim());
+        void targetSocket.leave(data.passcode.trim());
         usersMap.delete(target.socketId);
         targetSocket.disconnect(true);
       }

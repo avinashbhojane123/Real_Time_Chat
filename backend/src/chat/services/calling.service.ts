@@ -70,7 +70,11 @@ export class CallingService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: CallUserDto,
     usersMap: Map<string, UserSession>,
-    findSocketInRoom: (passcode: string, nickname?: string, excludeSocketId?: string) => { socketId: string; nickname: string } | undefined,
+    findSocketInRoom: (
+      passcode: string,
+      nickname?: string,
+      excludeSocketId?: string,
+    ) => { socketId: string; nickname: string } | undefined,
   ) {
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
@@ -331,12 +335,8 @@ export class CallingService implements OnModuleDestroy {
     };
 
     if (callSession?.callerSocketId) {
-      server
-        .to(callSession.callerSocketId)
-        .emit('callAccepted', acceptPayload);
-      server
-        .to(callSession.callerSocketId)
-        .emit('acceptCall', acceptPayload);
+      server.to(callSession.callerSocketId).emit('callAccepted', acceptPayload);
+      server.to(callSession.callerSocketId).emit('acceptCall', acceptPayload);
     } else if (data.targetSocketId) {
       const targetSession = usersMap.get(data.targetSocketId);
       if (targetSession && targetSession.passcode.trim() === room) {
@@ -353,7 +353,6 @@ export class CallingService implements OnModuleDestroy {
     client: Socket,
     session: UserSession | undefined,
     data: DeclineCallDto,
-    usersMap: Map<string, UserSession>,
   ) {
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
@@ -380,9 +379,7 @@ export class CallingService implements OnModuleDestroy {
       server
         .to(callSession.callerSocketId)
         .emit('callDeclined', declinePayload);
-      server
-        .to(callSession.callerSocketId)
-        .emit('declineCall', declinePayload);
+      server.to(callSession.callerSocketId).emit('declineCall', declinePayload);
     } else if (data.targetSocketId) {
       server.to(data.targetSocketId).emit('callDeclined', declinePayload);
       server.to(data.targetSocketId).emit('declineCall', declinePayload);
@@ -506,9 +503,7 @@ export class CallingService implements OnModuleDestroy {
     if (targetSocketId) {
       const targetSession = usersMap.get(targetSocketId);
       if (targetSession && targetSession.passcode.trim() === room) {
-        server
-          .to(targetSocketId)
-          .emit('webrtcCandidate', candidatePayload);
+        server.to(targetSocketId).emit('webrtcCandidate', candidatePayload);
       }
     } else {
       client.to(room).emit('webrtcCandidate', candidatePayload);
@@ -605,7 +600,11 @@ export class CallingService implements OnModuleDestroy {
     client.emit('iceServers', { iceServers });
   }
 
-  togglePip(client: Socket, session: UserSession | undefined, data: TogglePipDto) {
+  togglePip(
+    client: Socket,
+    session: UserSession | undefined,
+    data: TogglePipDto,
+  ) {
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
     session.isPip = data.isPip;
@@ -620,7 +619,11 @@ export class CallingService implements OnModuleDestroy {
     });
   }
 
-  screenShareStatus(client: Socket, session: UserSession | undefined, data: ScreenShareStatusDto) {
+  screenShareStatus(
+    client: Socket,
+    session: UserSession | undefined,
+    data: ScreenShareStatusDto,
+  ) {
     if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
 
     const room = session.passcode.trim();
@@ -652,11 +655,18 @@ export class CallingService implements OnModuleDestroy {
           : callSession.callerSocketId
         : undefined);
 
+    const isMicMuted =
+      data.micMuted !== undefined ? data.micMuted : data.isAudioMuted;
+    const isCameraOff =
+      data.cameraOff !== undefined ? data.cameraOff : data.isVideoMuted;
+
     const payload = {
       from: session.nickname,
       fromSocketId: client.id,
-      isAudioMuted: data.isAudioMuted,
-      isVideoMuted: data.isVideoMuted,
+      micMuted: isMicMuted,
+      cameraOff: isCameraOff,
+      isAudioMuted: isMicMuted,
+      isVideoMuted: isCameraOff,
       callId: data.callId || callSession?.callId,
     };
 

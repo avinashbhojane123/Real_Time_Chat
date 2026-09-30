@@ -92,7 +92,11 @@ export class WatchPartyService implements OnModuleDestroy {
     client: Socket,
     session: UserSession | undefined,
     data: WatchPartyActionDto,
-    checkRateLimit: (client: Socket, maxLimit?: number, windowMs?: number) => boolean,
+    checkRateLimit: (
+      client: Socket,
+      maxLimit?: number,
+      windowMs?: number,
+    ) => boolean,
   ) {
     const targetPasscode = (data.passcode || session?.passcode || '').trim();
     if (!session || !targetPasscode || session.passcode !== targetPasscode) {
@@ -539,7 +543,11 @@ export class WatchPartyService implements OnModuleDestroy {
     anyUserInRoom: boolean,
   ) {
     const wpState = this.watchPartyRooms.get(passcode);
-    if (wpState && wpState.isActive && wpState.bufferingUsers?.includes(nickname)) {
+    if (
+      wpState &&
+      wpState.isActive &&
+      wpState.bufferingUsers?.includes(nickname)
+    ) {
       wpState.bufferingUsers = wpState.bufferingUsers.filter(
         (u) => u !== nickname,
       );
@@ -615,7 +623,11 @@ export class WatchPartyService implements OnModuleDestroy {
     }
   }
 
-  cleanupKickedUser(passcode: string, kickedNickname: string, hostNickname: string) {
+  cleanupKickedUser(
+    passcode: string,
+    kickedNickname: string,
+    hostNickname: string,
+  ) {
     const wpState = this.watchPartyRooms.get(passcode);
     if (wpState) {
       if (
@@ -628,8 +640,7 @@ export class WatchPartyService implements OnModuleDestroy {
         );
       }
       if (
-        wpState.hostNickname?.toLowerCase() ===
-        kickedNickname.toLowerCase()
+        wpState.hostNickname?.toLowerCase() === kickedNickname.toLowerCase()
       ) {
         wpState.hostNickname = hostNickname;
         wpState.isHostOnly = false;

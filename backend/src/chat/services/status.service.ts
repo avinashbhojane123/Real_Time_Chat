@@ -168,7 +168,11 @@ export class StatusService {
     return statuses;
   }
 
-  async viewStatus(server: Server, session: UserSession | undefined, data: ViewStatusDto) {
+  async viewStatus(
+    server: Server,
+    session: UserSession | undefined,
+    data: ViewStatusDto,
+  ) {
     if (!session) return;
 
     const status = await this.statusRepo.findOne({
@@ -190,7 +194,11 @@ export class StatusService {
     });
   }
 
-  async deleteStatus(server: Server, session: UserSession | undefined, data: DeleteStatusDto) {
+  async deleteStatus(
+    server: Server,
+    session: UserSession | undefined,
+    data: DeleteStatusDto,
+  ) {
     if (!session) return;
 
     const status = await this.statusRepo.findOne({
