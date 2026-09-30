@@ -199,3 +199,13 @@
   border: 1px solid rgba(134, 150, 160, 0.15);
   margin: 8px auto;
 }
+
+.chat-feed-sender-nick {
+  cursor: pointer;
+  user-select: none;
+}
+
+.chat-feed-sender-nick:hover {
+  text-decoration: underline;
+  filter: brightness(1.25);
+}

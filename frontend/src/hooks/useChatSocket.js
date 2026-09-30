@@ -102,6 +102,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         nickname,
         passcode,
         sessionToken: sessionStorage.getItem('sessionAuthToken') || undefined,
+        avatarUrl: sessionStorage.getItem('avatarUrl') || localStorage.getItem('avatarUrl') || undefined,
         deviceType: clientDevice.deviceType,
         deviceModel: clientDevice.deviceModel,
         browser: clientDevice.browser,
@@ -355,7 +356,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         setUsers((prev) =>
           prev.map((u) => ({
             ...u,
-            role: isSameNick(u.nickname, nextHost) ? 'host' : isSameNick(u.nickname, prevHost) ? 'member' : u.role,
+            role: isSameNick(u.nickname, nextHost) ? 'host' : isSameNick(u.nickname, prevHost) ? 'admin' : u.role,
           }))
         );
       }
@@ -1091,6 +1092,13 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
   const handleUpdateAvatar = (newAvatarUrl) => {
     if (!socketRef.current || !passcode) return;
+    if (newAvatarUrl) {
+      sessionStorage.setItem('avatarUrl', newAvatarUrl);
+      localStorage.setItem('avatarUrl', newAvatarUrl);
+    } else {
+      sessionStorage.removeItem('avatarUrl');
+      localStorage.removeItem('avatarUrl');
+    }
     socketRef.current.emit('updateMetadata', {
       passcode,
       avatarUrl: newAvatarUrl,

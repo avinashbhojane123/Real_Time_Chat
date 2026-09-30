@@ -415,7 +415,7 @@ export class ChatGateway
     const roomUsers = await query
       .orderBy('user.isOnline', 'DESC')
       .addOrderBy('user.lastSeen', 'DESC')
-      .take(150)
+      .take(300)
       .getMany();
 
     const relevant = roomUsers.filter((u) => {

@@ -131,13 +131,18 @@ const ChatRoster = memo(function ChatRoster({
   onMuteUser,
   onSendDirectMessage,
   onUpdateAvatar,
+  inspectingNickname: propInspectingNickname,
+  setInspectingNickname: propSetInspectingNickname,
 }) {
   const [showOnlineGroup, setShowOnlineGroup] = useState(true);
   const [showOfflineGroup, setShowOfflineGroup] = useState(true);
   const [showBannedGroup, setShowBannedGroup] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarErrors, setAvatarErrors] = useState({});
-  const [inspectingNickname, setInspectingNickname] = useState(null);
+  const [internalInspectingNickname, setInternalInspectingNickname] = useState(null);
+  const inspectingNickname =
+    propInspectingNickname !== undefined ? propInspectingNickname : internalInspectingNickname;
+  const setInspectingNickname = propSetInspectingNickname || setInternalInspectingNickname;
   const [copiedHandle, setCopiedHandle] = useState(false);
   const [whisperMessage, setWhisperMessage] = useState('');
   const [actionModal, setActionModal] = useState(null);
@@ -883,7 +888,11 @@ const ChatRoster = memo(function ChatRoster({
                         onlineUsers.map((u, idx) => {
                           const presence = formatUserPresence(u.isOnline, u.lastSeen);
                           const isMe = u.nickname === nickname;
-                          const isTyping = typingUsers && typingUsers.includes(u.nickname);
+                          const isTyping =
+                            typingUsers &&
+                            typingUsers.some(
+                              (t) => (t || '').trim().toLowerCase() === (u.nickname || '').trim().toLowerCase()
+                            );
 
                           return (
                             <motion.div

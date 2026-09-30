@@ -142,6 +142,7 @@ export default function ChatRoom() {
   const [showRosterPanel, setShowRosterPanel] = useState(false);
   const [showRailSidebar, setShowRailSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const [isMobileDevice, setIsMobileDevice] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [inspectingNickname, setInspectingNickname] = useState(null);
 
   const handleLogout = useCallback(() => {
     try {
@@ -779,6 +780,8 @@ export default function ChatRoom() {
         typingUsers={typingUsers}
         statusUserList={statusUserList}
         socketLatency={socketLatency}
+        inspectingNickname={inspectingNickname}
+        setInspectingNickname={setInspectingNickname}
         setInputText={setInputText}
         onStartCall={webRTC.startCall}
         currentUserRole={currentUserRole}
@@ -907,6 +910,10 @@ export default function ChatRoom() {
           QUICK_REACTIONS={QUICK_REACTIONS}
           EMOJI_LIST={EMOJI_LIST}
           pinnedMessage={pinnedMessage}
+          onInspectUser={(targetNick) => {
+            setInspectingNickname(targetNick);
+            setShowRosterPanel(true);
+          }}
         />
 
         {/* CinemaOS Movie Quick Launcher Banner */}

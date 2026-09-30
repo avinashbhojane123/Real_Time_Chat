@@ -45,6 +45,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
   QUICK_REACTIONS,
   EMOJI_LIST,
   pinnedMessage,
+  onInspectUser,
 }) {
   // Helper function to normalize reaction maps/arrays into a clean list
   const getNormalizedReactions = (reactions) => {
@@ -481,11 +482,103 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
                       )}
 
                       {/* Sender Nickname Header for Incoming Messages */}
-                      {!isMe && (
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#00a884', marginBottom: '2px', paddingRight: '28px' }}>
-                          {msg.nickname}
-                        </div>
-                      )}
+                      {!isMe && (() => {
+                        const senderUser = (users || []).find(
+                          (u) => (u.nickname || '').trim().toLowerCase() === (msg.nickname || '').trim().toLowerCase()
+                        );
+                        return (
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              marginBottom: '3px',
+                              paddingRight: '28px',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onInspectUser && msg.nickname) {
+                                  onInspectUser(msg.nickname);
+                                }
+                              }}
+                              style={{
+                                fontSize: '0.76rem',
+                                fontWeight: 700,
+                                color: '#00a884',
+                                cursor: onInspectUser ? 'pointer' : 'default',
+                                transition: 'all 0.15s ease',
+                              }}
+                              className="chat-feed-sender-nick"
+                              title={onInspectUser ? `Click to view profile of @${msg.nickname}` : undefined}
+                            >
+                              {msg.nickname}
+                            </span>
+                            {senderUser?.role === 'host' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(255, 193, 7, 0.16)',
+                                  color: '#ffc107',
+                                  border: '1px solid rgba(255, 193, 7, 0.35)',
+                                  padding: '1px 5px',
+                                  borderRadius: '5px',
+                                  lineHeight: 1.2,
+                                }}
+                                title="Room Host"
+                              >
+                                👑 Host
+                              </span>
+                            )}
+                            {senderUser?.role === 'admin' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(0, 168, 132, 0.16)',
+                                  color: '#00a884',
+                                  border: '1px solid rgba(0, 168, 132, 0.35)',
+                                  padding: '1px 5px',
+                                  borderRadius: '5px',
+                                  lineHeight: 1.2,
+                                }}
+                                title="Room Admin"
+                              >
+                                🛡️ Admin
+                              </span>
+                            )}
+                            {senderUser?.isCreator && senderUser?.role !== 'host' && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  fontSize: '0.62rem',
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(168, 85, 247, 0.16)',
+                                  color: '#c084fc',
+                                  border: '1px solid rgba(168, 85, 247, 0.35)',
+                                  padding: '1px 5px',
+                                  borderRadius: '5px',
+                                  lineHeight: 1.2,
+                                }}
+                                title="Room Creator"
+                              >
+                                ⭐ Creator
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Feature 3 (Set 2): M3 Quoted Reply Sub-Card */}
                       {msg.replyTo && (
