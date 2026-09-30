@@ -36,6 +36,12 @@ if (typeof window !== 'undefined') {
     },
     true
   );
+
+  // Handle stale Vite dynamic chunks/stylesheets after new deployments
+  window.addEventListener('vite:preloadError', (event) => {
+    console.warn('[Vite] Dynamic asset failed to load after new deployment. Reloading to fetch latest assets...', event);
+    window.location.reload();
+  });
 }
 
 // Register PWA Service Worker in production for offline caching & installability

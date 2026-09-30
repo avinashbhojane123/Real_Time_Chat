@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { getSocketBaseUrl } from '../utils/apiConfig';
@@ -18,6 +18,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const [isSocketConnected, setIsSocketConnected] = useState(true);
   const [socketLatency, setSocketLatency] = useState(null);
   const [kickedInfo, setKickedInfo] = useState(null);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const isLoadingOlderRef = useRef(false);
 
   const DEFAULT_WALLPAPER =
     'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop';
@@ -76,12 +79,14 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     const socketUrl = getSocketBaseUrl(baseUrl);
     const socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
+      upgrade: true,
+      rememberUpgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 500,
-      reconnectionDelayMax: 2500,
-      timeout: 20000,
+      reconnectionDelayMax: 2000,
+      timeout: 10000,
     });
     socketRef.current = socket;
 
@@ -188,8 +193,24 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
     // Chat History Event Listeners
     socket.on('chatHistory', (history) => {
-      const msgs = history || [];
-      setMessages(msgs);
+      const msgs = Array.isArray(history) ? history : [];
+      setMessages((prev) => {
+        if (!prev || prev.length === 0) return msgs;
+        const optimistic = prev.filter((m) => String(m.id).startsWith('temp-'));
+        const map = new Map();
+        for (const m of msgs) {
+          map.set(String(m.id), m);
+        }
+        for (const m of prev) {
+          if (!String(m.id).startsWith('temp-') && !map.has(String(m.id))) {
+            map.set(String(m.id), m);
+          }
+        }
+        const merged = Array.from(map.values()).sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        return [...merged, ...optimistic];
+      });
       if (nickname) {
         const myNick = nickname.trim().toLowerCase();
         const unreadWhispers = msgs.filter(
@@ -700,6 +721,40 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     };
   }, [isSocketConnected, passcode]);
 
+  const loadOlderMessages = useCallback(() => {
+    if (!socketRef.current || !socketRef.current.connected || isLoadingOlderRef.current || !hasMoreOlder) return;
+
+    // Find the oldest persisted message ID (exclude optimistic temp- IDs)
+    const oldestMsg = messages.find(
+      (m) => typeof m.id === 'number' || (!String(m.id).startsWith('temp-') && !isNaN(Number(m.id)))
+    );
+    if (!oldestMsg) return;
+
+    isLoadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+
+    socketRef.current.emit(
+      'getMessages',
+      { passcode, beforeId: Number(oldestMsg.id), limit: 30 },
+      (response) => {
+        setIsLoadingOlder(false);
+        isLoadingOlderRef.current = false;
+        const older = Array.isArray(response) ? response : [];
+        if (older.length < 30) {
+          setHasMoreOlder(false);
+        }
+        if (older.length > 0) {
+          setMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => String(m.id)));
+            const newOlder = older.filter((m) => !existingIds.has(String(m.id)));
+            if (newOlder.length === 0) return prev;
+            return [...newOlder, ...prev];
+          });
+        }
+      }
+    );
+  }, [passcode, messages, hasMoreOlder]);
+
   const handleMarkAsRead = (messageIds) => {
     if (socketRef.current && messageIds && messageIds.length > 0) {
       socketRef.current.emit('markRead', {
@@ -1205,5 +1260,8 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     isCurrentUserCreator,
     isCurrentUserMuted,
     isCurrentUserBanned,
+    hasMoreOlder,
+    isLoadingOlder,
+    loadOlderMessages,
   };
 }

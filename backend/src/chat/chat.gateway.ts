@@ -117,8 +117,8 @@ function sanitizeAvatarUrl(url?: string): string | null {
       ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
       : '*',
   },
-  pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 25000),
-  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 20000),
+  pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 10000),
+  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 10000),
   maxHttpBufferSize: 1e7,
 })
 export class ChatGateway
@@ -281,6 +281,25 @@ export class ChatGateway
       role?: 'host' | 'admin' | 'member';
     }
   >();
+
+  private async findRoomByPasscode(passcode: string): Promise<Room | null> {
+    if (!passcode) return null;
+    const cleanPass = passcode.trim();
+    return await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', { passcode: cleanPass })
+      .getOne();
+  }
+
+  private async findMatchingRoomIds(passcode: string): Promise<number[]> {
+    if (!passcode) return [];
+    const cleanPass = passcode.trim();
+    const rooms = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', { passcode: cleanPass })
+      .getMany();
+    return rooms.map((r) => r.id);
+  }
 
   private socketMessageTimes = new Map<string, number[]>();
   private userDisconnectDebounceTimers = new Map<string, NodeJS.Timeout>();
@@ -1217,13 +1236,19 @@ export class ChatGateway
       this.watchPartyCleanupTimers.delete(roomPasscode);
     }
 
+    const matchingRoomIds = await this.findMatchingRoomIds(cleanPass);
+    if (!matchingRoomIds.includes(room.id)) {
+      matchingRoomIds.push(room.id);
+    }
+
     const messages = await this.messageRepo
       .createQueryBuilder('m')
-      .where('m.roomId = :roomId', { roomId: room.id })
+      .where('m.roomId IN (:...roomIds)', { roomIds: matchingRoomIds })
       .andWhere(
-        '(m.isDirect = false OR m.isDirect IS NULL OR LOWER(m.nickname) = LOWER(:clientNick) OR LOWER(m.targetNickname) = LOWER(:clientNick))',
+        '(m.isDirect = false OR m.isDirect IS NULL OR LOWER(TRIM(m.nickname)) = LOWER(TRIM(:clientNick)) OR LOWER(TRIM(m.targetNickname)) = LOWER(TRIM(:clientNick)))',
         { clientNick: cleanNick },
       )
+      .andWhere('(m.expiresAt IS NULL OR m.expiresAt > :now)', { now: new Date() })
       .orderBy('m.createdAt', 'ASC')
       .getMany();
 
@@ -1323,7 +1348,9 @@ export class ChatGateway
     }
 
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) {
+    const reqPass = (data?.passcode || '').trim().toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || (sessionPass !== reqPass && !sessionPass.includes(reqPass) && !reqPass.includes(sessionPass))) {
       client.emit('error', {
         message: 'Unauthorized: Please join the room first',
       });
@@ -1333,11 +1360,7 @@ export class ChatGateway
       };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: {
-        passcode: data.passcode,
-      },
-    });
+    const room = await this.findRoomByPasscode(data.passcode || session.passcode);
 
     if (!room) {
       return {
@@ -1584,29 +1607,42 @@ export class ChatGateway
     data: GetRoomDto,
   ) {
     const session = this.users.get(client.id);
-    if (!session || session.passcode !== data.passcode) {
+    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    if (!targetPasscode) {
       return [];
     }
 
-    const room = await this.roomRepo.findOne({
-      where: {
-        passcode: data.passcode,
-      },
-    });
-
+    const room = await this.findRoomByPasscode(targetPasscode);
     if (!room) {
       return [];
     }
 
-    return await this.messageRepo
+    const matchingRoomIds = await this.findMatchingRoomIds(targetPasscode);
+    if (!matchingRoomIds.includes(room.id)) {
+      matchingRoomIds.push(room.id);
+    }
+
+    const clientNick = (session?.nickname || '').trim();
+    const query = this.messageRepo
       .createQueryBuilder('m')
-      .where('m.roomId = :roomId', { roomId: room.id })
+      .where('m.roomId IN (:...roomIds)', { roomIds: matchingRoomIds })
       .andWhere(
-        '(m.isDirect = false OR m.isDirect IS NULL OR LOWER(m.nickname) = LOWER(:clientNick) OR LOWER(m.targetNickname) = LOWER(:clientNick))',
-        { clientNick: session.nickname.trim() },
+        '(m.isDirect = false OR m.isDirect IS NULL OR LOWER(TRIM(m.nickname)) = LOWER(TRIM(:clientNick)) OR LOWER(TRIM(m.targetNickname)) = LOWER(TRIM(:clientNick)))',
+        { clientNick },
       )
-      .orderBy('m.createdAt', 'ASC')
+      .andWhere('(m.expiresAt IS NULL OR m.expiresAt > :now)', { now: new Date() });
+
+    if (data?.beforeId) {
+      query.andWhere('m.id < :beforeId', { beforeId: data.beforeId });
+    }
+
+    const limit = Math.min(data?.limit || 50, 100);
+    const olderMessages = await query
+      .orderBy('m.createdAt', 'DESC')
+      .take(limit)
       .getMany();
+
+    return olderMessages.reverse();
   }
 
   @SubscribeMessage('typing')

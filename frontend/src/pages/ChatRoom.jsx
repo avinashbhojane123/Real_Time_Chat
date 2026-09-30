@@ -117,6 +117,9 @@ export default function ChatRoom() {
     isCurrentUserCreator,
     isCurrentUserMuted,
     isCurrentUserBanned,
+    hasMoreOlder,
+    isLoadingOlder,
+    loadOlderMessages,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
   const isSameNick = (n1, n2) =>
@@ -882,6 +885,9 @@ export default function ChatRoom() {
         {/* Main Feed */}
         <ChatMessagesFeed
           filteredMessages={filteredMessages}
+          hasMoreOlder={hasMoreOlder}
+          isLoadingOlder={isLoadingOlder}
+          loadOlderMessages={loadOlderMessages}
           nickname={nickname}
           users={users}
           chatFeedRef={chatFeedRef}

@@ -11,6 +11,9 @@ import './ChatMessagesFeed.css';
 
 const ChatMessagesFeed = memo(function ChatMessagesFeed({
   filteredMessages,
+  hasMoreOlder,
+  isLoadingOlder,
+  loadOlderMessages,
   nickname,
   users,
   chatFeedRef,
@@ -135,6 +138,8 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
   const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
   const prevMessagesLengthRef = useRef(filteredMessages.length);
+  const newestMsgIdRef = useRef(null);
+  const oldestMsgIdRef = useRef(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState(null);
   const messageRefs = useRef({});
 
@@ -257,7 +262,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     );
   };
 
-  // Scroll listener to toggle showScrollToBottom & clear unreadCount when scrolled to bottom
+  // Scroll listener to toggle showScrollToBottom, clear unreadCount, and load older messages at top
   useEffect(() => {
     const feedEl = chatFeedRef?.current;
     if (!feedEl) return;
@@ -272,12 +277,17 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
       if (isAtBottom && setUnreadCount) {
         setUnreadCount(0);
       }
+
+      // Check if user has scrolled near top to automatically fetch earlier messages
+      if (feedEl.scrollTop <= 80 && hasMoreOlder && !isLoadingOlder && loadOlderMessages) {
+        loadOlderMessages();
+      }
     };
 
     feedEl.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => feedEl.removeEventListener('scroll', handleScroll);
-  }, [chatFeedRef, setShowScrollToBottom, setUnreadCount]);
+  }, [chatFeedRef, setShowScrollToBottom, setUnreadCount, hasMoreOlder, isLoadingOlder, loadOlderMessages]);
 
   // Auto-scroll effect on initial mount & new messages
   useEffect(() => {
@@ -290,10 +300,11 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
     if (currentLength === 0) return;
 
-    const distanceFromBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight;
-    const isAtBottom = distanceFromBottom <= 60;
     const lastMsg = filteredMessages[filteredMessages.length - 1];
-    const isOwnMessage = lastMsg?.nickname === nickname;
+    const firstMsg = filteredMessages[0];
+    const prevNewestId = newestMsgIdRef.current;
+    newestMsgIdRef.current = lastMsg?.id;
+    oldestMsgIdRef.current = firstMsg?.id;
 
     // Initial load: scroll to bottom immediately without window shift
     if (prevLength === 0) {
@@ -302,8 +313,18 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
       return;
     }
 
-    // Only scroll if a NEW message was added to the feed
-    if (currentLength > prevLength) {
+    // If older messages were loaded at the top (newest message ID is unchanged)
+    if (currentLength > prevLength && String(lastMsg?.id) === String(prevNewestId)) {
+      // Do not auto-scroll down; user is reading older messages at the top!
+      return;
+    }
+
+    // A brand new message was appended to the bottom
+    if (currentLength > prevLength && String(lastMsg?.id) !== String(prevNewestId)) {
+      const distanceFromBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight;
+      const isAtBottom = distanceFromBottom <= 120;
+      const isOwnMessage = lastMsg?.nickname === nickname;
+
       if (isOwnMessage || isAtBottom) {
         feedEl.scrollTo({ top: feedEl.scrollHeight, behavior: 'smooth' });
         if (setUnreadCount) setUnreadCount(0);
@@ -332,7 +353,70 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
       className="wa-doodle-wallpaper wa-feed-container"
     >
       <div className="wa-feed-inner">
-        <div style={{ marginTop: 'auto' }} />
+        {/* Older Messages Loader Banner / Button */}
+        {visibleMessages.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0 12px 0' }}>
+            {isLoadingOlder ? (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: 'rgba(32, 44, 51, 0.85)',
+                  color: '#00a884',
+                  padding: '6px 16px',
+                  borderRadius: '16px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  border: '1px solid rgba(0, 168, 132, 0.3)',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <Icon icon="solar:refresh-circle-bold-duotone" className="wa-spin" width="18" height="18" />
+                <span>Loading earlier messages...</span>
+              </div>
+            ) : hasMoreOlder && visibleMessages.length >= 10 ? (
+              <button
+                type="button"
+                onClick={() => loadOlderMessages && loadOlderMessages()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(32, 44, 51, 0.85)',
+                  color: '#00a884',
+                  padding: '6px 16px',
+                  borderRadius: '16px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  border: '1px solid rgba(0, 168, 132, 0.35)',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(8px)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Icon icon="solar:history-bold-duotone" width="16" height="16" />
+                <span>Load earlier messages</span>
+              </button>
+            ) : visibleMessages.length >= 5 ? (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: '#8696a0',
+                  fontSize: '0.72rem',
+                  padding: '4px 12px',
+                }}
+              >
+                <Icon icon="solar:shield-check-bold-duotone" width="14" height="14" style={{ color: '#00a884' }} />
+                <span>End-to-end encrypted • Start of room history</span>
+              </div>
+            ) : null}
+          </div>
+        )}
         {visibleMessages.length === 0 ? (
           <div style={{ margin: 'auto', textAlign: 'center', color: '#8696a0', padding: '32px 16px', maxWidth: '380px' }}>
             <div
