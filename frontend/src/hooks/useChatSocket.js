@@ -91,16 +91,15 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   useEffect(() => {
     if (!nickname || !passcode) return;
 
-    const socketUrl = getSocketBaseUrl(baseUrl);
     const socket = io(socketUrl, {
       transports: ['polling', 'websocket'],
       upgrade: true,
-      rememberUpgrade: true,
+      rememberUpgrade: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,
-      reconnectionDelayMax: 2000,
-      timeout: 10000,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
     socketRef.current = socket;
 
@@ -155,19 +154,13 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       if (!isTerminatedByHostRef.current) {
         if (reason === 'io server disconnect') {
           socket.connect();
-        } else if (reason === 'transport close' || reason === 'ping timeout') {
-          setTimeout(() => {
-            if (!socket.connected && !isTerminatedByHostRef.current) {
-              console.log('[Socket] Proactive reconnection triggered for:', reason);
-              socket.connect();
-            }
-          }, 1000);
         }
       }
     });
 
     socket.on('connect_error', (err) => {
       console.warn('[Socket] Connection error:', err?.message || err);
+      setIsSocketConnected(false);
     });
 
     // Periodic heartbeat to keep reverse proxies alive and monitor smoothed real-time latency (8s interval)
