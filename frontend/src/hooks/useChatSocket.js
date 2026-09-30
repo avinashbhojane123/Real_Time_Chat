@@ -138,8 +138,17 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         console.warn('[Socket] Disconnected from server. Reason:', reason);
       }
       setIsSocketConnected(false);
-      if (reason === 'io server disconnect' && !isTerminatedByHostRef.current) {
-        socket.connect();
+      if (!isTerminatedByHostRef.current) {
+        if (reason === 'io server disconnect') {
+          socket.connect();
+        } else if (reason === 'transport close' || reason === 'ping timeout') {
+          setTimeout(() => {
+            if (!socket.connected && !isTerminatedByHostRef.current) {
+              console.log('[Socket] Proactive reconnection triggered for:', reason);
+              socket.connect();
+            }
+          }, 1000);
+        }
       }
     });
 

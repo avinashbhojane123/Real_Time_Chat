@@ -118,7 +118,7 @@ function sanitizeAvatarUrl(url?: string): string | null {
       : '*',
   },
   pingInterval: Number(process.env.SOCKET_PING_INTERVAL || 10000),
-  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 10000),
+  pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT || 20000),
   maxHttpBufferSize: 1e7,
 })
 export class ChatGateway
