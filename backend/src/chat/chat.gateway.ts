@@ -369,10 +369,13 @@ export class ChatGateway
     nickname?: string,
     excludeSocketId?: string,
   ): Array<{ socketId: string; nickname: string }> {
-    const cleanPass = passcode.trim();
+    const cleanPass = passcode.trim().toLowerCase();
     const result: Array<{ socketId: string; nickname: string }> = [];
     for (const [id, user] of this.users.entries()) {
-      if (user.passcode.trim() === cleanPass && id !== excludeSocketId) {
+      if (
+        (user.passcode || '').trim().toLowerCase() === cleanPass &&
+        id !== excludeSocketId
+      ) {
         if (
           !nickname ||
           user.nickname.trim().toLowerCase() === nickname.trim().toLowerCase()
@@ -385,12 +388,12 @@ export class ChatGateway
   }
 
   private async getFormattedUsersList(roomPasscode: string, roomId: number) {
-    const cleanPass = roomPasscode.trim();
+    const cleanPass = roomPasscode.trim().toLowerCase();
     const activeSockets = Array.from(this.users.values()).filter(
-      (s) => s.passcode === cleanPass,
+      (s) => (s.passcode || '').trim().toLowerCase() === cleanPass,
     );
     const activeNicknames = new Set(
-      activeSockets.map((s) => s.nickname.toLowerCase()),
+      activeSockets.map((s) => (s.nickname || '').trim().toLowerCase()),
     );
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -419,7 +422,9 @@ export class ChatGateway
       .getMany();
 
     const relevant = roomUsers.filter((u) => {
-      if (activeNicknames.has(u.nickname.toLowerCase())) return true;
+      const cleanNick = (u.nickname || '').trim().toLowerCase();
+      if (activeNicknames.has(cleanNick)) return true;
+      if (u.isOnline && !u.isBanned) return true;
       if (u.isBanned || u.role === 'host' || u.role === 'admin' || u.isCreator) return true;
       const activityDate = u.lastSeen
         ? new Date(u.lastSeen)
@@ -427,30 +432,40 @@ export class ChatGateway
       return activityDate ? activityDate > sevenDaysAgo : false;
     });
 
-    return relevant.map((u) => ({
-      id: u.id,
-      nickname: u.nickname,
-      role: u.role || 'member',
-      isCreator: Boolean(u.isCreator),
-      isMuted: Boolean(u.isMuted),
-      mutedUntil: u.mutedUntil,
-      isBanned: Boolean(u.isBanned),
-      isOnline: activeNicknames.has(u.nickname.toLowerCase()),
-      lastSeen: u.lastSeen,
-      deviceType: u.deviceType,
-      deviceModel: u.deviceModel,
-      browser: u.browser,
-      os: u.os,
-      avatarUrl: u.avatarUrl,
-      networkLabel: u.networkLabel,
-      batteryLabel: u.batteryLabel,
-      batteryIsCharging: u.batteryIsCharging,
-    }));
+    return relevant.map((u) => {
+      const cleanNick = (u.nickname || '').trim().toLowerCase();
+      const isOnline =
+        (activeNicknames.has(cleanNick) || Boolean(u.isOnline)) && !u.isBanned;
+
+      return {
+        id: u.id,
+        nickname: u.nickname,
+        role: u.role || 'member',
+        isCreator: Boolean(u.isCreator),
+        isMuted: Boolean(u.isMuted),
+        mutedUntil: u.mutedUntil,
+        isBanned: Boolean(u.isBanned),
+        isOnline,
+        lastSeen: u.lastSeen,
+        deviceType: u.deviceType,
+        deviceModel: u.deviceModel,
+        browser: u.browser,
+        os: u.os,
+        avatarUrl: u.avatarUrl,
+        networkLabel: u.networkLabel,
+        batteryLabel: u.batteryLabel,
+        batteryIsCharging: u.batteryIsCharging,
+      };
+    });
   }
 
   private async broadcastUsersList(roomPasscode: string, roomId: number) {
     const list = await this.getFormattedUsersList(roomPasscode, roomId);
-    this.server.to(roomPasscode.trim()).emit('usersList', list);
+    const cleanPass = roomPasscode.trim();
+    this.server.to(cleanPass).emit('usersList', list);
+    if (cleanPass.toLowerCase() !== cleanPass) {
+      this.server.to(cleanPass.toLowerCase()).emit('usersList', list);
+    }
   }
 
   private getCalculatedWatchPartyPosition(state: WatchPartyState): number {
@@ -936,25 +951,30 @@ export class ChatGateway
       data.os || '',
     );
 
-    let room = await this.roomRepo.findOne({
-      where: {
-        passcode: data.passcode,
-      },
-    });
+    const cleanReqPasscode = (data.passcode || '').trim();
+    let room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(room.passcode) = LOWER(:passcode)', {
+        passcode: cleanReqPasscode,
+      })
+      .getOne();
 
     if (!room) {
       try {
         room = this.roomRepo.create({
-          passcode: data.passcode,
-          roomName: `Room-${data.passcode}`,
+          passcode: cleanReqPasscode,
+          roomName: `Room-${cleanReqPasscode}`,
         });
 
         room = await this.roomRepo.save(room);
       } catch (err: any) {
         if (err.code === '23505') {
-          room = await this.roomRepo.findOne({
-            where: { passcode: data.passcode },
-          });
+          room = await this.roomRepo
+            .createQueryBuilder('room')
+            .where('LOWER(room.passcode) = LOWER(:passcode)', {
+              passcode: cleanReqPasscode,
+            })
+            .getOne();
         } else {
           throw err;
         }
@@ -1141,7 +1161,9 @@ export class ChatGateway
     const roomPasscode = room.passcode.trim();
     const dataPasscode = data.passcode.trim();
     client.join(roomPasscode);
+    client.join(roomPasscode.toLowerCase());
     client.join(dataPasscode);
+    client.join(dataPasscode.toLowerCase());
 
     this.users.set(client.id, {
       nickname: user.nickname,
@@ -1223,13 +1245,20 @@ export class ChatGateway
       customWallpaper: activeWallpaper.customWallpaper,
       isDefault: isRoomDefault,
     });
+    const updatedUsersList = await this.getFormattedUsersList(room.passcode, room.id);
+    client.emit('usersList', updatedUsersList);
     await this.broadcastUsersList(room.passcode, room.id);
 
-    this.server.to(room.passcode).emit('userOnline', {
+    this.server.to(roomPasscode).emit('userOnline', {
       nickname: user.nickname,
     });
+    if (dataPasscode.toLowerCase() !== roomPasscode.toLowerCase()) {
+      this.server.to(dataPasscode).emit('userOnline', {
+        nickname: user.nickname,
+      });
+    }
 
-    this.server.to(room.passcode).emit('userJoined', {
+    const joinedPayload = {
       nickname: user.nickname,
       user: {
         id: user.id,
@@ -1249,7 +1278,12 @@ export class ChatGateway
         batteryLabel: user.batteryLabel,
         batteryIsCharging: user.batteryIsCharging,
       },
-    });
+    };
+
+    this.server.to(roomPasscode).emit('userJoined', joinedPayload);
+    if (dataPasscode.toLowerCase() !== roomPasscode.toLowerCase()) {
+      this.server.to(dataPasscode).emit('userJoined', joinedPayload);
+    }
 
     const now = new Date();
     const activeStatuses = await this.statusRepo
@@ -2460,11 +2494,10 @@ export class ChatGateway
       return;
     }
 
-    const room = await this.roomRepo.findOne({
-      where: {
-        passcode,
-      },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(room.passcode) = LOWER(:passcode)', { passcode })
+      .getOne();
 
     if (!room) {
       client.emit('usersList', []);

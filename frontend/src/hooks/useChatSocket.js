@@ -231,34 +231,50 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       });
     });
 
-    // User List / Room Users Listeners
-    socket.on('usersList', (userList) => {
-      setUsers(userList || []);
-    });
-
-    socket.on('userList', (userList) => {
-      setUsers(userList || []);
-    });
-
-    socket.on('roomUsers', (userList) => {
-      setUsers(userList || []);
-    });
-
     const isSameNick = (n1, n2) =>
       typeof n1 === 'string' &&
       typeof n2 === 'string' &&
       n1.trim().toLowerCase() === n2.trim().toLowerCase();
 
+    const normalizeUserList = (rawList) => {
+      const list = Array.isArray(rawList) ? rawList : [];
+      return list.map((u) => {
+        if (isSameNick(u.nickname, nickname)) {
+          return { ...u, isOnline: true };
+        }
+        return u;
+      });
+    };
+
+    // User List / Room Users Listeners
+    socket.on('usersList', (userList) => {
+      setUsers(normalizeUserList(userList));
+    });
+
+    socket.on('userList', (userList) => {
+      setUsers(normalizeUserList(userList));
+    });
+
+    socket.on('roomUsers', (userList) => {
+      setUsers(normalizeUserList(userList));
+    });
+
     socket.on('userOnline', ({ nickname: onlineUser }) => {
       if (onlineUser) {
-        setUsers((prev) =>
-          prev.map((u) => (isSameNick(u.nickname, onlineUser) ? { ...u, isOnline: true, lastSeen: null } : u))
-        );
+        setUsers((prev) => {
+          const exists = prev.some((u) => isSameNick(u.nickname, onlineUser));
+          if (exists) {
+            return prev.map((u) =>
+              isSameNick(u.nickname, onlineUser) ? { ...u, isOnline: true, lastSeen: null } : u
+            );
+          }
+          return [...prev, { nickname: onlineUser, isOnline: true, lastSeen: null, role: 'member' }];
+        });
       }
     });
 
     socket.on('userOffline', ({ nickname: offlineUser, lastSeen: offlineTime }) => {
-      if (offlineUser) {
+      if (offlineUser && !isSameNick(offlineUser, nickname)) {
         setUsers((prev) =>
           prev.map((u) =>
             isSameNick(u.nickname, offlineUser)

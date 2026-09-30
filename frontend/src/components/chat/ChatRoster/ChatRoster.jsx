@@ -157,6 +157,9 @@ const ChatRoster = memo(function ChatRoster({
     return users.find((u) => (u.nickname || '').toLowerCase() === inspectingNickname.toLowerCase()) || null;
   }, [users, inspectingNickname]);
 
+  const isInspectingMe = isSameNick(inspectingUser?.nickname, nickname);
+  const isInspectingOnline = isInspectingMe || Boolean(inspectingUser?.isOnline);
+
   // Framer motion performance optimization: disable stagger on mobile or when list is large
   const activeContainerVariants = useMemo(() => {
     return (!isMobileDevice && users.length <= 40) ? listContainerVariants : listContainerVariantsInstant;
@@ -229,7 +232,11 @@ const ChatRoster = memo(function ChatRoster({
 
   // Online users with "You" pinned at top, followed by role hierarchy (Host -> Admin -> Member) and alphabetical order
   const onlineUsers = useMemo(() => {
-    const list = filteredUsers.filter((u) => u.isOnline);
+    const list = filteredUsers.filter((u) => {
+      if (u.isBanned) return false;
+      if (isSameNick(u.nickname, nickname)) return true;
+      return Boolean(u.isOnline);
+    });
     return list.sort((a, b) => {
       if (isSameNick(a.nickname, nickname)) return -1;
       if (isSameNick(b.nickname, nickname)) return 1;
@@ -250,7 +257,9 @@ const ChatRoster = memo(function ChatRoster({
 
   // Offline non-banned users sorted by role hierarchy, then lastSeen DESC (most recently active first)
   const offlineUsers = useMemo(() => {
-    const list = filteredUsers.filter((u) => !u.isOnline && !u.isBanned);
+    const list = filteredUsers.filter(
+      (u) => !isSameNick(u.nickname, nickname) && !u.isOnline && !u.isBanned
+    );
     return list.sort((a, b) => {
       const prioA = rolePriority[a.role || 'member'] || 3;
       const prioB = rolePriority[b.role || 'member'] || 3;
@@ -260,7 +269,7 @@ const ChatRoster = memo(function ChatRoster({
       if (timeA !== timeB) return timeB - timeA;
       return (a.nickname || '').localeCompare(b.nickname || '', undefined, { sensitivity: 'base' });
     });
-  }, [filteredUsers]);
+  }, [filteredUsers, nickname]);
 
   const getMuteLabel = (u) => {
     if (!u.isMuted) return null;
@@ -898,8 +907,8 @@ const ChatRoster = memo(function ChatRoster({
                         </div>
                       ) : (
                         onlineUsers.map((u, idx) => {
-                          const presence = formatUserPresence(u.isOnline, u.lastSeen);
                           const isMe = isSameNick(u.nickname, nickname);
+                          const presence = formatUserPresence(isMe || u.isOnline, u.lastSeen);
                           const isTyping =
                             typingUsers &&
                             typingUsers.some(
@@ -1584,7 +1593,7 @@ const ChatRoster = memo(function ChatRoster({
                     src={inspectingUser.avatarUrl}
                     alt={inspectingUser.nickname}
                     onError={() => handleAvatarError(inspectingUser.nickname)}
-                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${inspectingUser.isOnline ? '#00a884' : '#8696a0'}` }}
+                    style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${isInspectingOnline ? '#00a884' : '#8696a0'}` }}
                   />
                 ) : (
                   <div
@@ -1592,14 +1601,14 @@ const ChatRoster = memo(function ChatRoster({
                       width: '64px',
                       height: '64px',
                       borderRadius: '50%',
-                      backgroundColor: isSameNick(inspectingUser.nickname, nickname) ? '#005c4b' : '#202c33',
-                      color: inspectingUser.isOnline ? '#00a884' : '#8696a0',
+                      backgroundColor: isInspectingMe ? '#005c4b' : '#202c33',
+                      color: isInspectingOnline ? '#00a884' : '#8696a0',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: 700,
                       fontSize: '1.4rem',
-                      border: `2px solid ${inspectingUser.isOnline ? '#00a884' : '#8696a0'}`,
+                      border: `2px solid ${isInspectingOnline ? '#00a884' : '#8696a0'}`,
                     }}
                   >
                     {getInitials(inspectingUser.nickname)}
@@ -1613,7 +1622,7 @@ const ChatRoster = memo(function ChatRoster({
                     width: '14px',
                     height: '14px',
                     borderRadius: '50%',
-                    backgroundColor: inspectingUser.isOnline ? '#00a884' : '#8696a0',
+                    backgroundColor: isInspectingOnline ? '#00a884' : '#8696a0',
                     border: '2px solid #1f2c34',
                   }}
                 />
@@ -1621,10 +1630,10 @@ const ChatRoster = memo(function ChatRoster({
 
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e9edef' }}>
-                  {inspectingUser.nickname} {isSameNick(inspectingUser.nickname, nickname) && '(You)'}
+                  {inspectingUser.nickname} {isInspectingMe && '(You)'}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: inspectingUser.isOnline ? '#00a884' : '#8696a0', fontWeight: 600, marginTop: '2px' }}>
-                  {formatUserPresence(inspectingUser.isOnline, inspectingUser.lastSeen).text}
+                <div style={{ fontSize: '0.78rem', color: isInspectingOnline ? '#00a884' : '#8696a0', fontWeight: 600, marginTop: '2px' }}>
+                  {formatUserPresence(isInspectingOnline, inspectingUser.lastSeen).text}
                 </div>
                 {whisperSenders.has((inspectingUser.nickname || '').toLowerCase()) && (
                   <div

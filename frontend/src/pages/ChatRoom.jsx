@@ -119,12 +119,16 @@ export default function ChatRoom() {
     isCurrentUserBanned,
   } = useChatSocket({ nickname, passcode, baseUrl });
 
+  const isSameNick = (n1, n2) =>
+    typeof n1 === 'string' &&
+    typeof n2 === 'string' &&
+    n1.trim().toLowerCase() === n2.trim().toLowerCase();
+
   // Recipient User & Presence Calculation
   const otherUsers = (users || []).filter(
     (u) =>
       typeof u.nickname === 'string' &&
-      typeof nickname === 'string' &&
-      u.nickname.trim().toLowerCase() !== nickname.trim().toLowerCase()
+      !isSameNick(u.nickname, nickname)
   );
   const otherOnlineUsers = otherUsers.filter((u) => u.isOnline);
   const recipientUser = otherUsers.length === 1 ? otherUsers[0] : (otherOnlineUsers.length > 0 ? otherOnlineUsers[0] : null);
@@ -685,10 +689,12 @@ export default function ChatRoom() {
   };
 
   const renderStatusAvatar = (userNick, size = '40px', isOnline = false, extraStyle = {}, avatarOverrideUrl = null) => {
-    const userObj = users.find((u) => u.nickname === userNick);
+    const isMe = isSameNick(userNick, nickname);
+    const userObj = users.find((u) => isSameNick(u.nickname, userNick));
     const avatarUrl = avatarOverrideUrl || userObj?.avatarUrl;
-    const userStatuses = statusUserMap[userNick]?.statuses || [];
+    const userStatuses = (userNick && statusUserMap[userNick]?.statuses) || [];
     const hasStatus = userStatuses.length > 0;
+    const isActuallyOnline = isMe || isOnline || Boolean(userObj?.isOnline);
 
     return (
       <div
@@ -727,7 +733,7 @@ export default function ChatRoom() {
             {(userNick || 'U').slice(0, 2).toUpperCase()}
           </div>
         )}
-        {isOnline && (
+        {isActuallyOnline && (
           <span
             style={{
               position: 'absolute',
@@ -848,7 +854,7 @@ export default function ChatRoom() {
           isGroupRoom={isGroupRoom}
           passcode={passcode}
           usersCount={users.filter((u) => !u.isBanned).length}
-          onlineCount={users.filter((u) => u.isOnline && !u.isBanned).length}
+          onlineCount={users.filter((u) => !u.isBanned && (isSameNick(u.nickname, nickname) || u.isOnline)).length}
           recipientUser={recipientUser}
           isRecipientOnline={isRecipientOnline}
           typingUsers={typingUsers}
