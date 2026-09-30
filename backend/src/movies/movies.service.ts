@@ -78,7 +78,9 @@ export class MoviesService {
             : undefined,
           releaseDate: item.release_date || item.first_air_date,
           mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
-          rating: item.vote_average ? Math.round(item.vote_average * 10) / 10 : 0,
+          rating: item.vote_average
+            ? Math.round(item.vote_average * 10) / 10
+            : 0,
         }));
     } catch (err: any) {
       this.logger.warn(`Failed to fetch trending from TMDB: ${err.message}`);
@@ -192,7 +194,9 @@ export class MoviesService {
             : undefined,
           releaseDate: item.release_date || item.first_air_date,
           mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
-          rating: item.vote_average ? Math.round(item.vote_average * 10) / 10 : 0,
+          rating: item.vote_average
+            ? Math.round(item.vote_average * 10) / 10
+            : 0,
         }));
     } catch (err: any) {
       this.logger.warn(`Failed to search TMDB: ${err.message}`);
@@ -232,7 +236,10 @@ export class MoviesService {
     try {
       const searchRes = await fetch(
         `${this.consumetBaseUrl}/movies/flixhq/${encodeURIComponent(cleanTitle)}`,
-        { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4500) },
+        {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(4500),
+        },
       );
 
       if (searchRes.ok) {
@@ -242,7 +249,10 @@ export class MoviesService {
           const match = results[0];
           const infoRes = await fetch(
             `${this.consumetBaseUrl}/movies/flixhq/info?id=${encodeURIComponent(match.id)}`,
-            { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4500) },
+            {
+              headers: { Accept: 'application/json' },
+              signal: AbortSignal.timeout(4500),
+            },
           );
 
           if (infoRes.ok) {
@@ -264,7 +274,10 @@ export class MoviesService {
               `${this.consumetBaseUrl}/movies/flixhq/watch?episodeId=${encodeURIComponent(
                 episodeId,
               )}&mediaId=${encodeURIComponent(match.id)}`,
-              { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(4500) },
+              {
+                headers: { Accept: 'application/json' },
+                signal: AbortSignal.timeout(4500),
+              },
             );
 
             if (watchRes.ok) {
@@ -427,10 +440,16 @@ export class MoviesService {
         // Binary segment (.ts / .m4s / .mp4 / key file)
         res.setHeader('Content-Type', contentType || 'video/MP2T');
         if (remoteRes.headers.get('content-range')) {
-          res.setHeader('Content-Range', remoteRes.headers.get('content-range')!);
+          res.setHeader(
+            'Content-Range',
+            remoteRes.headers.get('content-range')!,
+          );
         }
         if (remoteRes.headers.get('content-length')) {
-          res.setHeader('Content-Length', remoteRes.headers.get('content-length')!);
+          res.setHeader(
+            'Content-Length',
+            remoteRes.headers.get('content-length')!,
+          );
         }
         res.setHeader('Cache-Control', 'public, max-age=86400');
 

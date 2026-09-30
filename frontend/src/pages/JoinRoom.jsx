@@ -94,11 +94,22 @@ export default function JoinRoom() {
 
         try {
           if (data.customWallpaper) {
-            sessionStorage.setItem('chat_custom_wallpaper', data.customWallpaper);
-            localStorage.setItem(`chat_custom_wallpaper_${cleanPass}`, data.customWallpaper);
+            // Only cache in local storage if not an ephemeral /uploads/ URL that might 404
+            if (
+              data.customWallpaper.startsWith('data:') ||
+              (!data.customWallpaper.includes('/uploads/') &&
+                !data.customWallpaper.includes('backend-9i6w.onrender.com'))
+            ) {
+              sessionStorage.setItem('chat_custom_wallpaper', data.customWallpaper);
+              localStorage.setItem(`chat_custom_wallpaper_${cleanPass}`, data.customWallpaper);
+            }
             sessionStorage.setItem('chat_theme', data.theme || 'custom');
             localStorage.setItem(`chat_theme_${cleanPass}`, data.theme || 'custom');
-          } else if (existingLocalTheme === 'custom' && existingLocalWp) {
+          } else if (
+            existingLocalTheme === 'custom' &&
+            existingLocalWp &&
+            !existingLocalWp.includes('/uploads/')
+          ) {
             // Keep existing custom wallpaper preference instead of falling back to default
             sessionStorage.setItem('chat_theme', 'custom');
             sessionStorage.setItem('chat_custom_wallpaper', existingLocalWp);

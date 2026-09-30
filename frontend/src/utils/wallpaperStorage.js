@@ -42,11 +42,21 @@ export async function saveWallpaperOffline(passcode, { url, dataUrl, theme = 'cu
   const cleanPasscode = String(passcode).trim();
   const timestamp = Date.now();
 
+  // Retrieve existing record so we NEVER blow away a durable dataUrl or url
+  let existing = null;
+  try {
+    existing = await getWallpaperOffline(cleanPasscode);
+  } catch {}
+
+  const finalUrl = url !== undefined ? (url || '') : (existing?.url || '');
+  const finalDataUrl = dataUrl !== undefined ? (dataUrl || '') : (existing?.dataUrl || '');
+  const finalTheme = theme || existing?.theme || 'custom';
+
   const record = {
     passcode: cleanPasscode,
-    url: url || '',
-    dataUrl: dataUrl || '',
-    theme: theme || 'custom',
+    url: finalUrl,
+    dataUrl: finalDataUrl,
+    theme: finalTheme,
     updatedAt: timestamp,
   };
 
@@ -66,12 +76,15 @@ export async function saveWallpaperOffline(passcode, { url, dataUrl, theme = 'cu
 
   // 2. LocalStorage fallback (safely guarded against QuotaExceededError)
   try {
-    if (theme) {
-      localStorage.setItem(`chat_theme_${cleanPasscode}`, theme);
-      localStorage.setItem('chat_theme', theme);
+    if (finalTheme) {
+      localStorage.setItem(`chat_theme_${cleanPasscode}`, finalTheme);
+      localStorage.setItem('chat_theme', finalTheme);
     }
     // Only store URL or compact dataUrl in localStorage to avoid QuotaExceededError
-    const storageValue = url || (dataUrl && dataUrl.length < 500000 ? dataUrl : '');
+    // Prefer dataUrl over an ephemeral /uploads/ URL if both exist
+    const storageValue = (finalUrl && !finalUrl.includes('/uploads/'))
+      ? finalUrl
+      : (finalDataUrl && finalDataUrl.length < 500000 ? finalDataUrl : (finalUrl || ''));
     if (storageValue) {
       localStorage.setItem(`chat_custom_wallpaper_${cleanPasscode}`, storageValue);
       localStorage.setItem('chat_custom_wallpaper', storageValue);
@@ -102,9 +115,12 @@ export async function getWallpaperOffline(passcode) {
     });
 
     if (record) {
+      // If record.url points to server /uploads/ (ephemeral on Render), prefer dataUrl if available
+      const isEphemeralUpload = typeof record.url === 'string' && record.url.includes('/uploads/');
+      const preferred = (isEphemeralUpload && record.dataUrl) ? record.dataUrl : (record.dataUrl || record.url);
       return {
         ...record,
-        preferred: record.dataUrl || record.url,
+        preferred,
       };
     }
   } catch (idbErr) {
@@ -160,6 +176,29 @@ export async function removeWallpaperOffline(passcode) {
 
   try {
     localStorage.removeItem(`chat_custom_wallpaper_${cleanPasscode}`);
+  } catch {}
+}
+
+/**
+ * Clear expired or 404 remote /uploads/ wallpaper from localStorage & sessionStorage
+ * @param {string} passcode - Room passcode
+ */
+export function clearExpiredWallpaper(passcode) {
+  if (!passcode) return;
+  const cleanPasscode = String(passcode).trim();
+  try {
+    const localVal = localStorage.getItem(`chat_custom_wallpaper_${cleanPasscode}`);
+    if (localVal && localVal.includes('/uploads/')) {
+      localStorage.removeItem(`chat_custom_wallpaper_${cleanPasscode}`);
+    }
+    const globalVal = localStorage.getItem('chat_custom_wallpaper');
+    if (globalVal && globalVal.includes('/uploads/')) {
+      localStorage.removeItem('chat_custom_wallpaper');
+    }
+    const sessionVal = sessionStorage.getItem('chat_custom_wallpaper');
+    if (sessionVal && sessionVal.includes('/uploads/')) {
+      sessionStorage.removeItem('chat_custom_wallpaper');
+    }
   } catch {}
 }
 

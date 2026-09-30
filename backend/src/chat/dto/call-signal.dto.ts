@@ -194,6 +194,18 @@ export class WebrtcMediaStateDto {
   cameraOff?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isAudioMuted?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isVideoMuted?: boolean;
+
+  @IsOptional()
+  @IsString()
+  callId?: string;
+
+  @IsOptional()
   @IsString()
   targetSocketId?: string;
 }

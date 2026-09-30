@@ -1,4 +1,10 @@
-import { Controller, Post, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomHttpDto } from './dto/join-room-http.dto';
 import { RateLimitGuard } from '../common/guards/rate-limit.guard';
@@ -15,9 +21,14 @@ export class RoomsController {
   ) {
     const room = await this.roomService.findOrCreate(body.passcode.trim());
 
-    const isBanned = await this.roomService.checkBanned(room.id, body.nickname.trim());
+    const isBanned = await this.roomService.checkBanned(
+      room.id,
+      body.nickname.trim(),
+    );
     if (isBanned) {
-      throw new ForbiddenException('You are permanently banned from this room by the host.');
+      throw new ForbiddenException(
+        'You are permanently banned from this room by the host.',
+      );
     }
 
     return {

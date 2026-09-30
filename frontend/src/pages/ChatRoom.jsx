@@ -6,7 +6,12 @@ import './ChatRoom.css';
 // Utilities & Config
 import { getApiBaseUrl } from '../utils/apiConfig';
 import { formatTimer } from '../utils/chatUtils';
-import { saveWallpaperOffline, getWallpaperOffline, checkImageUrlValid } from '../utils/wallpaperStorage';
+import {
+  saveWallpaperOffline,
+  getWallpaperOffline,
+  checkImageUrlValid,
+  clearExpiredWallpaper,
+} from '../utils/wallpaperStorage';
 import {
   validateSession,
   touchSessionActivity,
@@ -240,12 +245,20 @@ export default function ChatRoom() {
   });
 
   const [customWallpaper, setCustomWallpaper] = useState(() => {
-    return (
+    const stored =
       (passcode && localStorage.getItem(`chat_custom_wallpaper_${passcode}`)) ||
       sessionStorage.getItem('chat_custom_wallpaper') ||
-      localStorage.getItem('chat_custom_wallpaper') ||
-      DEFAULT_CUSTOM_WALLPAPER
-    );
+      localStorage.getItem('chat_custom_wallpaper');
+
+    // Never initialize directly with an ephemeral /uploads/ URL to avoid an immediate 404 browser GET
+    if (
+      stored &&
+      (stored.startsWith('data:') ||
+        (!stored.includes('/uploads/') && !stored.includes('backend-9i6w.onrender.com')))
+    ) {
+      return stored;
+    }
+    return DEFAULT_CUSTOM_WALLPAPER;
   });
   const [showThemeModal, setShowThemeModal] = useState(false);
 
@@ -255,10 +268,10 @@ export default function ChatRoom() {
     let isCancelled = false;
     getWallpaperOffline(passcode).then((offline) => {
       if (isCancelled || !offline) return;
-      if (offline.preferred) {
-        setCustomWallpaper((curr) =>
-          curr === DEFAULT_CUSTOM_WALLPAPER || curr.includes('/uploads/') ? offline.preferred : curr
-        );
+      if (offline.dataUrl) {
+        setCustomWallpaper(offline.dataUrl);
+      } else if (offline.preferred && !offline.preferred.includes('/uploads/')) {
+        setCustomWallpaper(offline.preferred);
       }
       if (offline.theme && offline.theme === 'custom') {
         setCurrentTheme((curr) => (curr === 'wa-doodle' ? 'custom' : curr));
@@ -278,18 +291,25 @@ export default function ChatRoom() {
       if (isCancelled) return;
       if (!isValid) {
         console.warn(`[Wallpaper] Remote wallpaper failed to load (404/expired): ${customWallpaper}`);
+        if (passcode) {
+          clearExpiredWallpaper(passcode);
+        }
         // Check if we have an offline dataUrl fallback stored in IndexedDB
         if (passcode) {
           const offline = await getWallpaperOffline(passcode);
           if (!isCancelled && offline?.dataUrl) {
             console.log('[Wallpaper] Seamlessly recovered wallpaper from offline IndexedDB cache');
             setCustomWallpaper(offline.dataUrl);
+            sendUpdateRoomWallpaper({ theme: 'custom', customWallpaper: offline.dataUrl });
             return;
           }
+          // No offline dataUrl: notify server to clear dead wallpaper from room
+          sendUpdateRoomWallpaper({ theme: 'wa-doodle', customWallpaper: null });
         }
         // Fallback to default if no offline data is available
         if (!isCancelled) {
           setCustomWallpaper(DEFAULT_CUSTOM_WALLPAPER);
+          setCurrentTheme('wa-doodle');
         }
       }
     });
@@ -308,7 +328,30 @@ export default function ChatRoom() {
 
   useEffect(() => {
     if (roomCustomWallpaper && roomCustomWallpaper !== customWallpaper) {
-      setCustomWallpaper(roomCustomWallpaper);
+      if (roomCustomWallpaper.startsWith('data:') || !roomCustomWallpaper.includes('/uploads/')) {
+        setCustomWallpaper(roomCustomWallpaper);
+      } else {
+        // Ephemeral /uploads/ URL from server: verify before applying to prevent 404
+        checkImageUrlValid(roomCustomWallpaper, 3000).then(async (isValid) => {
+          if (isValid) {
+            setCustomWallpaper(roomCustomWallpaper);
+          } else {
+            console.warn(`[Wallpaper] Server-synced wallpaper is 404/expired: ${roomCustomWallpaper}`);
+            if (passcode) {
+              clearExpiredWallpaper(passcode);
+              const offline = await getWallpaperOffline(passcode);
+              if (offline?.dataUrl) {
+                setCustomWallpaper(offline.dataUrl);
+                sendUpdateRoomWallpaper({ theme: 'custom', customWallpaper: offline.dataUrl });
+                return;
+              }
+              sendUpdateRoomWallpaper({ theme: 'wa-doodle', customWallpaper: null });
+            }
+            setCustomWallpaper(DEFAULT_CUSTOM_WALLPAPER);
+            setCurrentTheme('wa-doodle');
+          }
+        });
+      }
     }
   }, [roomCustomWallpaper]);
 

@@ -161,4 +161,3 @@ export class Message {
   })
   targetNickname!: string | null;
 }
-

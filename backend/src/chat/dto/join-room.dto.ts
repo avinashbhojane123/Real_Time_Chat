@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsNumber,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class JoinRoomDto {

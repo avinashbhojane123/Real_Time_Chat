@@ -69,10 +69,10 @@ export default function ThemeModal({
 
     try {
       setIsUploading(true);
-      // Auto-compress image (ensures standard JPEG and ultra-fast upload under 400KB)
-      const file = await compressImageFile(rawFile, 1920, 1080, 0.85);
+      // Auto-compress image (ensures crisp 1600x900 JPEG and ultra-fast base64 under 150KB)
+      const file = await compressImageFile(rawFile, 1600, 900, 0.78);
 
-      // Read compressed image as Data URL so we have an instant, permanent local fallback
+      // Read compressed image as Data URL for 100% durable, restart-proof wallpaper
       const dataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (event) => resolve(event.target?.result || '');
@@ -80,47 +80,22 @@ export default function ThemeModal({
         reader.readAsDataURL(file);
       });
 
-      // Instantly cache into IndexedDB to guarantee persistence against server restarts
-      if (passcode && dataUrl) {
+      if (!dataUrl) {
+        throw new Error('Failed to read image data');
+      }
+
+      // 1. Cache permanently in IndexedDB for instant offline recovery
+      if (passcode) {
         await saveWallpaperOffline(passcode, { url: '', dataUrl, theme: 'custom' });
       }
 
-      // Try uploading to server for a lightweight, shared URL across devices
-      if (baseUrl) {
-        try {
-          const data = await uploadFileApi(baseUrl, file);
-          if (data && data.fileUrl) {
-            // Strip any trailing /api to ensure static uploads route correctly to /uploads/
-            const serverBaseUrl = baseUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '');
-            const fullUrl = data.fileUrl.startsWith('http')
-              ? data.fileUrl
-              : `${serverBaseUrl}${data.fileUrl.startsWith('/') ? '' : '/'}${data.fileUrl}`;
-
-            // Save both fullUrl and dataUrl in IndexedDB so client can fall back if server 404s
-            if (passcode) {
-              await saveWallpaperOffline(passcode, { url: fullUrl, dataUrl, theme: 'custom' });
-            }
-
-            setInputUrl(fullUrl);
-            setImageError(false);
-            setIsUploading(false);
-            onSelectTheme('custom', fullUrl);
-            return;
-          }
-        } catch (uploadErr) {
-          console.warn('Server wallpaper upload failed, using local offline copy:', uploadErr);
-        }
-      }
-
-      // Fallback: Use permanent offline Data URL if server upload was unavailable or failed
-      if (dataUrl) {
-        setInputUrl(dataUrl);
-        setImageError(false);
-        setIsUploading(false);
-        onSelectTheme('custom', dataUrl);
-      } else {
-        throw new Error('Failed to read image data');
-      }
+      // 2. Set as room wallpaper directly using dataUrl:
+      // This is stored in PostgreSQL (TEXT column), survives all Render container restarts/spin-downs,
+      // and guarantees it NEVER 404s or expires.
+      setInputUrl(dataUrl);
+      setImageError(false);
+      setIsUploading(false);
+      onSelectTheme('custom', dataUrl);
     } catch (err) {
       console.error('Wallpaper processing failed:', err);
       setImageError(true);

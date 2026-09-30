@@ -4,7 +4,12 @@ import axios from 'axios';
 import { getSocketBaseUrl } from '../utils/apiConfig';
 import { detectClientDevice, getBatteryInfo, detectNetworkInfo } from '../utils/deviceUtils';
 import { compressImageFile } from '../utils/imageUtils';
-import { saveWallpaperOffline, getWallpaperOffline } from '../utils/wallpaperStorage';
+import {
+  saveWallpaperOffline,
+  getWallpaperOffline,
+  checkImageUrlValid,
+  clearExpiredWallpaper,
+} from '../utils/wallpaperStorage';
 import { startBackgroundAudioKeepAlive, stopBackgroundAudioKeepAlive } from '../utils/keepAliveAudio';
 
 export function useChatSocket({ nickname, passcode, baseUrl }) {
@@ -35,12 +40,19 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   });
 
   const [roomCustomWallpaper, setRoomCustomWallpaper] = useState(() => {
-    return (
+    const stored =
       (passcode && localStorage.getItem(`chat_custom_wallpaper_${passcode}`)) ||
       sessionStorage.getItem('chat_custom_wallpaper') ||
-      localStorage.getItem('chat_custom_wallpaper') ||
-      DEFAULT_WALLPAPER
-    );
+      localStorage.getItem('chat_custom_wallpaper');
+
+    if (
+      stored &&
+      (stored.startsWith('data:') ||
+        (!stored.includes('/uploads/') && !stored.includes('backend-9i6w.onrender.com')))
+    ) {
+      return stored;
+    }
+    return DEFAULT_WALLPAPER;
   });
 
   // Load durable IndexedDB wallpaper on mount
@@ -49,7 +61,9 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     let isCancelled = false;
     getWallpaperOffline(passcode).then((offline) => {
       if (isCancelled || !offline) return;
-      if (offline.preferred) {
+      if (offline.dataUrl) {
+        setRoomCustomWallpaper(offline.dataUrl);
+      } else if (offline.preferred && !offline.preferred.includes('/uploads/')) {
         setRoomCustomWallpaper((curr) => (curr === DEFAULT_WALLPAPER ? offline.preferred : curr));
       }
       if (offline.theme && offline.theme === 'custom') {
@@ -608,6 +622,35 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       // If server sent a valid non-empty custom wallpaper string, sync it
       if (typeof customWallpaper === 'string' && customWallpaper.trim() !== '') {
         const finalWp = customWallpaper.trim();
+
+        // If server sent an ephemeral /uploads/ URL, handle possible 404
+        if (finalWp.includes('/uploads/')) {
+          if (offline?.dataUrl) {
+            // Restore durable base64 copy from offline cache and re-sync to server
+            socket.emit('updateRoomWallpaper', {
+              passcode,
+              theme: 'custom',
+              customWallpaper: offline.dataUrl,
+            });
+            setRoomCustomWallpaper(offline.dataUrl);
+            setRoomTheme('custom');
+            return;
+          }
+          const isAlive = await checkImageUrlValid(finalWp, 2500);
+          if (!isAlive) {
+            console.warn('[useChatSocket] Server sent 404/expired wallpaper URL. Clearing.');
+            if (passcode) clearExpiredWallpaper(passcode);
+            setRoomCustomWallpaper(DEFAULT_WALLPAPER);
+            setRoomTheme(theme && theme !== 'custom' ? theme : 'wa-doodle');
+            socket.emit('updateRoomWallpaper', {
+              passcode,
+              theme: theme && theme !== 'custom' ? theme : 'wa-doodle',
+              customWallpaper: null,
+            });
+            return;
+          }
+        }
+
         setRoomCustomWallpaper(finalWp);
         if (theme) setRoomTheme(theme);
         if (passcode) {
@@ -618,14 +661,15 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
 
       // If server sent null / empty wallpaper (e.g. server restart on Render or unconfigured):
       // DO NOT clobber the user's active local wallpaper!
-      if (hasLocalCustom) {
-        // Re-announce our offline wallpaper so server caches it and syncs to room
-        const activeUrl = offline.url || offline.dataUrl;
+      if (hasLocalCustom && offline.dataUrl) {
+        // Re-announce our durable offline base64 wallpaper so server caches it and syncs to room
         socket.emit('updateRoomWallpaper', {
           passcode,
           theme: offline.theme || 'custom',
-          customWallpaper: activeUrl,
+          customWallpaper: offline.dataUrl,
         });
+        setRoomCustomWallpaper(offline.dataUrl);
+        setRoomTheme(offline.theme || 'custom');
         return;
       }
 
@@ -649,6 +693,14 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
       if (typeof customWallpaper === 'string' && customWallpaper.trim() !== '') {
         const finalWp = customWallpaper.trim();
+        if (finalWp.includes('/uploads/')) {
+          const isAlive = await checkImageUrlValid(finalWp, 2500);
+          if (!isAlive) {
+            console.warn('[useChatSocket] Received 404 wallpaper update. Reverting.');
+            setRoomCustomWallpaper(DEFAULT_WALLPAPER);
+            return;
+          }
+        }
         setRoomCustomWallpaper(finalWp);
         if (passcode) {
           await saveWallpaperOffline(passcode, { url: finalWp, theme: theme || 'custom' });
