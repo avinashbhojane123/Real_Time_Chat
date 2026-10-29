@@ -28,11 +28,13 @@ export class User {
   nickname!: string;
 
   @Column({
+    type: 'boolean',
     default: false,
   })
   isOnline!: boolean;
 
   @Column({
+    type: 'timestamp',
     nullable: true,
   })
   lastSeen!: Date | null;
@@ -45,7 +47,9 @@ export class User {
   })
   room!: Room;
 
-  @Column()
+  @Column({
+    type: 'int',
+  })
   roomId!: number;
 
   @CreateDateColumn()
@@ -103,6 +107,7 @@ export class User {
   batteryLabel!: string | null;
 
   @Column({
+    type: 'boolean',
     default: false,
   })
   batteryIsCharging!: boolean;
@@ -115,16 +120,19 @@ export class User {
   role!: 'host' | 'admin' | 'member';
 
   @Column({
+    type: 'boolean',
     default: false,
   })
   isMuted!: boolean;
 
   @Column({
+    type: 'boolean',
     default: false,
   })
   isBanned!: boolean;
 
   @Column({
+    type: 'timestamp',
     nullable: true,
   })
   bannedAt!: Date | null;
@@ -137,11 +145,13 @@ export class User {
   sessionToken!: string | null;
 
   @Column({
+    type: 'boolean',
     default: false,
   })
   isCreator!: boolean;
 
   @Column({
+    type: 'timestamp',
     nullable: true,
   })
   mutedUntil!: Date | null;

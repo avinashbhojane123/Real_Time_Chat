@@ -16,18 +16,21 @@ export class Room {
   id!: number;
 
   @Column({
+    type: 'varchar',
     unique: true,
     length: 50,
   })
   passcode!: string;
 
   @Column({
+    type: 'varchar',
     nullable: true,
     length: 100,
   })
   roomName!: string;
 
   @Column({
+    type: 'boolean',
     default: true,
   })
   isActive!: boolean;

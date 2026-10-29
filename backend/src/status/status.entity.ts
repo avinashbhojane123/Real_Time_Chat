@@ -30,7 +30,9 @@ export class Status {
   room!: Room;
 
   @Index()
-  @Column()
+  @Column({
+    type: 'int',
+  })
   roomId!: number;
 
   @Column({
@@ -83,6 +85,7 @@ export class Status {
   createdAt!: Date;
 
   @Column({
+    type: 'timestamp',
     nullable: true,
   })
   expiresAt!: Date | null;

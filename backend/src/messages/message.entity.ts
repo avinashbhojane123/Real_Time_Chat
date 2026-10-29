@@ -15,7 +15,10 @@ export class Message {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({
+    type: 'varchar',
+    length: 50,
+  })
   nickname!: string;
 
   @Column({
@@ -32,7 +35,9 @@ export class Message {
   room!: Room;
 
   @Index()
-  @Column()
+  @Column({
+    type: 'int',
+  })
   roomId!: number;
 
   @CreateDateColumn()
@@ -113,6 +118,7 @@ export class Message {
 
   @Index()
   @Column({
+    type: 'timestamp',
     nullable: true,
     default: null,
   })
