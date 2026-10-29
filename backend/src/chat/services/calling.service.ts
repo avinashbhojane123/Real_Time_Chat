@@ -279,10 +279,8 @@ export class CallingService implements OnModuleDestroy {
     );
 
     if (target?.socketId) {
-      server.to(target.socketId).emit('userCalling', callPayload);
       server.to(target.socketId).emit('callUser', callPayload);
     } else {
-      client.to(room).emit('userCalling', callPayload);
       client.to(room).emit('callUser', callPayload);
     }
   }
@@ -336,16 +334,14 @@ export class CallingService implements OnModuleDestroy {
 
     if (callSession?.callerSocketId) {
       server.to(callSession.callerSocketId).emit('callAccepted', acceptPayload);
-      server.to(callSession.callerSocketId).emit('acceptCall', acceptPayload);
     } else if (data.targetSocketId) {
       const targetSession = usersMap.get(data.targetSocketId);
       if (targetSession && targetSession.passcode.trim() === room) {
         server.to(data.targetSocketId).emit('callAccepted', acceptPayload);
-        server.to(data.targetSocketId).emit('acceptCall', acceptPayload);
       }
+    } else {
+      client.to(room).emit('callAccepted', acceptPayload);
     }
-    client.to(room).emit('callAccepted', acceptPayload);
-    client.to(room).emit('acceptCall', acceptPayload);
   }
 
   declineCall(
@@ -379,13 +375,11 @@ export class CallingService implements OnModuleDestroy {
       server
         .to(callSession.callerSocketId)
         .emit('callDeclined', declinePayload);
-      server.to(callSession.callerSocketId).emit('declineCall', declinePayload);
     } else if (data.targetSocketId) {
       server.to(data.targetSocketId).emit('callDeclined', declinePayload);
-      server.to(data.targetSocketId).emit('declineCall', declinePayload);
+    } else {
+      client.to(room).emit('callDeclined', declinePayload);
     }
-    client.to(room).emit('callDeclined', declinePayload);
-    client.to(room).emit('declineCall', declinePayload);
   }
 
   webrtcOffer(
@@ -462,17 +456,9 @@ export class CallingService implements OnModuleDestroy {
       const targetSession = usersMap.get(targetSocketId);
       if (targetSession && targetSession.passcode.trim() === room) {
         server.to(targetSocketId).emit('webrtcAnswer', answerPayload);
-        server.to(targetSocketId).emit('callAccepted', {
-          receiverName: data.receiverName || session.nickname,
-          from: session.nickname,
-        });
       }
     } else {
       client.to(room).emit('webrtcAnswer', answerPayload);
-      client.to(room).emit('callAccepted', {
-        receiverName: data.receiverName || session.nickname,
-        from: session.nickname,
-      });
     }
   }
 
@@ -522,6 +508,7 @@ export class CallingService implements OnModuleDestroy {
     console.log(`[EndCall] Relaying endCall in room: ${room}`);
 
     const callSession = this.findCallBySocketId(client.id);
+    let notifiedPeer = false;
     if (callSession) {
       if (callSession.ringTimer) clearTimeout(callSession.ringTimer);
       this.clearCallDisconnectTimer(callSession.callId);
@@ -538,22 +525,16 @@ export class CallingService implements OnModuleDestroy {
           from: session.nickname,
           callId: callSession.callId,
         });
-        server.to(peerSocketId).emit('endCall', {
-          reason: data.reason || 'Call ended by participant',
-          from: session.nickname,
-          callId: callSession.callId,
-        });
+        notifiedPeer = true;
       }
     }
 
-    client.to(room).emit('callEnded', {
-      reason: data.reason || 'Call ended',
-      from: session.nickname,
-    });
-    client.to(room).emit('endCall', {
-      reason: data.reason || 'Call ended',
-      from: session.nickname,
-    });
+    if (!notifiedPeer) {
+      client.to(room).emit('callEnded', {
+        reason: data.reason || 'Call ended',
+        from: session.nickname,
+      });
+    }
   }
 
   getIceServers(client: Socket, session: UserSession | undefined) {

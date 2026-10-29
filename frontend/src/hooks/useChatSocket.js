@@ -48,7 +48,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     if (
       stored &&
       (stored.startsWith('data:') ||
-        (!stored.includes('/uploads/') && !stored.includes('backend-9i6w.onrender.com')))
+        (!stored.includes('/uploads/')))
     ) {
       return stored;
     }
@@ -78,6 +78,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const socketRef = useRef(null);
   const isTerminatedByHostRef = useRef(false);
   const typingTimeoutRef = useRef(null);
+  const lastTypingEmitRef = useRef(0);
   const typingTimersRef = useRef({});
 
   const showToast = (msg) => {
@@ -274,15 +275,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       });
     });
 
-    socket.on('message', (msg) => {
-      setMessages((prev) => {
-        const clean = prev.filter(
-          (m) => !(String(m.id).startsWith('temp-') && m.nickname === msg.nickname && m.message === msg.message)
-        );
-        if (clean.some((m) => String(m.id) === String(msg.id))) return clean;
-        return [...clean, msg];
-      });
-    });
+
 
     const isSameNick = (n1, n2) =>
       typeof n1 === 'string' &&
@@ -504,13 +497,16 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
     socket.on('userStoppedTyping', handleStopTyping);
 
     // Read Receipts Listener (Double Blue Ticks)
-    socket.on('messagesRead', ({ messageIds, readByNick }) => {
+    socket.on('messagesRead', ({ messageIds, readByNick, reader }) => {
+      const targetNick = readByNick || reader;
+      if (!targetNick || !messageIds || !messageIds.length) return;
+      const idsSet = new Set(messageIds.map(String));
       setMessages((prev) =>
         prev.map((m) => {
-          if (messageIds && messageIds.includes(m.id)) {
+          if (idsSet.has(String(m.id))) {
             const currentReadBy = Array.isArray(m.readBy) ? m.readBy : [m.nickname];
-            if (!currentReadBy.includes(readByNick)) {
-              return { ...m, readBy: [...currentReadBy, readByNick] };
+            if (!currentReadBy.some((r) => isSameNick(r, targetNick))) {
+              return { ...m, readBy: [...currentReadBy, targetNick] };
             }
           }
           return m;
@@ -732,7 +728,7 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
         socket.disconnect();
       }
     };
-  }, [nickname, passcode]);
+  }, [nickname, passcode, baseUrl]);
 
   // Live Battery & Network Telemetry Telecast
   useEffect(() => {
@@ -838,14 +834,21 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
   const handleInputChangeEmitter = (val) => {
     if (socketRef.current) {
       if (val && val.trim() !== '') {
-        socketRef.current.emit('typing', { passcode, nickname });
+        const now = Date.now();
+        // Throttle typing emissions: emit at most once every 2 seconds
+        if (now - lastTypingEmitRef.current > 2000) {
+          lastTypingEmitRef.current = now;
+          socketRef.current.emit('typing', { passcode, nickname });
+        }
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => {
           socketRef.current?.emit('stopTyping', { passcode, nickname });
-        }, 2000);
+          lastTypingEmitRef.current = 0;
+        }, 2500);
       } else {
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         socketRef.current.emit('stopTyping', { passcode, nickname });
+        lastTypingEmitRef.current = 0;
       }
     }
   };

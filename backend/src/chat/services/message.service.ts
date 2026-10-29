@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Server, Socket } from 'socket.io';
+import { join } from 'path';
+import * as fs from 'fs';
 
 import { Message } from '../../messages/message.entity';
 import { Room } from '../../rooms/room.entity';
@@ -18,6 +20,21 @@ import {
 } from '../dto/message-actions.dto';
 import { GetRoomDto } from '../dto/get-room.dto';
 import { UserSession } from '../chat.types';
+
+export async function unlinkUploadFile(fileUrl?: string | null): Promise<void> {
+  if (!fileUrl || typeof fileUrl !== 'string') return;
+  const match = fileUrl.match(/(?:uploads\/|api\/uploads\/)([^/?#]+)/i);
+  if (match && match[1]) {
+    const filename = match[1];
+    const uploadFolder = process.env.UPLOAD_DIR || 'uploads';
+    const filePath = join(process.cwd(), uploadFolder, filename);
+    try {
+      await fs.promises.unlink(filePath);
+    } catch {
+      // ignore if file does not exist or was already deleted
+    }
+  }
+}
 
 @Injectable()
 export class MessageService {
@@ -41,14 +58,9 @@ export class MessageService {
     data: SendMessageDto,
     findRoomByPasscode: (passcode: string) => Promise<Room | null>,
   ) {
-    const reqPass = (data?.passcode || '').trim().toLowerCase();
+    const reqPass = (data?.passcode || session?.passcode || '').trim().toLowerCase();
     const sessionPass = (session?.passcode || '').trim().toLowerCase();
-    if (
-      !session ||
-      (sessionPass !== reqPass &&
-        !sessionPass.includes(reqPass) &&
-        !reqPass.includes(sessionPass))
-    ) {
+    if (!session || !reqPass || sessionPass !== reqPass) {
       client.emit('error', {
         message: 'Unauthorized: Please join the room first',
       });
@@ -179,12 +191,7 @@ export class MessageService {
       .to(dataPasscode.toLowerCase())
       .emit('newMessage', messagePayload);
 
-    server
-      .to(roomPasscode)
-      .to(roomPasscode.toLowerCase())
-      .to(dataPasscode)
-      .to(dataPasscode.toLowerCase())
-      .emit('message', messagePayload);
+
 
     return {
       success: true,
@@ -357,7 +364,8 @@ export class MessageService {
       const currentReadBy = Array.isArray(msg.readBy)
         ? msg.readBy
         : [msg.nickname];
-      if (!currentReadBy.includes(reader)) {
+      const alreadyRead = currentReadBy.some((r) => r.trim().toLowerCase() === reader.toLowerCase());
+      if (!alreadyRead) {
         msg.readBy = [...currentReadBy, reader];
         updatedMessages.push(msg);
         updatedMessageIds.push(msg.id);
@@ -582,6 +590,10 @@ export class MessageService {
       return; // Unauthorized delete attempt!
     }
 
+    if (msg.fileUrl) {
+      void unlinkUploadFile(msg.fileUrl);
+    }
+
     msg.isDeleted = true;
     msg.message = 'This message was deleted';
     msg.fileUrl = null;
@@ -629,6 +641,14 @@ export class MessageService {
         success: false,
         message: 'Only room host or admin can clear history.',
       };
+    }
+
+    const msgsWithFiles = await this.messageRepo.find({
+      where: { roomId: room.id },
+      select: { id: true, fileUrl: true },
+    });
+    for (const m of msgsWithFiles) {
+      if (m.fileUrl) void unlinkUploadFile(m.fileUrl);
     }
 
     await this.messageRepo.delete({ roomId: room.id });
@@ -782,6 +802,10 @@ export class MessageService {
 
       if (expiredMessages.length > 0) {
         const ids = expiredMessages.map((m) => m.id);
+
+        for (const m of expiredMessages) {
+          if (m.fileUrl) void unlinkUploadFile(m.fileUrl);
+        }
 
         await this.messageRepo
           .createQueryBuilder()

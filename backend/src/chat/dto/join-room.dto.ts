@@ -64,6 +64,6 @@ export class JoinRoomDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(100)
+  @MaxLength(512)
   sessionToken?: string;
 }

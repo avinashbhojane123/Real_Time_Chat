@@ -1,5 +1,73 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
+import { Readable } from 'stream';
+import * as dns from 'dns';
+import * as net from 'net';
+
+function isPrivateIp(ip: string): boolean {
+  if (net.isIPv4(ip)) {
+    const parts = ip.split('.').map(Number);
+    if (parts[0] === 127) return true; // loopback
+    if (parts[0] === 10) return true; // private
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    if (parts[0] === 169 && parts[1] === 254) return true; // link-local / cloud metadata
+    if (parts[0] === 0) return true;
+    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true; // CGNAT
+    if (parts[0] >= 224) return true; // multicast
+    return false;
+  }
+  if (net.isIPv6(ip)) {
+    const lower = ip.toLowerCase();
+    if (
+      lower === '::1' ||
+      lower === '::' ||
+      lower.startsWith('fe80:') ||
+      lower.startsWith('fc00:') ||
+      lower.startsWith('fd00:')
+    ) {
+      return true;
+    }
+    if (lower.startsWith('::ffff:')) {
+      return isPrivateIp(lower.replace('::ffff:', ''));
+    }
+  }
+  return false;
+}
+
+async function isSafePublicUrl(targetUrl: URL): Promise<boolean> {
+  if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
+    return false;
+  }
+  const hostname = targetUrl.hostname.toLowerCase();
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname === '169.254.169.254' ||
+    hostname === 'metadata.google.internal'
+  ) {
+    return false;
+  }
+
+  if (net.isIP(hostname)) {
+    return !isPrivateIp(hostname);
+  }
+
+  try {
+    const lookup = await dns.promises.lookup(hostname, { all: true });
+    for (const addr of lookup) {
+      if (isPrivateIp(addr.address)) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface MovieSearchResult {
   id: string | number;
@@ -45,7 +113,8 @@ export class MoviesService {
   constructor(private readonly configService: ConfigService) {
     this.tmdbApiKey =
       this.configService.get<string>('TMDB_API_KEY') ||
-      '4e44d9029b1270a757cddc766a1bcb63'; // Public demo key for movie metadata
+      process.env.TMDB_API_KEY ||
+      '';
     this.consumetBaseUrl =
       this.configService.get<string>('CONSUMET_API_URL') ||
       'https://api.consumet.org';
@@ -351,22 +420,11 @@ export class MoviesService {
       return;
     }
 
-    // SSRF Security Guard: Prevent access to internal networks, localhost, link-local, and cloud metadata
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const isPrivateOrInternal =
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      hostname === '::1' ||
-      hostname === '169.254.169.254' ||
-      hostname.endsWith('.internal') ||
-      hostname.endsWith('.local') ||
-      /^10\./.test(hostname) ||
-      /^192\.168\./.test(hostname) ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
-
-    if (isPrivateOrInternal) {
-      this.logger.warn(`Blocked SSRF attempt targeting ${hostname}`);
-      res.status(403).send('Forbidden: Access to private networks is blocked');
+    // SSRF Security Guard: Deep DNS + IP Range Inspection
+    const isSafe = await isSafePublicUrl(parsedUrl);
+    if (!isSafe) {
+      this.logger.warn(`Blocked SSRF attempt targeting ${parsedUrl.hostname}`);
+      res.status(403).send('Forbidden: Access to private networks or restricted hosts is blocked');
       return;
     }
 
@@ -386,10 +444,47 @@ export class MoviesService {
           : clientHeaders['range'];
       }
 
-      const remoteRes = await fetch(parsedUrl.toString(), {
-        headers,
-        signal: AbortSignal.timeout(15000),
-      });
+      // Safe redirect following with SSRF re-check on each redirect hop (max 3)
+      let currentUrl = parsedUrl;
+      let remoteRes: globalThis.Response | null = null;
+      let redirectCount = 0;
+
+      while (redirectCount <= 3) {
+        remoteRes = await fetch(currentUrl.toString(), {
+          headers,
+          redirect: 'manual',
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (
+          remoteRes.status >= 300 &&
+          remoteRes.status < 400 &&
+          remoteRes.headers.get('location')
+        ) {
+          redirectCount++;
+          const redirectLocation = remoteRes.headers.get('location')!;
+          const nextUrl = new URL(redirectLocation, currentUrl.toString());
+
+          const isRedirectSafe = await isSafePublicUrl(nextUrl);
+          if (!isRedirectSafe) {
+            this.logger.warn(`Blocked SSRF redirect attempt targeting ${nextUrl.hostname}`);
+            res.status(403).send('Forbidden: Redirect to restricted destination blocked');
+            return;
+          }
+
+          currentUrl = nextUrl;
+          headers['Referer'] = `${currentUrl.protocol}//${currentUrl.host}/`;
+          headers['Origin'] = `${currentUrl.protocol}//${currentUrl.host}`;
+          continue;
+        }
+
+        break;
+      }
+
+      if (!remoteRes) {
+        res.status(502).send('Failed to receive response from remote media source');
+        return;
+      }
 
       if (!remoteRes.ok && remoteRes.status !== 206) {
         res
@@ -400,7 +495,7 @@ export class MoviesService {
 
       const contentType = remoteRes.headers.get('content-type') || '';
       const isM3U8 =
-        parsedUrl.pathname.endsWith('.m3u8') ||
+        currentUrl.pathname.endsWith('.m3u8') ||
         contentType.includes('mpegurl') ||
         contentType.includes('application/x-mpegurl') ||
         contentType.includes('vnd.apple.mpegurl');
@@ -411,7 +506,7 @@ export class MoviesService {
 
       if (isM3U8) {
         const text = await remoteRes.text();
-        const baseUrl = parsedUrl.toString();
+        const baseUrl = currentUrl.toString();
         const lines = text.split(/\r?\n/);
         const rewritten = lines.map((line) => {
           const trimmed = line.trim();
@@ -437,7 +532,7 @@ export class MoviesService {
         res.setHeader('Cache-Control', 'no-cache, no-store');
         res.status(200).send(rewritten.join('\n'));
       } else {
-        // Binary segment (.ts / .m4s / .mp4 / key file)
+        // Stream binary segment (.ts / .m4s / .mp4 / key file) chunk-by-chunk to prevent OOM crashes
         res.setHeader('Content-Type', contentType || 'video/MP2T');
         if (remoteRes.headers.get('content-range')) {
           res.setHeader(
@@ -453,8 +548,12 @@ export class MoviesService {
         }
         res.setHeader('Cache-Control', 'public, max-age=86400');
 
-        const arrayBuf = await remoteRes.arrayBuffer();
-        res.status(remoteRes.status).send(Buffer.from(arrayBuf));
+        if (remoteRes.body) {
+          res.status(remoteRes.status);
+          Readable.fromWeb(remoteRes.body as any).pipe(res);
+        } else {
+          res.status(remoteRes.status).end();
+        }
       }
     } catch (err: any) {
       this.logger.warn(`HLS Proxy error for ${streamUrl}: ${err.message}`);

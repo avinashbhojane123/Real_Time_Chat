@@ -608,6 +608,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     const handleCallAccepted = ({ receiverName: rName, from, receiverSocketId } = {}) => {
+      if (callStateRef.current === 'active') return;
       if (receiverSocketId) targetSocketIdRef.current = receiverSocketId;
       if (rName || from) {
         setRemoteUserName(rName || from);
@@ -719,11 +720,13 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     const handleCallEnd = ({ reason } = {}) => {
+      if (callStateRef.current === 'idle') return;
       if (showToast) showToast(reason || 'Call ended');
       cleanUpCall();
     };
 
     const handleCallDeclined = ({ reason } = {}) => {
+      if (callStateRef.current === 'idle') return;
       if (showToast) showToast(reason || 'Call was declined');
       cleanUpCall();
     };
@@ -760,7 +763,6 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     };
 
     socket.on('callUser', handleCallUser);
-    socket.on('acceptCall', handleCallAccepted);
     socket.on('callAccepted', handleCallAccepted);
     socket.on('webrtcOffer', handleWebrtcOffer);
     socket.on('webrtcAnswer', handleWebrtcAnswer);
@@ -772,16 +774,13 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
     socket.on('callMissed', handleCallMissed);
     socket.on('callError', handleCallError);
     socket.on('callEnded', handleCallEnd);
-    socket.on('endCall', handleCallEnd);
     socket.on('callDeclined', handleCallDeclined);
-    socket.on('declineCall', handleCallDeclined);
     socket.on('peerReconnecting', handlePeerReconnecting);
     socket.on('peerReconnected', handlePeerReconnected);
     socket.on('callRestored', handleCallRestored);
 
     return () => {
       socket.off('callUser', handleCallUser);
-      socket.off('acceptCall', handleCallAccepted);
       socket.off('callAccepted', handleCallAccepted);
       socket.off('webrtcOffer', handleWebrtcOffer);
       socket.off('webrtcAnswer', handleWebrtcAnswer);
@@ -793,9 +792,7 @@ export function useWebRTC({ socketRef, passcode, nickname, recipientUser, showTo
       socket.off('callMissed', handleCallMissed);
       socket.off('callError', handleCallError);
       socket.off('callEnded', handleCallEnd);
-      socket.off('endCall', handleCallEnd);
       socket.off('callDeclined', handleCallDeclined);
-      socket.off('declineCall', handleCallDeclined);
       socket.off('peerReconnecting', handlePeerReconnecting);
       socket.off('peerReconnected', handlePeerReconnected);
       socket.off('callRestored', handleCallRestored);

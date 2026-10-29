@@ -136,7 +136,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
     return cleanUrl;
   };
 
-  const visibleMessages = filteredMessages.filter((m) => !m.isDeleted);
+  const visibleMessages = useMemo(() => (filteredMessages || []).filter((m) => !m.isDeleted), [filteredMessages]);
   const prevMessagesLengthRef = useRef(filteredMessages.length);
   const newestMsgIdRef = useRef(null);
   const oldestMsgIdRef = useRef(null);
@@ -336,13 +336,25 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
 
   // Auto-mark visible messages from contacts as read (triggers Double Blue Ticks)
   useEffect(() => {
-    if (!handleMarkAsRead || !visibleMessages || visibleMessages.length === 0) return;
+    if (!handleMarkAsRead || !visibleMessages || visibleMessages.length === 0 || !nickname) return;
+
+    const isSameNick = (n1, n2) =>
+      typeof n1 === 'string' &&
+      typeof n2 === 'string' &&
+      n1.trim().toLowerCase() === n2.trim().toLowerCase();
 
     const unreadIds = visibleMessages
-      .filter((m) => m.nickname !== nickname && (!m.readBy || !m.readBy.includes(nickname)))
+      .filter((m) => {
+        if (!m || !m.id || isSameNick(m.nickname, nickname)) return false;
+        if (markedReadIdsRef.current.has(m.id)) return false;
+        const currentReadBy = Array.isArray(m.readBy) ? m.readBy : [];
+        const hasRead = currentReadBy.some((r) => isSameNick(r, nickname));
+        return !hasRead;
+      })
       .map((m) => m.id);
 
     if (unreadIds.length > 0) {
+      unreadIds.forEach((id) => markedReadIdsRef.current.add(id));
       handleMarkAsRead(unreadIds);
     }
   }, [visibleMessages, nickname, handleMarkAsRead]);

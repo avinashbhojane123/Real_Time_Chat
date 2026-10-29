@@ -15,30 +15,31 @@ interface RateLimitRecord {
 export class RateLimitGuard implements CanActivate {
   private readonly hits = new Map<string, RateLimitRecord>();
   private readonly windowMs = 60 * 1000; // 1 minute window
-  private readonly maxHits = 20; // max 20 requests per minute per IP
+  private readonly maxHits = 120; // max 45 requests per minute per route per verified client IP
+  private lastPruneTime = Date.now();
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
-    const ip =
-      req.headers['x-forwarded-for'] ||
-      req.socket?.remoteAddress ||
-      'unknown-ip';
-
-    const clientIp = Array.isArray(ip) ? ip[0] : ip.split(',')[0].trim();
+    // Use Express req.ip (secured via app.set('trust proxy', 1))
+    const clientIp = (req.ip || req.socket?.remoteAddress || 'unknown-ip').trim();
+    const route = req.baseUrl || req.path || '';
+    const key = `${clientIp}:${route}`;
     const now = Date.now();
 
-    const record = this.hits.get(clientIp);
-
-    if (this.hits.size > 1000) {
-      for (const [key, val] of this.hits.entries()) {
+    // Periodic prune every 30s instead of blocking on every request
+    if (now - this.lastPruneTime > 30000 || this.hits.size > 2000) {
+      this.lastPruneTime = now;
+      for (const [k, val] of this.hits.entries()) {
         if (now > val.resetTime) {
-          this.hits.delete(key);
+          this.hits.delete(k);
         }
       }
     }
 
+    const record = this.hits.get(key);
+
     if (!record || now > record.resetTime) {
-      this.hits.set(clientIp, {
+      this.hits.set(key, {
         count: 1,
         resetTime: now + this.windowMs,
       });

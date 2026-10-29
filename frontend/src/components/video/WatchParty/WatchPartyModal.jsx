@@ -676,6 +676,9 @@ export default function WatchPartyModal({
 
   useEffect(() => {
     const handleMsg = (e) => {
+      if (embedIframeRef.current && e.source !== embedIframeRef.current.contentWindow) {
+        return;
+      }
       try {
         const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!d) return;
@@ -1615,7 +1618,8 @@ export default function WatchPartyModal({
               key={videoSource.originalUrl || videoSource.url}
               src={embedSrc}
               className="watch-party-yt-iframe"
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope; clipboard-write; web-share *"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
               allowFullScreen
               webkitallowfullscreen="true"
               mozallowfullscreen="true"

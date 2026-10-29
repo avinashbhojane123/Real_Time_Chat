@@ -132,6 +132,9 @@ const ChatInputBar = memo(function ChatInputBar({
         setMentionQuery(null);
         return;
       }
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e);
     }
   };
 

@@ -66,6 +66,8 @@ import { UpdateRoomWallpaperDto } from './dto/room-wallpaper.dto';
 
 import { UserSession } from './chat.types';
 import { sanitizeAvatarUrl } from './chat.utils';
+import { isUniqueConstraintError } from '../rooms/rooms.service';
+import { verifySessionToken } from '../common/utils/session-token.util';
 
 import { CallingService } from './services/calling.service';
 import { WatchPartyService } from './services/watch-party.service';
@@ -98,6 +100,7 @@ export class ChatGateway
   private cleanupTimer?: NodeJS.Timeout;
   private userCleanupTimer?: NodeJS.Timeout;
   private socketMessageTimes = new Map<string, number[]>();
+  private lastTypingTimes = new Map<string, number>();
   private userDisconnectDebounceTimers = new Map<string, NodeJS.Timeout>();
   private users = new Map<string, UserSession>();
 
@@ -161,21 +164,27 @@ export class ChatGateway
 
   private checkRateLimit(
     client: Socket,
-    maxLimit = 15,
+    actionOrLimit: string | number = 'message',
+    maxLimitOrWindow = 50,
     windowMs = 3000,
   ): boolean {
+    const action = typeof actionOrLimit === 'string' ? actionOrLimit : 'default';
+    const limit = typeof actionOrLimit === 'number' ? actionOrLimit : maxLimitOrWindow;
+    const windowTime = typeof actionOrLimit === 'number' ? maxLimitOrWindow : windowMs;
+
+    const key = `${client.id}:${action}`;
     const now = Date.now();
-    const timestamps = (this.socketMessageTimes.get(client.id) || []).filter(
-      (t) => now - t < windowMs,
+    const timestamps = (this.socketMessageTimes.get(key) || []).filter(
+      (t) => now - t < windowTime,
     );
-    if (timestamps.length >= maxLimit) {
+    if (timestamps.length >= limit) {
       client.emit('error', {
         message: 'Rate limit exceeded. Please slow down.',
       });
       return false;
     }
     timestamps.push(now);
-    this.socketMessageTimes.set(client.id, timestamps);
+    this.socketMessageTimes.set(key, timestamps);
     return true;
   }
 
@@ -249,7 +258,12 @@ export class ChatGateway
   }
 
   async handleDisconnect(client: Socket) {
-    this.socketMessageTimes.delete(client.id);
+    for (const k of Array.from(this.socketMessageTimes.keys())) {
+      if (k.startsWith(`${client.id}:`)) {
+        this.socketMessageTimes.delete(k);
+      }
+    }
+    this.lastTypingTimes.delete(client.id);
     const userInfo = this.users.get(client.id);
     if (!userInfo) return;
 
@@ -592,7 +606,7 @@ export class ChatGateway
         });
         room = await this.roomRepo.save(room);
       } catch (err: any) {
-        if (err.code === '23505') {
+        if (isUniqueConstraintError(err)) {
           room = await this.roomRepo
             .createQueryBuilder('room')
             .where('LOWER(room.passcode) = LOWER(:passcode)', {
@@ -607,6 +621,21 @@ export class ChatGateway
 
     if (!room) {
       return { success: false, message: 'Could not create or find room' };
+    }
+
+    if (data.sessionToken) {
+      const verified = verifySessionToken(data.sessionToken);
+      if (
+        !verified ||
+        verified.roomId !== room.id ||
+        verified.passcode.toLowerCase() !== room.passcode.toLowerCase() ||
+        verified.nickname.toLowerCase() !== data.nickname.trim().toLowerCase()
+      ) {
+        client.emit('error', {
+          message: 'Invalid or forged session token. Please re-authenticate.',
+        });
+        return { success: false, message: 'Invalid session token' };
+      }
     }
 
     const sanitizedAvatar = sanitizeAvatarUrl(data.avatarUrl);
@@ -740,7 +769,7 @@ export class ChatGateway
     try {
       await this.userRepo.save(user);
     } catch (err: any) {
-      if (err.code === '23505') {
+      if (isUniqueConstraintError(err)) {
         user =
           (await this.userRepo.findOne({
             where: { nickname: cleanNick, roomId: room.id },
@@ -796,10 +825,11 @@ export class ChatGateway
       .andWhere('(m.expiresAt IS NULL OR m.expiresAt > :now)', {
         now: new Date(),
       })
-      .orderBy('m.createdAt', 'ASC')
+      .orderBy('m.createdAt', 'DESC')
+      .take(50)
       .getMany();
 
-    client.emit('chatHistory', messages);
+    client.emit('chatHistory', messages.reverse());
 
     const activeWallpaper = this.wallpaperService.getRoomWallpaperState(
       roomPasscode,
@@ -898,7 +928,7 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SendMessageDto,
   ) {
-    if (!this.checkRateLimit(client, 10, 3000)) {
+    if (!this.checkRateLimit(client, 'sendMessage', 50, 3000)) {
       return { success: false, message: 'Rate limit exceeded' };
     }
     const session = this.users.get(client.id);
@@ -925,7 +955,7 @@ export class ChatGateway
       fileSize?: number;
     },
   ) {
-    if (!this.checkRateLimit(client, 10, 3000)) {
+    if (!this.checkRateLimit(client, 'sendDirectMessage', 50, 3000)) {
       return { success: false, message: 'Rate limit exceeded' };
     }
     const session = this.users.get(client.id);
@@ -1038,9 +1068,14 @@ export class ChatGateway
 
   @SubscribeMessage('typing')
   typing(@ConnectedSocket() client: Socket, @MessageBody() data: TypingDto) {
-    if (!this.checkRateLimit(client, 6, 2000)) return;
     const session = this.users.get(client.id);
     if (!session || session.isMuted) return;
+
+    const now = Date.now();
+    const lastTime = this.lastTypingTimes.get(client.id) || 0;
+    // Silently throttle typing broadcast: at most once per 1.5 seconds per client
+    if (now - lastTime < 1500) return;
+    this.lastTypingTimes.set(client.id, now);
 
     const trimmedPasscode = (data.passcode || session.passcode).trim();
     client.to(trimmedPasscode).emit('userTyping', {

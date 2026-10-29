@@ -694,7 +694,18 @@ export class InstagramService {
   /**
    * Proxy media with Range streaming and CORS headers
    */
-  public proxyMedia(mediaUrl: string, req: Request, res: Response): void {
+  public proxyMedia(
+    mediaUrl: string,
+    req: Request,
+    res: Response,
+    redirectCount = 0,
+  ): void {
+    if (redirectCount > 3) {
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Too many redirects from upstream media server' });
+      }
+      return;
+    }
     if (!mediaUrl) {
       throw new BadRequestException('Media URL is required');
     }
@@ -750,7 +761,19 @@ export class InstagramService {
           statusCode < 400 &&
           upstreamRes.headers.location
         ) {
-          return this.proxyMedia(upstreamRes.headers.location, req, res);
+          let resolvedLocation: string;
+          try {
+            resolvedLocation = new URL(
+              upstreamRes.headers.location,
+              parsedUrl.href,
+            ).href;
+          } catch {
+            if (!res.headersSent) {
+              res.status(502).json({ error: 'Invalid redirect location from upstream' });
+            }
+            return;
+          }
+          return this.proxyMedia(resolvedLocation, req, res, redirectCount + 1);
         }
 
         res.setHeader('Access-Control-Allow-Origin', '*');

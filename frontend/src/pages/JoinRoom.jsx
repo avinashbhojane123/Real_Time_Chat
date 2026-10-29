@@ -88,6 +88,7 @@ export default function JoinRoom() {
           passcode: cleanPass,
           baseUrl: baseUrl.trim(),
           avatarUrl,
+          sessionToken: data.sessionToken,
         });
         const existingLocalTheme = localStorage.getItem(`chat_theme_${cleanPass}`);
         const existingLocalWp = localStorage.getItem(`chat_custom_wallpaper_${cleanPass}`);
@@ -97,8 +98,7 @@ export default function JoinRoom() {
             // Only cache in local storage if not an ephemeral /uploads/ URL that might 404
             if (
               data.customWallpaper.startsWith('data:') ||
-              (!data.customWallpaper.includes('/uploads/') &&
-                !data.customWallpaper.includes('backend-9i6w.onrender.com'))
+              (!data.customWallpaper.includes('/uploads/'))
             ) {
               sessionStorage.setItem('chat_custom_wallpaper', data.customWallpaper);
               localStorage.setItem(`chat_custom_wallpaper_${cleanPass}`, data.customWallpaper);

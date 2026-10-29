@@ -7,6 +7,20 @@ import { Repository } from 'typeorm';
 import { Room } from './room.entity';
 import { User } from '../users/user.entity';
 
+export function isUniqueConstraintError(err: any): boolean {
+  if (!err) return false;
+  const code = String(err.code || err.errno || '');
+  const message = String(err.message || '').toLowerCase();
+  return (
+    code === '23505' ||
+    code === 'SQLITE_CONSTRAINT' ||
+    code === '1062' ||
+    code === 'ER_DUP_ENTRY' ||
+    message.includes('unique') ||
+    message.includes('duplicate')
+  );
+}
+
 @Injectable()
 export class RoomsService {
   constructor(
@@ -33,7 +47,13 @@ export class RoomsService {
         const filename = match[1];
         const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
         const filePath = join(process.cwd(), uploadDirName, filename);
-        if (!fs.existsSync(filePath)) {
+
+        const exists = await fs.promises
+          .access(filePath, fs.constants.F_OK)
+          .then(() => true)
+          .catch(() => false);
+
+        if (!exists) {
           console.warn(
             `[RoomsService] Room ${room.passcode} wallpaper file ${filename} not found on disk. Resetting dead wallpaper.`,
           );
@@ -67,7 +87,7 @@ export class RoomsService {
 
         await this.roomRepo.save(room);
       } catch (err: any) {
-        if (err.code === '23505') {
+        if (isUniqueConstraintError(err)) {
           room = await this.roomRepo.findOne({
             where: { passcode },
           });

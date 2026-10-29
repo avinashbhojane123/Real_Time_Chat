@@ -13,6 +13,7 @@ import {
   DeleteStatusDto,
 } from '../dto/status.dto';
 import { UserSession } from '../chat.types';
+import { unlinkUploadFile } from './message.service';
 
 @Injectable()
 export class StatusService {
@@ -210,6 +211,10 @@ export class StatusService {
       return; // Unauthorized delete attempt
     }
 
+    if (status.mediaUrl) {
+      void unlinkUploadFile(status.mediaUrl);
+    }
+
     await this.statusRepo.remove(status);
 
     const trimmedPasscode = (data.passcode || session.passcode).trim();
@@ -220,12 +225,24 @@ export class StatusService {
 
   async cleanupExpiredStatuses(now: Date = new Date()) {
     try {
-      await this.statusRepo
-        .createQueryBuilder()
-        .delete()
-        .from(Status)
+      const expired = await this.statusRepo
+        .createQueryBuilder('status')
         .where('expiresAt IS NOT NULL AND expiresAt <= :now', { now })
-        .execute();
+        .getMany();
+
+      for (const s of expired) {
+        if (s.mediaUrl) void unlinkUploadFile(s.mediaUrl);
+      }
+
+      const ids = expired.map((s) => s.id);
+      if (ids.length > 0) {
+        await this.statusRepo
+          .createQueryBuilder()
+          .delete()
+          .from(Status)
+          .where('id IN (:...ids)', { ids })
+          .execute();
+      }
     } catch {
       // Non-critical if table not yet initialized
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
+import { Icon } from '@iconify/react';
 import './ChatRoom.css';
 
 // Utilities & Config
@@ -254,7 +255,7 @@ export default function ChatRoom() {
     if (
       stored &&
       (stored.startsWith('data:') ||
-        (!stored.includes('/uploads/') && !stored.includes('backend-9i6w.onrender.com')))
+        (!stored.includes('/uploads/')))
     ) {
       return stored;
     }
@@ -721,20 +722,20 @@ export default function ChatRoom() {
 
 
   // Pointer Drag-to-Reply Handlers
-  const handlePointerDown = (e, msgId) => {
+  const handlePointerDown = useCallback((e, msgId) => {
     if (e.button !== undefined && e.button !== 0) return;
     dragStartXRef.current = e.clientX;
     isDraggingRef.current = true;
     setActiveDragId(msgId);
-  };
+  }, []);
 
-  const handlePointerMove = (e, msgId) => {
+  const handlePointerMove = useCallback((e, msgId) => {
     if (!isDraggingRef.current || activeDragId !== msgId) return;
     const diffX = e.clientX - dragStartXRef.current;
     if (diffX > 0 && diffX <= 120) setDragTranslateX(diffX);
-  };
+  }, [activeDragId]);
 
-  const handlePointerUp = (msg) => {
+  const handlePointerUp = useCallback((msg) => {
     if (!isDraggingRef.current) return;
     if (dragTranslateX > 40 && msg) {
       setReplyingTo(msg);
@@ -743,7 +744,7 @@ export default function ChatRoom() {
     isDraggingRef.current = false;
     setActiveDragId(null);
     setDragTranslateX(0);
-  };
+  }, [dragTranslateX, showToast]);
 
   const renderStatusAvatar = (userNick, size = '40px', isOnline = false, extraStyle = {}, avatarOverrideUrl = null) => {
     const isMe = isSameNick(userNick, nickname);
@@ -808,13 +809,16 @@ export default function ChatRoom() {
     );
   };
 
-  const filteredMessages = messages.filter((m) => {
-    if (!searchQuery.trim()) return true;
-    return (
-      m.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.nickname?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery.trim()) return messages;
+    const q = searchQuery.toLowerCase();
+    return messages.filter((m) => {
+      return (
+        m.message?.toLowerCase().includes(q) ||
+        m.nickname?.toLowerCase().includes(q)
+      );
+    });
+  }, [messages, searchQuery]);
 
   return (
     <div

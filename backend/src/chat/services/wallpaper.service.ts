@@ -9,6 +9,15 @@ import { Room } from '../../rooms/room.entity';
 import { UpdateRoomWallpaperDto } from '../dto/room-wallpaper.dto';
 import { RoomWallpaperState, UserSession } from '../chat.types';
 
+async function fileExistsAsync(filePath: string): Promise<boolean> {
+  try {
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 @Injectable()
 export class WallpaperService {
   private roomWallpapers = new Map<string, RoomWallpaperState>();
@@ -27,7 +36,8 @@ export class WallpaperService {
         const filename = match[1];
         const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
         const filePath = join(process.cwd(), uploadDirName, filename);
-        if (!fs.existsSync(filePath)) {
+        const exists = await fileExistsAsync(filePath);
+        if (!exists) {
           console.warn(
             `[WallpaperService] Room ${room.passcode} wallpaper file ${filename} not found on disk. Resetting dead wallpaper.`,
           );
@@ -67,7 +77,8 @@ export class WallpaperService {
           if (match && match[1]) {
             const filename = match[1];
             const filePath = join(uploadDir, filename);
-            if (!fs.existsSync(filePath)) {
+            const exists = await fileExistsAsync(filePath);
+            if (!exists) {
               console.warn(
                 `[WallpaperService:Bootstrap] Room ${r.passcode} wallpaper file ${filename} not found on disk. Resetting dead wallpaper.`,
               );
@@ -93,36 +104,6 @@ export class WallpaperService {
       theme: room.theme || 'wa-doodle',
       customWallpaper: room.customWallpaper || null,
     };
-
-    // If customWallpaper points to server uploads, verify file actually exists on disk
-    if (
-      activeWallpaper.customWallpaper &&
-      (activeWallpaper.customWallpaper.includes('/uploads/') ||
-        activeWallpaper.customWallpaper.includes('/api/uploads/'))
-    ) {
-      const match =
-        activeWallpaper.customWallpaper.match(/uploads\/([^/?#]+)/i);
-      if (match && match[1]) {
-        const filename = match[1];
-        const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
-        const filePath = join(process.cwd(), uploadDirName, filename);
-        if (!fs.existsSync(filePath)) {
-          console.warn(
-            `[WallpaperService] Ephemeral upload wallpaper ${filename} missing from disk on join. Resetting.`,
-          );
-          activeWallpaper.customWallpaper = null;
-          if (activeWallpaper.theme === 'custom') {
-            activeWallpaper.theme = 'wa-doodle';
-          }
-          this.roomWallpapers.set(roomPasscode, activeWallpaper);
-          room.customWallpaper = null;
-          if (room.theme === 'custom') {
-            room.theme = 'wa-doodle';
-          }
-          void this.roomRepo.save(room);
-        }
-      }
-    }
 
     if (!this.roomWallpapers.has(roomPasscode)) {
       this.roomWallpapers.set(roomPasscode, activeWallpaper);
@@ -170,7 +151,7 @@ export class WallpaperService {
         ? data.customWallpaper
         : currentCached.customWallpaper;
 
-    // Reject non-existent /uploads/ files
+    // Reject non-existent /uploads/ files asynchronously
     if (
       newWallpaper &&
       (newWallpaper.includes('/uploads/') ||
@@ -181,7 +162,8 @@ export class WallpaperService {
         const filename = match[1];
         const uploadDirName = process.env.UPLOAD_DIR || 'uploads';
         const filePath = join(process.cwd(), uploadDirName, filename);
-        if (!fs.existsSync(filePath)) {
+        const exists = await fileExistsAsync(filePath);
+        if (!exists) {
           console.warn(
             `[WallpaperService] Rejecting non-existent wallpaper upload file ${filename}`,
           );

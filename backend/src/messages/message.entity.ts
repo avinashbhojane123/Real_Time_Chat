@@ -40,7 +40,7 @@ export class Message {
 
   // Reply support
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
   })
   replyTo!: {
@@ -105,7 +105,7 @@ export class Message {
   isWithoutSound!: boolean;
 
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
     default: null,
   })
@@ -113,14 +113,13 @@ export class Message {
 
   @Index()
   @Column({
-    type: 'timestamptz',
     nullable: true,
     default: null,
   })
   expiresAt!: Date | null;
 
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
     default: null,
   })
@@ -130,7 +129,7 @@ export class Message {
   } | null;
 
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
     default: null,
   })
@@ -140,7 +139,7 @@ export class Message {
   } | null;
 
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
     default: null,
   })

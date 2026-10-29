@@ -1,8 +1,10 @@
-import { Controller, Get, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { MoviesService } from './movies.service';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
 
 @Controller('movies')
+@UseGuards(RateLimitGuard)
 export class MoviesController {
   constructor(private readonly moviesService: MoviesService) {}
 

@@ -66,14 +66,14 @@ export class Status {
   fontStyle!: string | null;
 
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
     default: null,
   })
   stickers!: Array<{ id: number; emoji: string }> | null;
 
   @Column({
-    type: 'jsonb',
+    type: 'simple-json',
     nullable: true,
     default: '[]',
   })
@@ -83,7 +83,6 @@ export class Status {
   createdAt!: Date;
 
   @Column({
-    type: 'timestamptz',
     nullable: true,
   })
   expiresAt!: Date | null;

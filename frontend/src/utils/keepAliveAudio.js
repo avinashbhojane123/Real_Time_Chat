@@ -5,76 +5,104 @@
  * background JavaScript execution and terminate WebSockets after 15–30 seconds of
  * the screen locking or switching tabs.
  * 
- * By maintaining an inaudible, silent audio output stream using the Web Audio API,
- * the mobile OS treats the web application as an active media session (like a music player),
- * preventing the background execution thread from being suspended and keeping the
- * WebSocket connection alive.
+ * To prevent battery drain and avoid interrupting external music/podcasts (Spotify, Apple Music):
+ * 1. An AudioContext is prepared upon user gesture but kept SUSPENDED while the page is in the foreground.
+ * 2. It is only resumed when the page transitions to the background (`document.visibilityState === 'hidden'`).
+ * 3. A completely silent AudioBuffer (all zero samples) is used instead of a continuous oscillator tone.
+ * 4. As soon as the user returns to the app (`document.visibilityState === 'visible'`), the context
+ *    is suspended immediately to yield audio focus back to the OS and eliminate CPU/battery consumption.
  */
 
 let audioCtx = null;
-let oscillatorNode = null;
-let gainNode = null;
-let isKeepAliveRunning = false;
+let bufferSourceNode = null;
+let isKeepAliveEnabled = false;
+let visibilityListenerInstalled = false;
+
+function createSilentBufferSource(ctx) {
+  // Create a 1-second silent buffer (all samples 0.0)
+  const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  source.connect(ctx.destination);
+  return source;
+}
+
+function handleVisibilityChange() {
+  if (!isKeepAliveEnabled || !audioCtx) return;
+
+  if (document.visibilityState === 'hidden') {
+    // Tab backgrounded: resume audio context to keep websocket thread active
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+  } else {
+    // Tab foregrounded: suspend audio context immediately to save battery & free audio focus
+    if (audioCtx.state === 'running') {
+      audioCtx.suspend().catch(() => {});
+    }
+  }
+}
 
 export function startBackgroundAudioKeepAlive() {
-  if (isKeepAliveRunning) return;
+  if (isKeepAliveEnabled) return;
   if (typeof window === 'undefined') return;
 
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
 
-    audioCtx = new AudioContextClass();
-
-    // Create an inaudible sub-threshold audio carrier (frequency 440Hz with near-zero amplitude)
-    oscillatorNode = audioCtx.createOscillator();
-    gainNode = audioCtx.createGain();
-
-    // Amplitude is set to 0.00001 (completely silent to the human ear)
-    gainNode.gain.setValueAtTime(0.00001, audioCtx.currentTime);
-
-    oscillatorNode.type = 'sine';
-    oscillatorNode.frequency.setValueAtTime(440, audioCtx.currentTime);
-
-    oscillatorNode.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-
-    oscillatorNode.start();
-    isKeepAliveRunning = true;
-    console.log('[KeepAlive] Background audio keep-alive activated (WebSockets protected)');
-
-    // Resume AudioContext if suspended by browser autoplay policy
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new AudioContextClass();
     }
+
+    if (!bufferSourceNode) {
+      bufferSourceNode = createSilentBufferSource(audioCtx);
+      bufferSourceNode.start();
+    }
+
+    // Keep suspended while foregrounded; will resume on backgrounding
+    if (document.visibilityState === 'visible') {
+      audioCtx.suspend().catch(() => {});
+    }
+
+    if (!visibilityListenerInstalled && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      visibilityListenerInstalled = true;
+    }
+
+    isKeepAliveEnabled = true;
   } catch (err) {
     console.debug('[KeepAlive] Audio keep-alive initialization skipped:', err);
   }
 }
 
 export function stopBackgroundAudioKeepAlive() {
-  if (!isKeepAliveRunning) return;
+  if (!isKeepAliveEnabled) return;
 
   try {
-    if (oscillatorNode) {
-      oscillatorNode.stop();
-      oscillatorNode.disconnect();
-      oscillatorNode = null;
+    if (visibilityListenerInstalled && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      visibilityListenerInstalled = false;
     }
-    if (gainNode) {
-      gainNode.disconnect();
-      gainNode = null;
+
+    if (bufferSourceNode) {
+      try {
+        bufferSourceNode.stop();
+        bufferSourceNode.disconnect();
+      } catch (_) {}
+      bufferSourceNode = null;
     }
+
     if (audioCtx) {
       audioCtx.close().catch(() => {});
       audioCtx = null;
     }
   } catch (_) {}
 
-  isKeepAliveRunning = false;
-  console.log('[KeepAlive] Background audio keep-alive deactivated');
+  isKeepAliveEnabled = false;
 }
 
 export function isAudioKeepAliveActive() {
-  return isKeepAliveRunning;
+  return isKeepAliveEnabled;
 }

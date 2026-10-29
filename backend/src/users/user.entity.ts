@@ -33,7 +33,6 @@ export class User {
   isOnline!: boolean;
 
   @Column({
-    type: 'timestamptz',
     nullable: true,
   })
   lastSeen!: Date | null;
@@ -126,7 +125,6 @@ export class User {
   isBanned!: boolean;
 
   @Column({
-    type: 'timestamptz',
     nullable: true,
   })
   bannedAt!: Date | null;
@@ -144,7 +142,6 @@ export class User {
   isCreator!: boolean;
 
   @Column({
-    type: 'timestamptz',
     nullable: true,
   })
   mutedUntil!: Date | null;

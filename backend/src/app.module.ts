@@ -35,12 +35,16 @@ const isSslEnabled =
             database: process.env.DB_NAME,
           }),
 
-      ssl: isSslEnabled
-        ? {
-            rejectUnauthorized:
-              process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
-          }
-        : false,
+      ...((process.env.DB_TYPE === 'sqlite' || process.env.DB_TYPE === 'better-sqlite3')
+        ? {}
+        : {
+            ssl: isSslEnabled
+              ? {
+                  rejectUnauthorized:
+                    process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
+                }
+              : false,
+          }),
 
       autoLoadEntities: true,
       synchronize: process.env.DB_SYNCHRONIZE !== 'false',

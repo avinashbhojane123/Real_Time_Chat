@@ -8,6 +8,7 @@ import {
 import { RoomsService } from './rooms.service';
 import { JoinRoomHttpDto } from './dto/join-room-http.dto';
 import { RateLimitGuard } from '../common/guards/rate-limit.guard';
+import { generateSessionToken } from '../common/utils/session-token.util';
 
 @Controller('rooms')
 export class RoomsController {
@@ -31,11 +32,19 @@ export class RoomsController {
       );
     }
 
+    const sessionToken = generateSessionToken({
+      roomId: room.id,
+      passcode: room.passcode,
+      nickname: body.nickname.trim(),
+      issuedAt: Date.now(),
+    });
+
     return {
       success: true,
       roomId: room.id,
       passcode: room.passcode,
       nickname: body.nickname.trim(),
+      sessionToken,
       theme: room.theme || 'wa-doodle',
       customWallpaper: room.customWallpaper || null,
     };
