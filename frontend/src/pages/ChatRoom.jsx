@@ -696,8 +696,22 @@ export default function ChatRoom() {
     setMessages((prev) => [...prev, optimisticMsg]);
     socketRef.current?.emit('sendMessage', payload, (res) => {
       if (res && !res.success) {
-        showToast(res.message || 'Failed to send message');
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+        if (res.message && (res.message.includes('join the room') || res.message.includes('Unauthorized'))) {
+          socketRef.current?.emit('joinRoom', {
+            nickname,
+            passcode,
+            sessionToken: sessionStorage.getItem('sessionAuthToken') || undefined,
+          }, (joinRes) => {
+            if (joinRes && joinRes.success) {
+              socketRef.current?.emit('sendMessage', payload);
+            } else {
+              showToast(res.message || 'Failed to send message');
+            }
+          });
+        } else {
+          showToast(res.message || 'Failed to send message');
+        }
       }
     });
     socketRef.current?.emit('stopTyping', { passcode, nickname });

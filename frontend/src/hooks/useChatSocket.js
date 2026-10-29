@@ -114,6 +114,12 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       });
     };
 
+    socket.on('sessionTokenRefreshed', ({ sessionToken }) => {
+      if (sessionToken) {
+        sessionStorage.setItem('sessionAuthToken', sessionToken);
+      }
+    });
+
     socket.on('connect', async () => {
       setIsSocketConnected(true);
       const clientDevice = detectClientDevice();

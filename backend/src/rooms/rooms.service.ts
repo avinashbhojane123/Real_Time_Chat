@@ -75,9 +75,13 @@ export class RoomsService {
   }
 
   async findOrCreate(passcode: string): Promise<Room> {
-    let room = await this.roomRepo.findOne({
-      where: { passcode },
-    });
+    const cleanPass = (passcode || '').trim();
+    let room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: cleanPass,
+      })
+      .getOne();
 
     if (!room) {
       try {
