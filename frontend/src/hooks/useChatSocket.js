@@ -165,9 +165,34 @@ export function useChatSocket({ nickname, passcode, baseUrl }) {
       }
       setIsSocketConnected(false);
       if (!isTerminatedByHostRef.current) {
-        if (reason === 'io server disconnect') {
-          socket.connect();
+        // Proactively trigger reconnect if server restarted, deployed, or network dropped
+        if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'ping timeout') {
+          setTimeout(() => {
+            if (socketRef.current && !socketRef.current.connected && !isTerminatedByHostRef.current) {
+              socketRef.current.connect();
+            }
+          }, 1000);
         }
+      }
+    });
+
+    socket.io.on('reconnect_attempt', (attempt) => {
+      console.log(`[Socket] Reconnect attempt #${attempt} in progress...`);
+    });
+
+    socket.io.on('reconnect', (attempt) => {
+      console.log(`[Socket] Successfully reconnected to server after ${attempt} attempt(s).`);
+      setIsSocketConnected(true);
+    });
+
+    socket.io.on('reconnect_failed', () => {
+      console.warn('[Socket] Auto-reconnect exhausted. Initiating manual reconnect loop...');
+      if (!isTerminatedByHostRef.current) {
+        setTimeout(() => {
+          if (socketRef.current && !socketRef.current.connected) {
+            socketRef.current.connect();
+          }
+        }, 3000);
       }
     });
 

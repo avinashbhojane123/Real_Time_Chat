@@ -356,7 +356,7 @@ const ChatHeader = memo(function ChatHeader({
               width="15"
               height="15"
             />
-            <span>{isSocketConnected ? (latency !== null ? `${latency}ms` : '--') : 'Offline'}</span>
+            <span>{isSocketConnected ? (latency !== null ? `${latency}ms` : '--') : 'Reconnecting...'}</span>
           </div>
 
           {/* WhatsApp Video Call Button with M3 State Layer & Tactile Motion Feedback */}
