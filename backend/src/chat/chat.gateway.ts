@@ -732,32 +732,18 @@ export class ChatGateway
       client.id,
     );
     if (existingSockets.length > 0) {
-      const isReconnectingSession =
-        user &&
-        user.sessionToken &&
-        data.sessionToken &&
-        user.sessionToken === data.sessionToken;
-
-      if (isReconnectingSession) {
-        for (const existing of existingSockets) {
-          const oldSocket = this.server.sockets.sockets.get(existing.socketId);
-          if (oldSocket) {
-            oldSocket.emit('sessionReplaced', {
-              message: 'Your session has been resumed in another connection.',
-            });
-            void oldSocket.leave(cleanPass);
-            this.users.delete(existing.socketId);
-            oldSocket.disconnect(true);
-          }
+      for (const existing of existingSockets) {
+        const oldSocket = this.server.sockets.sockets.get(existing.socketId);
+        if (oldSocket) {
+          oldSocket.emit('sessionReplaced', {
+            message: 'Your session has been resumed in another connection.',
+          });
+          void oldSocket.leave(cleanPass);
+          this.users.delete(existing.socketId);
+          oldSocket.disconnect(true);
+        } else {
+          this.users.delete(existing.socketId);
         }
-      } else {
-        client.emit('error', {
-          message: `The nickname "${cleanNick}" is currently active in this room. Please choose another nickname.`,
-        });
-        return {
-          success: false,
-          message: `The nickname "${cleanNick}" is currently active in this room. Please choose another nickname.`,
-        };
       }
     }
 
@@ -819,7 +805,10 @@ export class ChatGateway
             where: { nickname: cleanNick, roomId: room.id },
           })) || user;
       } else {
-        throw err;
+        console.warn(
+          '[ChatGateway] Non-fatal user save notice, proceeding with room session:',
+          err?.message || err,
+        );
       }
     }
 

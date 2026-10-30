@@ -67,21 +67,21 @@ export class User {
 
   @Column({
     type: 'varchar',
-    length: 150,
+    length: 255,
     nullable: true,
   })
   deviceModel!: string | null;
 
   @Column({
     type: 'varchar',
-    length: 100,
+    length: 255,
     nullable: true,
   })
   browser!: string | null;
 
   @Column({
     type: 'varchar',
-    length: 100,
+    length: 255,
     nullable: true,
   })
   os!: string | null;
@@ -94,14 +94,14 @@ export class User {
 
   @Column({
     type: 'varchar',
-    length: 100,
+    length: 255,
     nullable: true,
   })
   networkLabel!: string | null;
 
   @Column({
     type: 'varchar',
-    length: 50,
+    length: 100,
     nullable: true,
   })
   batteryLabel!: string | null;
@@ -138,8 +138,7 @@ export class User {
   bannedAt!: Date | null;
 
   @Column({
-    type: 'varchar',
-    length: 100,
+    type: 'text',
     nullable: true,
   })
   sessionToken!: string | null;

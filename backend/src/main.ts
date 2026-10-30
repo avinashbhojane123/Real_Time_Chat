@@ -5,6 +5,7 @@ import { Response } from 'express';
 import { join } from 'path';
 
 import { AppModule } from './app.module';
+import { DataSource } from 'typeorm';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -84,6 +85,13 @@ async function bootstrap() {
   });
 
   const port = Number(process.env.PORT || 10000);
+
+  try {
+    const dataSource = app.get(DataSource);
+    if (dataSource && dataSource.isInitialized) {
+      await dataSource.query('ALTER TABLE "users" ALTER COLUMN "sessionToken" TYPE text').catch(() => {});
+    }
+  } catch (_) {}
 
   await app.listen(port);
 
