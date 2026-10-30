@@ -142,6 +142,7 @@ const ChatMessagesFeed = memo(function ChatMessagesFeed({
   const oldestMsgIdRef = useRef(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState(null);
   const messageRefs = useRef({});
+  const markedReadIdsRef = useRef(new Set());
 
   // Jump to referenced / replied message with smooth scroll & highlight animation
   const handleJumpToMessage = (replyTarget) => {
