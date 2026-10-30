@@ -42,6 +42,7 @@ self.addEventListener('fetch', (event) => {
   if (
     url.pathname.startsWith('/api') ||
     url.pathname.startsWith('/socket.io') ||
+    url.pathname.startsWith('/uploads') ||
     url.protocol.startsWith('chrome-extension')
   ) {
     return;

@@ -34,13 +34,20 @@ export class StatusService {
     session: UserSession | undefined,
     data: CreateStatusDto,
   ) {
-    if (!session || session.passcode !== data.passcode.trim()) {
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPasscode,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const user = await this.userRepo.findOne({
@@ -148,11 +155,16 @@ export class StatusService {
     session: UserSession | undefined,
     data: GetStatusesDto,
   ) {
-    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: targetPasscode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPasscode,
+      })
+      .getOne();
     if (!room) return [];
 
     const now = new Date();

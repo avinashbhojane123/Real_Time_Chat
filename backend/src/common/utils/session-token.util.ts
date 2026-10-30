@@ -33,7 +33,9 @@ export function generateSessionToken(payload: SessionTokenPayload): string {
  * Verifies the cryptographic HMAC-SHA256 signature of a session token.
  * Returns the verified payload, or null if invalid or tampered with.
  */
-export function verifySessionToken(token?: string | null): SessionTokenPayload | null {
+export function verifySessionToken(
+  token?: string | null,
+): SessionTokenPayload | null {
   if (!token || typeof token !== 'string') return null;
 
   const parts = token.split('.');

@@ -317,7 +317,7 @@ export class MoviesService {
         if (results.length > 0) {
           const match = results[0];
           const infoRes = await fetch(
-            `${this.consumetBaseUrl}/movies/flixhq/info?id=${encodeURIComponent(match.id)}`,
+            `${this.consumetBaseUrl}/movies/flixhq/info?id=${encodeURIComponent(String(match.id))}`,
             {
               headers: { Accept: 'application/json' },
               signal: AbortSignal.timeout(4500),
@@ -341,8 +341,8 @@ export class MoviesService {
 
             const watchRes = await fetch(
               `${this.consumetBaseUrl}/movies/flixhq/watch?episodeId=${encodeURIComponent(
-                episodeId,
-              )}&mediaId=${encodeURIComponent(match.id)}`,
+                String(episodeId),
+              )}&mediaId=${encodeURIComponent(String(match.id))}`,
               {
                 headers: { Accept: 'application/json' },
                 signal: AbortSignal.timeout(4500),
@@ -424,7 +424,11 @@ export class MoviesService {
     const isSafe = await isSafePublicUrl(parsedUrl);
     if (!isSafe) {
       this.logger.warn(`Blocked SSRF attempt targeting ${parsedUrl.hostname}`);
-      res.status(403).send('Forbidden: Access to private networks or restricted hosts is blocked');
+      res
+        .status(403)
+        .send(
+          'Forbidden: Access to private networks or restricted hosts is blocked',
+        );
       return;
     }
 
@@ -467,8 +471,12 @@ export class MoviesService {
 
           const isRedirectSafe = await isSafePublicUrl(nextUrl);
           if (!isRedirectSafe) {
-            this.logger.warn(`Blocked SSRF redirect attempt targeting ${nextUrl.hostname}`);
-            res.status(403).send('Forbidden: Redirect to restricted destination blocked');
+            this.logger.warn(
+              `Blocked SSRF redirect attempt targeting ${nextUrl.hostname}`,
+            );
+            res
+              .status(403)
+              .send('Forbidden: Redirect to restricted destination blocked');
             return;
           }
 
@@ -482,7 +490,9 @@ export class MoviesService {
       }
 
       if (!remoteRes) {
-        res.status(502).send('Failed to receive response from remote media source');
+        res
+          .status(502)
+          .send('Failed to receive response from remote media source');
         return;
       }
 
@@ -516,7 +526,7 @@ export class MoviesService {
             // Rewrite URI="..." in #EXT-X-KEY or #EXT-X-MAP
             if (trimmed.includes('URI="')) {
               return trimmed.replace(/URI="([^"]+)"/g, (_, uri) => {
-                const absUri = new URL(uri, baseUrl).toString();
+                const absUri = new URL(String(uri), baseUrl).toString();
                 return `URI="/api/movies/proxy?url=${encodeURIComponent(absUri)}"`;
               });
             }
@@ -550,7 +560,9 @@ export class MoviesService {
 
         if (remoteRes.body) {
           res.status(remoteRes.status);
-          Readable.fromWeb(remoteRes.body as any).pipe(res);
+          Readable.fromWeb(
+            remoteRes.body as unknown as Parameters<typeof Readable.fromWeb>[0],
+          ).pipe(res);
         } else {
           res.status(remoteRes.status).end();
         }

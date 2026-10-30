@@ -13,10 +13,7 @@ async function bootstrap() {
   // Enable reverse proxy trust for secure client IP detection and rate limiting
   app.set('trust proxy', 1);
 
-  const defaultOrigins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-  ];
+  const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000'];
 
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
@@ -89,9 +86,13 @@ async function bootstrap() {
   try {
     const dataSource = app.get(DataSource);
     if (dataSource && dataSource.isInitialized) {
-      await dataSource.query('ALTER TABLE "users" ALTER COLUMN "sessionToken" TYPE text').catch(() => {});
+      await dataSource
+        .query('ALTER TABLE "users" ALTER COLUMN "sessionToken" TYPE text')
+        .catch(() => {});
     }
-  } catch (_) {}
+  } catch {
+    // Non-fatal if table not initialized yet on bootstrap
+  }
 
   await app.listen(port);
 

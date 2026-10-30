@@ -67,7 +67,7 @@ import { UpdateRoomWallpaperDto } from './dto/room-wallpaper.dto';
 import { UserSession } from './chat.types';
 import { sanitizeAvatarUrl } from './chat.utils';
 import { isUniqueConstraintError } from '../rooms/rooms.service';
-import { verifySessionToken, generateSessionToken } from '../common/utils/session-token.util';
+import { verifySessionToken } from '../common/utils/session-token.util';
 
 import { CallingService } from './services/calling.service';
 import { WatchPartyService } from './services/watch-party.service';
@@ -168,9 +168,12 @@ export class ChatGateway
     maxLimitOrWindow = 50,
     windowMs = 3000,
   ): boolean {
-    const action = typeof actionOrLimit === 'string' ? actionOrLimit : 'default';
-    const limit = typeof actionOrLimit === 'number' ? actionOrLimit : maxLimitOrWindow;
-    const windowTime = typeof actionOrLimit === 'number' ? maxLimitOrWindow : windowMs;
+    const action =
+      typeof actionOrLimit === 'string' ? actionOrLimit : 'default';
+    const limit =
+      typeof actionOrLimit === 'number' ? actionOrLimit : maxLimitOrWindow;
+    const windowTime =
+      typeof actionOrLimit === 'number' ? maxLimitOrWindow : windowMs;
 
     const key = `${client.id}:${action}`;
     const now = Date.now();
@@ -459,6 +462,7 @@ export class ChatGateway
     if (room) {
       this.users.delete(client.id);
       void client.leave(roomPasscode);
+      void client.leave(roomPasscode.toLowerCase());
 
       const remainingSockets = this.findSocketsInRoom(
         roomPasscode,
@@ -568,50 +572,6 @@ export class ChatGateway
     }
 
     return { success: true };
-  }
-
-    private async getOrRehydrateSession(
-    client: Socket,
-    passcode?: string,
-    nickname?: string,
-  ): Promise<UserSession | undefined> {
-    let session = this.users.get(client.id);
-    if (session) return session;
-
-    const cleanPass = (passcode || '').trim();
-    if (!cleanPass) return undefined;
-
-    const room = await this.findRoomByPasscode(cleanPass);
-    if (!room) return undefined;
-
-    let user: User | null = null;
-    if (nickname) {
-      user = await this.userRepo
-        .createQueryBuilder('user')
-        .where(
-          'user.roomId = :roomId AND LOWER(user.nickname) = LOWER(:nickname)',
-          {
-            roomId: room.id,
-            nickname: nickname.trim(),
-          },
-        )
-        .getOne();
-    }
-
-    if (user && !user.isBanned) {
-      session = {
-        nickname: user.nickname,
-        passcode: room.passcode.trim(),
-        isMuted: Boolean(user.isMuted),
-        role: user.role,
-      };
-      this.users.set(client.id, session);
-      await client.join(room.passcode.trim());
-      await client.join(room.passcode.trim().toLowerCase());
-      return session;
-    }
-
-    return undefined;
   }
 
   @SubscribeMessage('joinRoom')

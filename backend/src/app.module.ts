@@ -11,9 +11,18 @@ import { InstagramModule } from './instagram/instagram.module';
 import { MoviesModule } from './movies/movies.module';
 
 const isProduction = process.env.NODE_ENV === 'production';
-const dbUrl = process.env.DATABASE_URL;
+const dbUrl =
+  process.env.DATABASE_URL ||
+  process.env.SUPABASE_DATABASE_URL ||
+  process.env.SUPABASE_DB_URL;
+
+const isSupabase =
+  Boolean(dbUrl && dbUrl.includes('supabase')) ||
+  Boolean(process.env.DB_HOST && process.env.DB_HOST.includes('supabase'));
+
 const isSslEnabled =
   process.env.DB_SSL === 'true' ||
+  isSupabase ||
   (process.env.DB_SSL !== 'false' && (isProduction || Boolean(dbUrl)));
 
 @Module({
@@ -35,7 +44,8 @@ const isSslEnabled =
             database: process.env.DB_NAME,
           }),
 
-      ...((process.env.DB_TYPE === 'sqlite' || process.env.DB_TYPE === 'better-sqlite3')
+      ...(process.env.DB_TYPE === 'sqlite' ||
+      process.env.DB_TYPE === 'better-sqlite3'
         ? {}
         : {
             ssl: isSslEnabled
@@ -44,6 +54,14 @@ const isSslEnabled =
                     process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
                 }
               : false,
+            extra: isSslEnabled
+              ? {
+                  ssl: {
+                    rejectUnauthorized:
+                      process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true',
+                  },
+                }
+              : undefined,
           }),
 
       autoLoadEntities: true,

@@ -76,7 +76,12 @@ export class CallingService implements OnModuleDestroy {
       excludeSocketId?: string,
     ) => { socketId: string; nickname: string } | undefined,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
 
@@ -129,7 +134,11 @@ export class CallingService implements OnModuleDestroy {
     let target: { socketId: string; nickname: string } | undefined = undefined;
     if (data.targetSocketId) {
       const targetSession = usersMap.get(data.targetSocketId);
-      if (targetSession && targetSession.passcode.trim() === room) {
+      if (
+        targetSession &&
+        (targetSession.passcode || '').trim().toLowerCase() ===
+          room.toLowerCase()
+      ) {
         target = {
           socketId: data.targetSocketId,
           nickname: targetSession.nickname,
@@ -292,7 +301,12 @@ export class CallingService implements OnModuleDestroy {
     data: AcceptCallDto,
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     if (session.isMuted) {
       client.emit('callError', {
@@ -336,7 +350,11 @@ export class CallingService implements OnModuleDestroy {
       server.to(callSession.callerSocketId).emit('callAccepted', acceptPayload);
     } else if (data.targetSocketId) {
       const targetSession = usersMap.get(data.targetSocketId);
-      if (targetSession && targetSession.passcode.trim() === room) {
+      if (
+        targetSession &&
+        (targetSession.passcode || '').trim().toLowerCase() ===
+          room.toLowerCase()
+      ) {
         server.to(data.targetSocketId).emit('callAccepted', acceptPayload);
       }
     } else {
@@ -350,7 +368,12 @@ export class CallingService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: DeclineCallDto,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     console.log(
@@ -389,7 +412,12 @@ export class CallingService implements OnModuleDestroy {
     data: WebrtcOfferDto,
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     console.log(
@@ -414,7 +442,11 @@ export class CallingService implements OnModuleDestroy {
 
     if (targetSocketId) {
       const targetSession = usersMap.get(targetSocketId);
-      if (targetSession && targetSession.passcode.trim() === room) {
+      if (
+        targetSession &&
+        (targetSession.passcode || '').trim().toLowerCase() ===
+          room.toLowerCase()
+      ) {
         server.to(targetSocketId).emit('webrtcOffer', offerPayload);
       }
     } else {
@@ -429,7 +461,12 @@ export class CallingService implements OnModuleDestroy {
     data: WebrtcAnswerDto,
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     console.log(
@@ -454,7 +491,11 @@ export class CallingService implements OnModuleDestroy {
 
     if (targetSocketId) {
       const targetSession = usersMap.get(targetSocketId);
-      if (targetSession && targetSession.passcode.trim() === room) {
+      if (
+        targetSession &&
+        (targetSession.passcode || '').trim().toLowerCase() ===
+          room.toLowerCase()
+      ) {
         server.to(targetSocketId).emit('webrtcAnswer', answerPayload);
       }
     } else {
@@ -469,7 +510,12 @@ export class CallingService implements OnModuleDestroy {
     data: WebrtcCandidateDto,
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     const candidatePayload = {
@@ -488,7 +534,11 @@ export class CallingService implements OnModuleDestroy {
 
     if (targetSocketId) {
       const targetSession = usersMap.get(targetSocketId);
-      if (targetSession && targetSession.passcode.trim() === room) {
+      if (
+        targetSession &&
+        (targetSession.passcode || '').trim().toLowerCase() ===
+          room.toLowerCase()
+      ) {
         server.to(targetSocketId).emit('webrtcCandidate', candidatePayload);
       }
     } else {
@@ -502,7 +552,12 @@ export class CallingService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: EndCallDto,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     console.log(`[EndCall] Relaying endCall in room: ${room}`);
@@ -586,7 +641,12 @@ export class CallingService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: TogglePipDto,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     session.isPip = data.isPip;
     const room = session.passcode.trim();
@@ -605,7 +665,12 @@ export class CallingService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: ScreenShareStatusDto,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     console.log(
@@ -624,7 +689,12 @@ export class CallingService implements OnModuleDestroy {
     data: WebrtcMediaStateDto,
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) return;
+    if (
+      !session ||
+      (session.passcode || '').trim().toLowerCase() !==
+        (data?.passcode || '').trim().toLowerCase()
+    )
+      return;
 
     const room = session.passcode.trim();
     const callSession = this.findCallBySocketId(client.id);
@@ -653,7 +723,11 @@ export class CallingService implements OnModuleDestroy {
 
     if (targetSocketId) {
       const targetSession = usersMap.get(targetSocketId);
-      if (targetSession && targetSession.passcode.trim() === room) {
+      if (
+        targetSession &&
+        (targetSession.passcode || '').trim().toLowerCase() ===
+          room.toLowerCase()
+      ) {
         server.to(targetSocketId).emit('webrtcMediaState', payload);
       }
     } else {
@@ -794,15 +868,22 @@ export class CallingService implements OnModuleDestroy {
     nickname: string,
   ) {
     for (const session of this.activeCallSessions.values()) {
-      if (session.room === roomPasscode && session.state === 'active') {
+      if (
+        (session.room || '').trim().toLowerCase() ===
+          (roomPasscode || '').trim().toLowerCase() &&
+        session.state === 'active'
+      ) {
         let reconnected = false;
         let peerId: string | undefined;
 
-        if (session.callerNickname === nickname) {
+        const cleanNick = (nickname || '').trim().toLowerCase();
+        if ((session.callerNickname || '').trim().toLowerCase() === cleanNick) {
           session.callerSocketId = client.id;
           peerId = session.calleeSocketId;
           reconnected = true;
-        } else if (session.calleeNickname === nickname) {
+        } else if (
+          (session.calleeNickname || '').trim().toLowerCase() === cleanNick
+        ) {
           session.calleeSocketId = client.id;
           peerId = session.callerSocketId;
           reconnected = true;

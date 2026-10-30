@@ -435,7 +435,7 @@ export class InstagramService {
           ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(videoUrl)}`
           : undefined,
         proxyThumbnailUrl: thumbnailUrl
-          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(thumbnailUrl)}`
+          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(String(thumbnailUrl))}`
           : undefined,
         caption,
         author: {
@@ -487,7 +487,7 @@ export class InstagramService {
         isVideo: true,
         thumbnailUrl,
         proxyThumbnailUrl: thumbnailUrl
-          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(thumbnailUrl)}`
+          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(String(thumbnailUrl))}`
           : undefined,
         caption: data.title,
         author: {
@@ -627,7 +627,7 @@ export class InstagramService {
           /<Representation[^>]*mimeType=["']audio\/mp4["'][^>]*>[\s\S]*?<BaseURL>([^<]+)<\/BaseURL>/i,
         );
       if (audioAdaptationMatch && audioAdaptationMatch[1]) {
-        audioUrl = this.decodeHtmlEntities(audioAdaptationMatch[1]);
+        audioUrl = this.decodeHtmlEntities(String(audioAdaptationMatch[1]));
       }
     }
 
@@ -647,10 +647,10 @@ export class InstagramService {
       videoUrl,
       thumbnailUrl,
       proxyVideoUrl: videoUrl
-        ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(videoUrl)}`
+        ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(String(videoUrl))}`
         : undefined,
       proxyThumbnailUrl: thumbnailUrl
-        ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(thumbnailUrl)}`
+        ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(String(thumbnailUrl))}`
         : undefined,
       caption,
       author: {
@@ -658,7 +658,7 @@ export class InstagramService {
         fullName,
         profilePicUrl,
         proxyProfilePicUrl: profilePicUrl
-          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(profilePicUrl)}`
+          ? `${prefix}/api/instagram/proxy-media?url=${encodeURIComponent(String(profilePicUrl))}`
           : undefined,
       },
       metrics: {
@@ -702,7 +702,9 @@ export class InstagramService {
   ): void {
     if (redirectCount > 3) {
       if (!res.headersSent) {
-        res.status(502).json({ error: 'Too many redirects from upstream media server' });
+        res
+          .status(502)
+          .json({ error: 'Too many redirects from upstream media server' });
       }
       return;
     }
@@ -769,7 +771,9 @@ export class InstagramService {
             ).href;
           } catch {
             if (!res.headersSent) {
-              res.status(502).json({ error: 'Invalid redirect location from upstream' });
+              res
+                .status(502)
+                .json({ error: 'Invalid redirect location from upstream' });
             }
             return;
           }

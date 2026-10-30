@@ -284,13 +284,31 @@ export class RoomModerationService {
     ) => Array<{ socketId: string; nickname: string }>,
     clearUserDisconnectDebounceTimer: (key: string) => void,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({
@@ -303,7 +321,10 @@ export class RoomModerationService {
       };
     }
 
-    if (data.targetNickname.trim() === session.nickname.trim()) {
+    if (
+      data.targetNickname.trim().toLowerCase() ===
+      session.nickname.trim().toLowerCase()
+    ) {
       return { success: false, message: 'Cannot kick yourself' };
     }
 
@@ -396,13 +417,31 @@ export class RoomModerationService {
     ) => Array<{ socketId: string; nickname: string }>,
     clearUserDisconnectDebounceTimer: (key: string) => void,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({
@@ -415,7 +454,10 @@ export class RoomModerationService {
       };
     }
 
-    if (data.targetNickname.trim() === session.nickname.trim()) {
+    if (
+      data.targetNickname.trim().toLowerCase() ===
+      session.nickname.trim().toLowerCase()
+    ) {
       return { success: false, message: 'Cannot ban yourself' };
     }
 
@@ -504,13 +546,31 @@ export class RoomModerationService {
     },
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({
@@ -560,13 +620,31 @@ export class RoomModerationService {
     },
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({
@@ -643,13 +721,31 @@ export class RoomModerationService {
       excludeSocketId?: string,
     ) => Array<{ socketId: string; nickname: string }>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({
@@ -734,13 +830,20 @@ export class RoomModerationService {
     },
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const creatorUser = await this.userRepo.findOne({
@@ -774,7 +877,7 @@ export class RoomModerationService {
     await this.userRepo.save(creatorUser);
 
     for (const [, user] of usersMap.entries()) {
-      if (user.passcode === data.passcode.trim()) {
+      if (user.passcode.toLowerCase() === reqPass) {
         if (
           currentHost &&
           user.nickname.toLowerCase() === currentHost.nickname.toLowerCase()
@@ -789,13 +892,15 @@ export class RoomModerationService {
       }
     }
 
-    server.to(data.passcode.trim()).emit('hostChanged', {
+    const hostPayload = {
       newHostNickname: creatorUser.nickname,
       newHost: creatorUser.nickname,
       previousHostNickname: currentHost?.nickname || 'Previous Host',
       previousHost: currentHost?.nickname || 'Previous Host',
       reason: 'Original creator reclaimed room host privileges',
-    });
+    };
+    server.to(room.passcode).emit('hostChanged', hostPayload);
+    server.to(room.passcode.toLowerCase()).emit('hostChanged', hostPayload);
 
     await this.broadcastUsersList(server, room.passcode, room.id, usersMap);
     return { success: true };
@@ -811,13 +916,20 @@ export class RoomModerationService {
     },
     usersMap: Map<string, UserSession>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({
@@ -883,13 +995,31 @@ export class RoomModerationService {
       excludeSocketId?: string,
     ) => Array<{ socketId: string; nickname: string }>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const hostUser = await this.userRepo.findOne({

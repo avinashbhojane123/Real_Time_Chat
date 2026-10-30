@@ -98,8 +98,11 @@ export class WatchPartyService implements OnModuleDestroy {
       windowMs?: number,
     ) => boolean,
   ) {
-    const targetPasscode = (data.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
@@ -430,8 +433,11 @@ export class WatchPartyService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: GetWatchPartyDto,
   ) {
-    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
@@ -474,8 +480,11 @@ export class WatchPartyService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: WatchPartyReactionDto,
   ) {
-    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return;
     }
 
@@ -492,8 +501,11 @@ export class WatchPartyService implements OnModuleDestroy {
     session: UserSession | undefined,
     data: WatchPartyCommentDto,
   ) {
-    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return;
     }
 

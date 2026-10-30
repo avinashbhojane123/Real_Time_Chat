@@ -21,7 +21,11 @@ export class RateLimitGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
     // Use Express req.ip (secured via app.set('trust proxy', 1))
-    const clientIp = (req.ip || req.socket?.remoteAddress || 'unknown-ip').trim();
+    const clientIp = (
+      req.ip ||
+      req.socket?.remoteAddress ||
+      'unknown-ip'
+    ).trim();
     const route = req.baseUrl || req.path || '';
     const key = `${clientIp}:${route}`;
     const now = Date.now();

@@ -19,7 +19,10 @@ const uploadDir = join(process.cwd(), uploadFolder);
 
 // Asynchronously ensure upload directory exists
 void fs.promises.mkdir(uploadDir, { recursive: true }).catch((err) => {
-  console.error('[UploadController] Failed to initialize upload directory:', err);
+  console.error(
+    '[UploadController] Failed to initialize upload directory:',
+    err,
+  );
 });
 
 const maxFileSizeMB = Number(process.env.MAX_FILE_SIZE_MB || 100);
@@ -95,7 +98,10 @@ const allowedExtensions = new Set([
 /**
  * Validates known binary file signatures (magic bytes) to prevent disguised executables.
  */
-async function isValidFileSignature(filePath: string, ext: string): Promise<boolean> {
+async function isValidFileSignature(
+  filePath: string,
+  ext: string,
+): Promise<boolean> {
   let fileHandle: fs.promises.FileHandle | null = null;
   try {
     fileHandle = await fs.promises.open(filePath, 'r');
@@ -120,14 +126,21 @@ async function isValidFileSignature(filePath: string, ext: string): Promise<bool
     }
     // WEBP (RIFF....WEBP)
     if (ext === '.webp') {
-      return hex.startsWith('52494646') && buffer.toString('ascii', 8, 12) === 'WEBP';
+      return (
+        hex.startsWith('52494646') && buffer.toString('ascii', 8, 12) === 'WEBP'
+      );
     }
     // PDF (%PDF)
     if (ext === '.pdf') {
       return hex.startsWith('25504446');
     }
     // ZIP / Office OpenXML (PK..)
-    if (ext === '.zip' || ext === '.docx' || ext === '.xlsx' || ext === '.pptx') {
+    if (
+      ext === '.zip' ||
+      ext === '.docx' ||
+      ext === '.xlsx' ||
+      ext === '.pptx'
+    ) {
       return hex.startsWith('504b0304') || hex.startsWith('504b0506');
     }
     // MP4 / MOV (ftyp)
@@ -217,7 +230,9 @@ export class UploadController {
     if (!isSignatureValid) {
       // Remove fraudulent file asynchronously
       await fs.promises.unlink(file.path).catch(() => {});
-      throw new BadRequestException('File contents do not match the declared file extension');
+      throw new BadRequestException(
+        'File contents do not match the declared file extension',
+      );
     }
 
     const uploadPrefix = process.env.UPLOAD_PREFIX || '/uploads/';

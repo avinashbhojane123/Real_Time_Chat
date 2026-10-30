@@ -117,14 +117,20 @@ export class WallpaperService {
     session: UserSession | undefined,
     data: UpdateRoomWallpaperDto,
   ) {
-    const targetPasscode = (data.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: targetPasscode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPasscode,
+      })
+      .getOne();
     if (!room) {
       return { success: false, message: 'Room not found' };
     }

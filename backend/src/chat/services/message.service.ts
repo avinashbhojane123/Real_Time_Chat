@@ -58,7 +58,9 @@ export class MessageService {
     data: SendMessageDto,
     findRoomByPasscode: (passcode: string) => Promise<Room | null>,
   ) {
-    const reqPass = (data?.passcode || session?.passcode || '').trim().toLowerCase();
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
     const sessionPass = (session?.passcode || '').trim().toLowerCase();
     if (!session || !reqPass || sessionPass !== reqPass) {
       client.emit('error', {
@@ -136,7 +138,7 @@ export class MessageService {
     const savedMessage = this.messageRepo.create({
       roomId: room.id,
       nickname: session.nickname,
-      message: data.message,
+      message: data.message ?? '',
       replyTo: data.replyTo,
       fileUrl: data.fileUrl ?? null,
       fileName: data.fileName ?? null,
@@ -191,8 +193,6 @@ export class MessageService {
       .to(dataPasscode.toLowerCase())
       .emit('newMessage', messagePayload);
 
-
-
     return {
       success: true,
       messageId: savedMessage.id,
@@ -218,13 +218,31 @@ export class MessageService {
       excludeSocketId?: string,
     ) => Array<{ socketId: string; nickname: string }>,
   ) {
-    if (!session || session.passcode.trim() !== data.passcode?.trim()) {
+    const reqPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !reqPass || sessionPass !== reqPass) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: data.passcode.trim() },
-    });
+    if (
+      !data?.targetNickname ||
+      typeof data.targetNickname !== 'string' ||
+      !data.targetNickname.trim()
+    ) {
+      return {
+        success: false,
+        message: 'Invalid target participant specified',
+      };
+    }
+
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: reqPass,
+      })
+      .getOne();
     if (!room) {
       return { success: false, message: 'Room not found' };
     }
@@ -348,14 +366,24 @@ export class MessageService {
     session: UserSession | undefined,
     payload: MarkReadDto,
   ) {
-    if (!payload || !payload.messageIds || !payload.messageIds.length) {
+    if (
+      !payload ||
+      !payload.messageIds ||
+      !Array.isArray(payload.messageIds) ||
+      !payload.messageIds.length
+    ) {
       return { success: false };
     }
     const reader = payload.nickname || session?.nickname;
     if (!reader) return { success: false };
 
+    const validIds = payload.messageIds
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (validIds.length === 0) return { success: false };
+
     const messages = await this.messageRepo.find({
-      where: payload.messageIds.map((id) => ({ id })),
+      where: validIds.map((id) => ({ id })),
     });
 
     const updatedMessages: Message[] = [];
@@ -364,7 +392,9 @@ export class MessageService {
       const currentReadBy = Array.isArray(msg.readBy)
         ? msg.readBy
         : [msg.nickname];
-      const alreadyRead = currentReadBy.some((r) => r.trim().toLowerCase() === reader.toLowerCase());
+      const alreadyRead = currentReadBy.some(
+        (r) => r.trim().toLowerCase() === reader.toLowerCase(),
+      );
       if (!alreadyRead) {
         msg.readBy = [...currentReadBy, reader];
         updatedMessages.push(msg);
@@ -392,18 +422,20 @@ export class MessageService {
     session: UserSession | undefined,
     payload: VotePollDto,
   ) {
-    const targetPasscode = (
-      payload?.passcode ||
-      session?.passcode ||
-      ''
-    ).trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (payload?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: targetPasscode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPasscode,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const voterUser = await this.userRepo
@@ -530,11 +562,18 @@ export class MessageService {
     session: UserSession | undefined,
     data: EditMessageDto,
   ) {
-    if (!session || session.passcode !== data.passcode) return;
+    const targetPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPass || sessionPass !== targetPass) return;
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: session.passcode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPass,
+      })
+      .getOne();
     if (!room) return;
 
     const msg = await this.messageRepo.findOne({
@@ -542,7 +581,10 @@ export class MessageService {
     });
     if (!msg) return;
 
-    if (msg.nickname !== session.nickname) {
+    if (
+      msg.nickname.trim().toLowerCase() !==
+      session.nickname.trim().toLowerCase()
+    ) {
       return; // Unauthorized edit attempt!
     }
 
@@ -564,8 +606,14 @@ export class MessageService {
       isEdited: true,
     };
 
-    server.to(data.passcode).emit('messageEdited', updatedPayload);
-    server.to(data.passcode).emit('messageUpdated', updatedPayload);
+    server
+      .to(room.passcode)
+      .to(room.passcode.toLowerCase())
+      .emit('messageEdited', updatedPayload);
+    server
+      .to(room.passcode)
+      .to(room.passcode.toLowerCase())
+      .emit('messageUpdated', updatedPayload);
   }
 
   async deleteMessage(
@@ -574,11 +622,18 @@ export class MessageService {
     session: UserSession | undefined,
     data: DeleteMessageDto,
   ) {
-    if (!session || session.passcode !== data.passcode) return;
+    const targetPass = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPass || sessionPass !== targetPass) return;
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: session.passcode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPass,
+      })
+      .getOne();
     if (!room) return;
 
     const msg = await this.messageRepo.findOne({
@@ -586,7 +641,10 @@ export class MessageService {
     });
     if (!msg) return;
 
-    if (msg.nickname !== session.nickname) {
+    if (
+      msg.nickname.trim().toLowerCase() !==
+      session.nickname.trim().toLowerCase()
+    ) {
       return; // Unauthorized delete attempt!
     }
 
@@ -606,12 +664,18 @@ export class MessageService {
     if (room.pinnedMessageId === msg.id) {
       room.pinnedMessageId = null;
       await this.roomRepo.save(room);
-      server.to(data.passcode).emit('pinnedMessageUpdated', null);
+      server
+        .to(room.passcode)
+        .to(room.passcode.toLowerCase())
+        .emit('pinnedMessageUpdated', null);
     }
 
-    server.to(data.passcode).emit('messageDeleted', {
-      messageId: msg.id,
-    });
+    server
+      .to(room.passcode)
+      .to(room.passcode.toLowerCase())
+      .emit('messageDeleted', {
+        messageId: msg.id,
+      });
   }
 
   async clearHistory(
@@ -620,14 +684,20 @@ export class MessageService {
     session: UserSession | undefined,
     data: ClearHistoryDto,
   ) {
-    const targetPasscode = (data?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: targetPasscode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPasscode,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const user = await this.userRepo.findOne({
@@ -661,8 +731,14 @@ export class MessageService {
       `[ClearHistory] Room ${targetPasscode} history cleared by ${user.role} ${session.nickname}`,
     );
 
-    server.to(targetPasscode).emit('historyCleared');
-    server.to(targetPasscode).emit('pinnedMessageUpdated', null);
+    server
+      .to(room.passcode)
+      .to(room.passcode.toLowerCase())
+      .emit('historyCleared');
+    server
+      .to(room.passcode)
+      .to(room.passcode.toLowerCase())
+      .emit('pinnedMessageUpdated', null);
     return { success: true };
   }
 
@@ -672,14 +748,20 @@ export class MessageService {
     session: UserSession | undefined,
     data: PinMessageDto,
   ) {
-    const targetPasscode = (data?.passcode || session?.passcode || '').trim();
-    if (!session || !targetPasscode || session.passcode !== targetPasscode) {
+    const targetPasscode = (data?.passcode || session?.passcode || '')
+      .trim()
+      .toLowerCase();
+    const sessionPass = (session?.passcode || '').trim().toLowerCase();
+    if (!session || !targetPasscode || sessionPass !== targetPasscode) {
       return { success: false, message: 'Unauthorized session' };
     }
 
-    const room = await this.roomRepo.findOne({
-      where: { passcode: targetPasscode },
-    });
+    const room = await this.roomRepo
+      .createQueryBuilder('room')
+      .where('LOWER(TRIM(room.passcode)) = LOWER(TRIM(:passcode))', {
+        passcode: targetPasscode,
+      })
+      .getOne();
     if (!room) return { success: false, message: 'Room not found' };
 
     const user = await this.userRepo.findOne({
@@ -710,7 +792,10 @@ export class MessageService {
 
     await this.roomRepo.save(room);
 
-    server.to(targetPasscode).emit('pinnedMessageUpdated', pinnedMsg);
+    server
+      .to(room.passcode)
+      .to(room.passcode.toLowerCase())
+      .emit('pinnedMessageUpdated', pinnedMsg);
     return { success: true, pinnedMessage: pinnedMsg };
   }
 
